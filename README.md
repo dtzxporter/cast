@@ -43,7 +43,7 @@ enum class CastId : uint32_t
 	Skeleton = 0x6C656B73,
 	Bone = 0x656E6F62,
 	Animation = 0x6D696E61,
-    Material = 0x6C74616D,
+	Material = 0x6C74616D,
 };
 ```
 
