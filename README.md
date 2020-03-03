@@ -2,7 +2,19 @@
 
 The goal of cast is to create an engine agnostic format that can be parsed and written with ease. In addition, cast should have very similar output on any engine.
 
-<TODO: Cast logo>
+<p align="center">
+	<img src="images/cast-icon-md.png" alt="SEAnim"/>
+</p>
+
+## 3D Engine Plugins:
+- Autodesk Maya: (COMING SOON)
+- Blender: (COMING SOON)
+- 3DS Max: (COMING SOON)
+
+# Programming libraries:
+- .NET Framework: (COMING SOON)
+- Python: (COMING SOON)
+- C++: (COMMING SOON)
 
 ## File stucture:
 All files start with a cast header:
@@ -86,3 +98,8 @@ To read a cast file, you just need to traverse the root nodes and their children
 Cast ids are integers for performance, unlike FBX where nodes are full strings.
 
 ## Cast processors : TODO Define all processors and data required.
+
+<br>
+
+- Format designed by DTZxPorter with input from various developers.
+- Icons by Smashicons
