@@ -59,7 +59,7 @@ class CastProperty(object):
     def load(self, file):
         header = struct.unpack("2sHI", file.read(0x8))
 
-        self.name = struct.unpack(("%ds" % header[1]), file.read(header[1]))
+        self.name = struct.unpack(("%ds" % header[1]), file.read(header[1]))[0]
         self.type = CastProperty_t(header[0].strip("\0"))
 
         if (self.type.size == 0 and self.type.fmt == "s"):
@@ -71,27 +71,215 @@ class CastProperty(object):
 
 
 class CastNode(object):
-    __slots__ = ("identifier", "childNodes", "properties")
+    __slots__ = ("identifier", "hash", "childNodes", "properties")
 
-    def __init__(self, file=None):
+    def __init__(self):
         self.childNodes = []
-        self.properties = []
+        self.properties = {}
         self.identifier = 0
+        self.hash = 0
 
-        if file is not None:
-            self.load(file)
+    def ChildrenOfType(self, pType):
+        return [x for x in self.childNodes if x.__class__ is pType]
 
-    def load(self, file):
+    def ChildByHash(self, hash):
+        find = [x for x in self.childNodes if x.hash == hash]
+        if len(find) > 0:
+            return find[0]
+        return None
+
+    @staticmethod
+    def load(file):
         header = struct.unpack("IIQII", file.read(0x18))
 
-        self.identifier = header[0]
-        self.properties = [None] * header[3]
-        self.childNodes = [None] * header[4]
+        if header[0] in typeSwitcher:
+            node = typeSwitcher[header[0]]()
+        else:
+            node = typeSwitcher[None]()
+
+        node.identifier = header[0]
+        node.childNodes = [None] * header[4]
+        node.hash = header[2]
 
         for i in range(header[3]):
-            self.properties[i] = CastProperty(file)
+            prop = CastProperty(file)
+            node.properties[prop.name] = prop
         for i in range(header[4]):
-            self.childNodes[i] = CastNode(file)
+            node.childNodes[i] = CastNode.load(file)
+
+        return node
+
+
+class Model(CastNode):
+    def __init__(self):
+        super(Model, self).__init__()
+
+    def Skeleton(self):
+        find = self.ChildrenOfType(Skeleton)
+        if len(find) > 0:
+            return find[0]
+        return None
+
+    def Meshes(self):
+        return self.ChildrenOfType(Mesh)
+
+    def Materials(self):
+        return self.ChildrenOfType(Material)
+
+
+class Mesh(CastNode):
+    def __init__(self):
+        super(Mesh, self).__init__()
+
+    def VertexCount(self):
+        vp = self.properties.get("vp")
+        if vp is not None:
+            return len(vp.values) / 3
+
+    def FaceCount(self):
+        f = self.properties.get("f")
+        if f is not None:
+            return len(f.values) / 3
+
+    def UVLayerCount(self):
+        uc = self.properties.get("ul")
+        if uc is not None:
+            return uc.values[0]
+        return 0
+
+    def MaximumWeightInfluence(self):
+        mi = self.properties.get("mi")
+        if mi is not None:
+            return mi.values[0]
+        return 0
+
+    def FaceBuffer(self):
+        f = self.properties.get("f")
+        if f is not None:
+            return f.values
+        return None
+
+    def VertexPositionBuffer(self):
+        vp = self.properties.get("vp")
+        if vp is not None:
+            return vp.values
+        return None
+
+    def VertexNormalBuffer(self):
+        vn = self.properties.get("vn")
+        if vn is not None:
+            return vn.values
+        return None
+
+    def VertexColorBuffer(self):
+        vc = self.properties.get("vc")
+        if vc is not None:
+            return vc.values
+        return None
+
+    def VertexUVLayerBuffer(self, index):
+        ul = self.properties.get("u%d" % index)
+        if ul is not None:
+            return ul.values
+        return None
+
+    def VertexWeightBoneBuffer(self):
+        wb = self.properties.get("wb")
+        if wb is not None:
+            return wb.values
+        return None
+
+    def VertexWeightValueBuffer(self):
+        wv = self.properties.get("wv")
+        if wv is not None:
+            return wv.values
+        return None
+
+    def Material(self):
+        m = self.properties.get("m")
+        if m is not None:
+            return self.ChildByHash(m.values[0])
+        return None
+
+
+class Skeleton(CastNode):
+    def __init__(self):
+        super(Skeleton, self).__init__()
+
+    def Bones(self):
+        return self.ChildrenOfType(Bone)
+
+
+class Bone(CastNode):
+    def __init__(self):
+        super(Bone, self).__init__()
+
+    def Name(self):
+        name = self.properties.get("n")
+        if name is not None:
+            return name.values[0]
+        return None
+
+    def ParentIndex(self):
+        parent = self.properties.get("p")
+        if parent is not None:
+            # Since cast uses unsigned types, we must
+            # convert to a signed integer, as the range is -1 - INT32_MAX
+            parentUnsigned = parent.values[0]
+            parentUnsigned = parentUnsigned & 0xffffffff
+            return (parentUnsigned ^ 0x80000000) - 0x80000000
+        return -1
+
+    def LocalPosition(self):
+        localPos = self.properties.get("lp")
+        if localPos is not None:
+            return localPos.values
+        return None
+
+    def LocalRotation(self):
+        localRot = self.properties.get("lr")
+        if localRot is not None:
+            return localRot.values
+        return None
+
+    def WorldPosition(self):
+        worldPos = self.properties.get("wp")
+        if worldPos is not None:
+            return worldPos.values
+        return None
+
+    def WorldRotation(self):
+        worldRot = self.properties.get("wr")
+        if worldRot is not None:
+            return worldRot.values
+        return None
+
+    def Scale(self):
+        scale = self.properties.get("s")
+        if scale is not None:
+            return scale.values
+        return None
+
+
+class Material(CastNode):
+    def __init__(self):
+        super(Material, self).__init__()
+
+    def Name(self):
+        name = self.properties.get("n")
+        if name is not None:
+            return name.values[0]
+        return None
+
+
+typeSwitcher = {
+    None: CastNode,
+    0x6C646F6D: Model,
+    0x6873656D: Mesh,
+    0x6C656B73: Skeleton,
+    0x656E6F62: Bone,
+    0x6C74616D: Material
+}
 
 
 class Cast(object):
@@ -114,4 +302,7 @@ class Cast(object):
 
         self.rootNodes = [None] * header[2]
         for i in range(header[2]):
-            self.rootNodes[i] = CastNode(file)
+            self.rootNodes[i] = CastNode.load(file)
+
+    def Roots(self):
+        return [x for x in self.rootNodes]
