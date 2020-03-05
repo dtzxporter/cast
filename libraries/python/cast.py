@@ -273,6 +273,21 @@ class Material(CastNode):
             return name.values[0]
         return None
 
+    def Type(self):
+        tp = self.properties.get("t")
+        if tp is not None:
+            return tp.values[0]
+        return None
+
+class File(CastNode):
+    def __init__(self):
+        super(File, self).__init__()
+
+    def Path(self):
+        path = self.properties.get("p")
+        if path is not None:
+            return path.values[0]
+        return None
 
 typeSwitcher = {
     None: CastNode,
@@ -280,7 +295,8 @@ typeSwitcher = {
     0x6873656D: Mesh,
     0x6C656B73: Skeleton,
     0x656E6F62: Bone,
-    0x6C74616D: Material
+    0x6C74616D: Material,
+    0x656C6966: File
 }
 
 

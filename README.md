@@ -56,6 +56,7 @@ enum class CastId : uint32_t
 	Bone = 0x656E6F62,
 	Animation = 0x6D696E61,
 	Material = 0x6C74616D,
+	File = 0x656C6966,
 };
 ```
 
@@ -132,7 +133,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	<tr>
   		<td>Children</td>
    		<td>None</td>
-		<td>False</td>
+		<td>True</td>
 		<td>False</td>
  	</tr>
 	 <tr>
@@ -208,6 +209,184 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
    		<td>Integer 32 (i), Short (h), Byte (b)</td>
 		<td>False</td>
 		<td>True if has weights else False</td>
+ 	</tr>
+	 <tr>
+  		<td>Material (Hash of CastNode:Material) (m)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+### Skeleton:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>Bone</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Model</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+### Bone:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Skeleton</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent Index (p)</td>
+   		<td>Integer 32 (i)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Local Position (lp)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Local Rotation (lr)</td>
+   		<td>Vector 4 (v4)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	  <tr>
+  		<td>World Position (wp)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>World Rotation (wr)</td>
+   		<td>Vector 4 (v4)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Scale (s)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+### Material:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>File</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Model</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Type (t)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+### File:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>CastNode</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Path (p)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
  	</tr>
 </table>
 
