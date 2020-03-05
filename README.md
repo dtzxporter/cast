@@ -97,7 +97,119 @@ To read a cast file, you just need to traverse the root nodes and their children
 
 Cast ids are integers for performance, unlike FBX where nodes are full strings.
 
-## Cast processors : TODO Define all processors and data required.
+## Cast processors:
+
+### Model:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>Skeleton, Mesh, Material</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Root</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+### Mesh:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Model</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Vertex Position Buffer (vp)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Vertex Normal Buffer (vn)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Vertex Tangent Buffer (vt)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Vertex Color Buffer (vc)</td>
+   		<td>Integer 32 (i)</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	  <tr>
+  		<td>Vertex UV Buffer (u%d)</td>
+   		<td>Vector 2 (v2)</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Vertex Weight Bone Buffer (wb)</td>
+   		<td>Integer 32 (i), Short (h), Byte (b)</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Vertex Weight Value Buffer (wv)</td>
+   		<td>Float (f)</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	  <tr>
+  		<td>Face Buffer (f)</td>
+   		<td>Integer 32 (i), Short (h), Byte (b)</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>UV Layer Count (ul)</td>
+   		<td>Integer 32 (i), Short (h), Byte (b)</td>
+		<td>False</td>
+		<td>True if has uv layers else False</td>
+ 	</tr>
+	 <tr>
+  		<td>Maximum Weight Influence (mi)</td>
+   		<td>Integer 32 (i), Short (h), Byte (b)</td>
+		<td>False</td>
+		<td>True if has weights else False</td>
+ 	</tr>
+</table>
 
 <br>
 
