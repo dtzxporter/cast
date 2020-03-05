@@ -12,6 +12,25 @@ if xrange is None:
     xrange = range
 
 
+def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1):
+    skinParams = [x for x in bones]
+    skinParams.append(newMesh.fullPathName())
+
+    try:
+        newSkin = cmds.skinCluster(
+            *skinParams, tsb=True, mi=maxWeightInfluence, nw=False)
+    except RuntimeError:
+        return None
+
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(newSkin[0])
+
+    clusterObject = OpenMaya.MObject()
+    selectList.getDependNode(0, clusterObject)
+
+    return OpenMayaAnim.MFnSkinCluster(clusterObject)
+
+
 def importSkeletonNode(skeleton):
     if skeleton is None:
         return (None, None)
@@ -139,6 +158,86 @@ def importModelNode(model, path):
             scriptUtil.asFloat4Ptr(), len(vertexColors))
 
         newMesh.setVertexColors(vertexColorBuffer, vertexIndexBuffer)
+
+        uvLayerCount = mesh.UVLayerCount()
+
+        scriptUtil = OpenMaya.MScriptUtil()
+        scriptUtil.createFromList([x for x in xrange(len(faces))], len(faces))
+
+        faceIndexBuffer = OpenMaya.MIntArray(
+            scriptUtil.asIntPtr(), len(faces))
+
+        # Set a material, or default
+        meshMaterial = mesh.Material()
+        try:
+            if meshMaterial is not None:
+                cmds.sets(newMesh.fullPathName(), forceElement=(
+                    "%sSG" % meshMaterial.Name()))
+            else:
+                cmds.sets(newMesh.fullPathName(),
+                          forceElement="initialShadingGroup")
+        except RuntimeError:
+            pass
+
+        for i in xrange(uvLayerCount):
+            uvLayer = mesh.VertexUVLayerBuffer(i)
+            scriptUtil = OpenMaya.MScriptUtil()
+            scriptUtil.createFromList([y for xs in [uvLayer[faces[x] * 2:faces[x] * 2 + 1]
+                                                    for x in xrange(len(faces))] for y in xs], len(faces))
+
+            uvUBuffer = OpenMaya.MFloatArray(
+                scriptUtil.asFloatPtr(), len(faces))
+
+            scriptUtil = OpenMaya.MScriptUtil()
+            scriptUtil.createFromList([y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
+                                                    for x in xrange(len(faces))] for y in xs], len(faces))
+
+            uvVBuffer = OpenMaya.MFloatArray(
+                scriptUtil.asFloatPtr(), len(faces))
+
+            if i > 0:
+                newUVName = newMesh.createUVSetWithName(
+                    ("map%d" % (i + 1)))
+            else:
+                newUVName = newMesh.currentUVSetName()
+
+            newMesh.setCurrentUVSetName(newUVName)
+            newMesh.setUVs(
+                uvUBuffer, uvVBuffer, newUVName)
+            newMesh.assignUVs(
+                faceCountBuffer, faceIndexBuffer, newUVName)
+
+        maximumInfluence = mesh.MaximumWeightInfluence()
+
+        if maximumInfluence > 0:
+            weightBoneBuffer = mesh.VertexWeightBoneBuffer()
+            weightValueBuffer = mesh.VertexWeightValueBuffer()
+            weightedBones = list({paths[x] for x in weightBoneBuffer})
+            weightedBonesCount = len(weightedBones)
+
+            skinCluster = utilityCreateSkinCluster(
+                newMesh, weightedBones, maximumInfluence)
+
+            weightedRemap = {paths.index(
+                x): i for i, x in enumerate(weightedBones)}
+
+            clusterAttrBase = skinCluster.name() + ".weightList[%d]"
+            clusterAttrArray = (".weights[0:%d]" % (weightedBonesCount - 1))
+
+            weightedValueBuffer = [0.0] * (weightedBonesCount)
+
+            for i in xrange(vertexCount):
+                if weightedBonesCount == 1:
+                    clusterAttrPayload = clusterAttrBase % i + ".weights[0]"
+                else:
+                    clusterAttrPayload = clusterAttrBase % i + clusterAttrArray
+
+                for j in xrange(maximumInfluence):
+                    weightedValueBuffer[weightedRemap[weightBoneBuffer[j + (
+                        i * maximumInfluence)]]] = weightValueBuffer[j + (i * maximumInfluence)]
+
+                cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
+                weightedValueBuffer = [0.0] * (weightedBonesCount)
 
 
 def importRootNode(node, path):

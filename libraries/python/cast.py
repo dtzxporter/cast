@@ -71,13 +71,14 @@ class CastProperty(object):
 
 
 class CastNode(object):
-    __slots__ = ("identifier", "hash", "childNodes", "properties")
+    __slots__ = ("identifier", "hash", "parentNode", "childNodes", "properties")
 
     def __init__(self):
         self.childNodes = []
         self.properties = {}
         self.identifier = 0
         self.hash = 0
+        self.parentNode = None
 
     def ChildrenOfType(self, pType):
         return [x for x in self.childNodes if x.__class__ is pType]
@@ -106,6 +107,7 @@ class CastNode(object):
             node.properties[prop.name] = prop
         for i in range(header[4]):
             node.childNodes[i] = CastNode.load(file)
+            node.childNodes[i].parentNode = node
 
         return node
 
@@ -198,7 +200,7 @@ class Mesh(CastNode):
     def Material(self):
         m = self.properties.get("m")
         if m is not None:
-            return self.ChildByHash(m.values[0])
+            return self.parentNode.ChildByHash(m.values[0])
         return None
 
 
