@@ -71,7 +71,8 @@ class CastProperty(object):
 
 
 class CastNode(object):
-    __slots__ = ("identifier", "hash", "parentNode", "childNodes", "properties")
+    __slots__ = ("identifier", "hash", "parentNode",
+                 "childNodes", "properties")
 
     def __init__(self):
         self.childNodes = []
@@ -279,6 +280,14 @@ class Material(CastNode):
             return tp.values[0]
         return None
 
+    def Slots(self):
+        slots = {}
+        for slot in self.properties:
+            if slot != "n" and slot != "t":
+                slots[slot] = self.ChildByHash(self.properties[slot].values[0])
+        return slots
+
+
 class File(CastNode):
     def __init__(self):
         super(File, self).__init__()
@@ -288,6 +297,7 @@ class File(CastNode):
         if path is not None:
             return path.values[0]
         return None
+
 
 typeSwitcher = {
     None: CastNode,

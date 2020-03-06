@@ -1,6 +1,6 @@
 import os
 import os.path
-from cast import Cast, Model, Mesh, Skeleton, Bone, Material
+from cast import Cast, Model, Mesh, Skeleton, Bone, Material, File
 import maya.mel as mel
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
@@ -29,6 +29,125 @@ def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1):
     selectList.getDependNode(0, clusterObject)
 
     return OpenMayaAnim.MFnSkinCluster(clusterObject)
+
+
+def utilityBuildPath(root, asset):
+    if os.path.isabs(asset):
+        return asset
+
+    root = os.path.dirname(root)
+    return os.path.join(root, asset)
+
+
+def utilityAssignStingrayPBSSlots(materialInstance, slots, path):
+    switcher = {
+        "albedo": "TEX_color_map",
+        "diffuse": "TEX_color_map",
+        "normal": "TEX_normal_map",
+        "metal": "TEX_metallic_map",
+        "roughness": "TEX_roughness_map",
+        "gloss": "TEX_roughness_map",
+        "emissive": "TEX_emissive_map",
+        "ao": "TEX_ao_map"
+    }
+    booleans = {
+        "albedo": "use_color_map",
+        "diffuse": "use_color_map",
+        "normal": "use_normal_map",
+        "metal": "use_metallic_map",
+        "roughness": "TEX_roughness_map",
+        "gloss": "use_roughness_map",
+        "emissive": "use_emissive_map",
+        "ao": "use_ao_map"
+    }
+
+    for slot in slots:
+        connection = slots[slot]
+        if not connection.__class__ is File:
+            continue
+
+        # Import the file by creating the node
+        fileNode = cmds.shadingNode("file", name=(
+            "%s_%s" % (materialInstance, slot)), asTexture=True)
+        cmds.setAttr(("%s.fileTextureName" % fileNode), utilityBuildPath(
+            path, connection.Path()), type="string")
+
+        texture2dNode = cmds.shadingNode("place2dTexture", name=(
+            "place2dTexture_%s_%s" % (materialInstance, slot)), asUtility=True)
+        cmds.connectAttr(("%s.outUV" % texture2dNode),
+                         ("%s.uvCoord" % fileNode))
+
+        mel.eval("shaderfx -sfxnode %s -update" % materialInstance)
+
+        # If we don't have a map for this material, skip to next one
+        if not switcher.has_key(slot):
+            continue
+
+        # We have a slot, lets connect it
+        cmds.connectAttr(("%s.outColor" % fileNode), ("%s.%s" %
+                                                      (materialInstance, switcher[slot])), force=True)
+        cmds.setAttr("%s.%s" % (materialInstance, booleans[slot]), 1)
+
+
+def utilityAssignGenericSlots(materialInstance, slots, path):
+    switcher = {
+        "albedo": "color",
+        "diffuse": "color",
+        "normal": "normalCamera",
+    }
+
+    for slot in slots:
+        connection = slots[slot]
+        if not connection.__class__ is File:
+            continue
+
+        # Import the file by creating the node
+        fileNode = cmds.shadingNode("file", name=(
+            "%s_%s" % (materialInstance, slot)), asTexture=True)
+        cmds.setAttr(("%s.fileTextureName" % fileNode), utilityBuildPath(
+            path, connection.Path()), type="string")
+
+        texture2dNode = cmds.shadingNode("place2dTexture", name=(
+            "place2dTexture_%s_%s" % (materialInstance, slot)), asUtility=True)
+        cmds.connectAttr(("%s.outUV" % texture2dNode),
+                         ("%s.uvCoord" % fileNode))
+
+        # If we don't have a map for this material, skip to next one
+        if not switcher.has_key(slot):
+            continue
+
+        # We have a slot, lets connect it
+        cmds.connectAttr(("%s.outColor" % fileNode), ("%s.%s" %
+                                                      (materialInstance, switcher[slot])), force=True)
+
+
+def utilityCreateMaterial(name, type, slots={}, path=""):
+    switcher = {
+        None: "lambert",
+        "lambert": "lambert",
+        "phong": "phong",
+        "pbr": "StingrayPBS"
+    }
+
+    loader = {
+        "lambert": utilityAssignGenericSlots,
+        "phong": utilityAssignGenericSlots,
+        "StingrayPBS": utilityAssignStingrayPBSSlots
+    }
+
+    if not switcher.has_key(type):
+        type = None
+
+    mayaShaderType = switcher[type]
+    if cmds.getClassification(mayaShaderType) == [u'']:
+        mayaShaderType = switcher[None]
+
+    materialInstance = cmds.shadingNode(
+        mayaShaderType, asShader=True, name=name)
+
+    loader[mayaShaderType](materialInstance, slots, path)
+
+    return (materialInstance)
 
 
 def importSkeletonNode(skeleton):
@@ -76,13 +195,16 @@ def importSkeletonNode(skeleton):
     return (handles, paths)
 
 
-def importMaterialNode(material):
+def importMaterialNode(path, material):
     # If you already created the material, ignore this
     if cmds.objExists(material.Name()):
         return material.Name()
 
-    materialNew = cmds.shadingNode(
-        "lambert", asShader=True, name=material.Name())
+    # Create the material and assign slots
+    (materialNew) = utilityCreateMaterial(
+        material.Name(), material.Type(), material.Slots(), path)
+
+    # Create the shader group that connects to a surface
     materialGroup = cmds.sets(
         renderable=True, empty=True, name=("%sSG" % materialNew))
 
@@ -90,14 +212,13 @@ def importMaterialNode(material):
     cmds.connectAttr(("%s.outColor" % materialNew),
                      ("%s.surfaceShader" % materialGroup), force=True)
 
-    # TODO: Convert dynamic texture slots to shader mapping
     return material.Name()
 
 
 def importModelNode(model, path):
     # Import skeleton for binds, materials for meshes
     (handles, paths) = importSkeletonNode(model.Skeleton())
-    materials = [importMaterialNode(x) for x in model.Materials()]
+    materials = [importMaterialNode(path, x) for x in model.Materials()]
 
     # Import the meshes
     meshTransform = OpenMaya.MFnTransform()
@@ -189,8 +310,8 @@ def importModelNode(model, path):
                 scriptUtil.asFloatPtr(), len(faces))
 
             scriptUtil = OpenMaya.MScriptUtil()
-            scriptUtil.createFromList([y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
-                                                    for x in xrange(len(faces))] for y in xs], len(faces))
+            scriptUtil.createFromList([1 - y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
+                                                        for x in xrange(len(faces))] for y in xs], len(faces))
 
             uvVBuffer = OpenMaya.MFloatArray(
                 scriptUtil.asFloatPtr(), len(faces))
@@ -229,12 +350,12 @@ def importModelNode(model, path):
             for i in xrange(vertexCount):
                 if weightedBonesCount == 1:
                     clusterAttrPayload = clusterAttrBase % i + ".weights[0]"
+                    weightedValueBuffer[0] = 1.0
                 else:
                     clusterAttrPayload = clusterAttrBase % i + clusterAttrArray
-
-                for j in xrange(maximumInfluence):
-                    weightedValueBuffer[weightedRemap[weightBoneBuffer[j + (
-                        i * maximumInfluence)]]] = weightValueBuffer[j + (i * maximumInfluence)]
+                    for j in xrange(maximumInfluence):
+                        weightedValueBuffer[weightedRemap[weightBoneBuffer[j + (
+                            i * maximumInfluence)]]] = weightValueBuffer[j + (i * maximumInfluence)]
 
                 cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
                 weightedValueBuffer = [0.0] * (weightedBonesCount)

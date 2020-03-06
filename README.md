@@ -55,6 +55,7 @@ enum class CastId : uint32_t
 	Skeleton = 0x6C656B73,
 	Bone = 0x656E6F62,
 	Animation = 0x6D696E61,
+	Curve = 0x76727563,
 	Material = 0x6C74616D,
 	File = 0x656C6966,
 };
@@ -349,6 +350,66 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 	 <tr>
   		<td>Type (t)</td>
    		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	  <tr>
+  		<td>Albedo File Hash (albedo)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Diffuse File Hash (diffuse)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Normal File Hash (normal)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Specular File Hash (specular)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Emissive File Hash (emissive)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Gloss File Hash (gloss)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Roughness File Hash (roughness)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Ambient Occlusion File Hash (ao)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Cavity File Hash (cavity)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Extra (x) File Hash (extra%d)</td>
+   		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
