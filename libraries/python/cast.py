@@ -381,6 +381,8 @@ typeSwitcher = {
     0x6C646F6D: Model,
     0x6873656D: Mesh,
     0x6C656B73: Skeleton,
+    0x6D696E61: Animation,
+    0x76727563: Curve,
     0x656E6F62: Bone,
     0x6C74616D: Material,
     0x656C6966: File
