@@ -129,6 +129,77 @@ class Model(CastNode):
     def Materials(self):
         return self.ChildrenOfType(Material)
 
+class Animation(CastNode):
+    def __init__(self):
+        super(Animation, self).__init__()
+
+    def Skeleton(self):
+        find = self.ChildrenOfType(Skeleton)
+        if len(find) > 0:
+            return find[0]
+        return None
+
+    def Curves(self):
+        return self.ChildrenOfType(Curve)
+
+    def RotationInterpolation(self):
+        ri = self.properties.get("ri")
+        if ri is not None:
+            return ri.values[0]
+        return "quaternion"
+
+    def Framerate(self):
+        fr = self.properties.get("fr")
+        if fr is not None:
+            return fr.values[0]
+        return None
+
+    def Looping(self):
+        lo = self.properties.get("lo")
+        if lo is not None:
+            return lo.values[0] == 1
+        return False
+
+    def TransformSpace(self):
+        ts = self.properties.get("ts")
+        if ts is not None:
+            return ts.values[0]
+        return "local"
+
+class Curve(CastNode):
+    def __init__(self):
+        super(Curve, self).__init__()
+
+    def NodeName(self):
+        nn = self.properties.get("nn")
+        if nn is not None:
+            return nn.values[0]
+        return None
+    
+    def KeyPropertyName(self):
+        kp = self.properties.get("kp")
+        if kp is not None:
+            return kp.values[0]
+        return None
+
+    def KeyFrameBuffer(self):
+        kb = self.properties.get("kb")
+        if kb is not None:
+            return kb.values
+        return None
+
+    def KeyValueBuffer(self):
+        kv = self.properties.get("kv")
+        if kv is not None:
+            return kv.values
+        return None
+
+    def Mode(self):
+        m = self.properties.get("m")
+        if m is not None:
+            return m.values[0]
+        return None
+
 
 class Mesh(CastNode):
     def __init__(self):
