@@ -282,6 +282,12 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<td>False</td>
  	</tr>
 	 <tr>
+  		<td>Segment Scale Compensate (ssc)</td>
+   		<td>Byte (b)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
   		<td>Local Position (lp)</td>
    		<td>Vector 3 (v3)</td>
 		<td>False</td>

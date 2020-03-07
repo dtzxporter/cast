@@ -233,6 +233,12 @@ class Bone(CastNode):
             return (parentUnsigned ^ 0x80000000) - 0x80000000
         return -1
 
+    def SegmentScaleCompensate(self):
+        ssc = self.properties.get("ssc")
+        if ssc is not None:
+            return ssc.values[0] == 1
+        return None
+
     def LocalPosition(self):
         localPos = self.properties.get("lp")
         if localPos is not None:

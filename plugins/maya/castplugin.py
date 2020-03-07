@@ -178,6 +178,10 @@ def importSkeletonNode(skeleton):
         newBone = handles[i]
         paths[i] = newBone.fullPathName()
 
+        if bone.SegmentScaleCompensate() is not None:
+            segmentScale = bone.SegmentScaleCompensate()
+            cmds.setAttr("%s.segmentScaleCompensate" % paths[1], segmentScale)
+
         if bone.LocalPosition() is not None:
             localPos = bone.LocalPosition()
             localRot = bone.LocalRotation()
