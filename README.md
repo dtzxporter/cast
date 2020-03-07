@@ -283,7 +283,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 	 <tr>
   		<td>Segment Scale Compensate (ssc)</td>
-   		<td>Byte (b)</td>
+   		<td>Byte (b) [True, False]</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
@@ -452,6 +452,120 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 	 <tr>
   		<td>Path (p)</td>
    		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+### Animation:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>Skeleton, Curve</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Root</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Rotation Interpolation (ri)</td>
+   		<td>String (s) [quaternion, euler]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Framerate (fr)</td>
+   		<td>Float (f)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Looping (lo)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Transform Space (ts)</td>
+   		<td>String (s) [local, world]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+### Curve:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Animation</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Node Name (nn)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Key Property Name (kp)</td>
+   		<td>String (s) [rx, ry, rz, rw, tx, ty, tz, sx, sy, sz, vb]</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Key Frame Buffer (kt)</td>
+   		<td>Byte (b), Short (h), Integer 32 (i), Float (f)</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Key Value Buffer (kv)</td>
+   		<td>Byte (b), Short (h), Integer 32 (i), Float (f)</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Mode (m)</td>
+   		<td>String (s) [additive, absolute, relative]</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
