@@ -56,6 +56,7 @@ enum class CastId : uint32_t
 	Bone = 0x656E6F62,
 	Animation = 0x6D696E61,
 	Curve = 0x76727563,
+	NotificationTrack = 0x6669746E,
 	Material = 0x6C74616D,
 	File = 0x656C6966,
 };
@@ -467,7 +468,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>Skeleton, Curve</td>
+   		<td>Skeleton, Curve, NotificiationTrack</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
@@ -484,12 +485,6 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<th>Type(s)</th>
 		<th>IsArray</th>
 		<th>Required</th>
- 	</tr>
-	 <tr>
-  		<td>Rotation Interpolation (ri)</td>
-   		<td>String (s) [quaternion, euler]</td>
-		<td>False</td>
-		<td>False</td>
  	</tr>
 	 <tr>
   		<td>Framerate (fr)</td>
@@ -547,19 +542,19 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 	 <tr>
   		<td>Key Property Name (kp)</td>
-   		<td>String (s) [rx, ry, rz, rw, tx, ty, tz, sx, sy, sz, vb]</td>
+   		<td>String (s) [rq, rx, ry, rz, tx, ty, tz, sx, sy, sz, vb]</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
 	 <tr>
-  		<td>Key Frame Buffer (kt)</td>
+  		<td>Key Frame Buffer (kb)</td>
    		<td>Byte (b), Short (h), Integer 32 (i), Float (f)</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
 	 <tr>
   		<td>Key Value Buffer (kv)</td>
-   		<td>Byte (b), Short (h), Integer 32 (i), Float (f)</td>
+   		<td>Byte (b), Short (h), Integer 32 (i), Float (f), Vector 4 (v4)</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
@@ -567,6 +562,48 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
   		<td>Mode (m)</td>
    		<td>String (s) [additive, absolute, relative]</td>
 		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+### NotificationTrack:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Animation</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Key Frame Buffer (kb)</td>
+   		<td>Byte (b), Short (h), Integer 32 (i), Float (f)</td>
+		<td>True</td>
 		<td>True</td>
  	</tr>
 </table>

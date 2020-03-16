@@ -142,12 +142,6 @@ class Animation(CastNode):
     def Curves(self):
         return self.ChildrenOfType(Curve)
 
-    def RotationInterpolation(self):
-        ri = self.properties.get("ri")
-        if ri is not None:
-            return ri.values[0]
-        return "quaternion"
-
     def Framerate(self):
         fr = self.properties.get("fr")
         if fr is not None:
@@ -198,6 +192,22 @@ class Curve(CastNode):
         m = self.properties.get("m")
         if m is not None:
             return m.values[0]
+        return None
+
+class NotificationTrack(CastNode):
+    def __init__(self):
+        super(NotificationTrack, self).__init__()
+
+    def Name(self):
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
+
+    def KeyFrameBuffer(self):
+        kb = self.properties.get("kb")
+        if kb is not None:
+            return kb.values
         return None
 
 
@@ -383,6 +393,7 @@ typeSwitcher = {
     0x6C656B73: Skeleton,
     0x6D696E61: Animation,
     0x76727563: Curve,
+    0x6669746E: NotificationTrack,
     0x656E6F62: Bone,
     0x6C74616D: Material,
     0x656C6966: File

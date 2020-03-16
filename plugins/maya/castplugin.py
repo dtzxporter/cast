@@ -1,6 +1,7 @@
 import os
 import os.path
-from cast import Cast, Model, Mesh, Skeleton, Bone, Material, File
+import json
+from cast import Cast, Model, Animation, Curve, NotificationTrack, Mesh, Skeleton, Bone, Material, File
 import maya.mel as mel
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
@@ -10,6 +11,155 @@ import maya.OpenMayaMPx as OpenMayaMPx
 # Support Python 3.0+
 if xrange is None:
     xrange = range
+
+# Used for scene reset cache
+sceneResetCache = {}
+
+# Used for various configuration
+sceneSettings = {
+    "importAtTime": False,
+    "importSkin": True,
+}
+
+
+def utilityRemoveNamespaces():
+    namespaceController = OpenMaya.MNamespace()
+    namespaces = namespaceController.getNamespaces(True)
+
+    for namespace in namespaces:
+        try:
+            mel.eval(
+                "namespace -removeNamespace \"%s\" -mergeNamespaceWithRoot;" % namespace)
+        except RuntimeError:
+            pass
+
+
+def utilitySetToggleItem(name, value=False):
+    if sceneSettings.has_key(name):
+        sceneSettings[name] = bool(
+            cmds.menuItem(name, query=True, checkBox=True))
+
+    utilitySaveSettings()
+
+
+def utilityQueryToggleItem(name):
+    if sceneSettings.has_key(name):
+        return sceneSettings[name]
+    return False
+
+
+def utilityLoadSettings():
+    global sceneSettings
+
+    currentPath = os.path.dirname(os.path.realpath(
+        cmds.pluginInfo("castplugin", q=True, p=True)))
+    settingsPath = os.path.join(currentPath, "cast.cfg")
+
+    try:
+        file = open(settingsPath, "r")
+        text = file.read()
+        file.close()
+
+        diskSettings = json.loads(text.decode("utf-8"))
+    except:
+        diskSettings = {}
+
+    for key in diskSettings:
+        if sceneSettings.has_key(key):
+            sceneSettings[key] = diskSettings[key]
+
+    utilitySaveSettings()
+
+
+def utilitySaveSettings():
+    global sceneSettings
+
+    currentPath = os.path.dirname(os.path.realpath(
+        cmds.pluginInfo("castplugin", q=True, p=True)))
+    settingsPath = os.path.join(currentPath, "cast.cfg")
+
+    try:
+        file = open(settingsPath, "w")
+        file.write(json.dumps(sceneSettings).encode("utf-8"))
+        file.close()
+    except:
+        pass
+
+
+def utilityCreateProgress(status="", maximum=0):
+    instance = mel.eval("$tmp = $gMainProgressBar")
+    cmds.progressBar(instance, edit=True, beginProgress=True,
+                     isInterruptable=False, status=status, maxValue=max(1, maximum))
+    return instance
+
+
+def utilityStepProgress(instance):
+    try:
+        cmds.progressBar(instance, edit=True, step=1)
+    except RuntimeError:
+        pass
+
+
+def utilityEndProgress(instance):
+    try:
+        cmds.progressBar(instance, edit=True, endProgress=True)
+    except RuntimeError:
+        pass
+
+
+def utilityRemoveMenu():
+    if cmds.control("CastMenu", exists=True):
+        cmds.deleteUI("CastMenu", menu=True)
+
+
+def utilityCreateMenu():
+    cmds.setParent(mel.eval("$tmp = $gMainWindow"))
+    menu = cmds.menu("CastMenu", label="Cast", tearOff=True)
+
+    animMenu = cmds.menuItem(label="Animation", subMenu=True)
+
+    cmds.menuItem("importAtTime", label="Import At Scene Time", annotation="Import animations starting at the current scene time",
+                  checkBox=utilityQueryToggleItem("importAtTime"), command=lambda x: utilitySetToggleItem("importAtTime"))
+
+    cmds.setParent(animMenu, menu=True)
+    cmds.setParent(menu, menu=True)
+
+    modelMenu = cmds.menuItem(label="Model", subMenu=True)
+
+    cmds.menuItem("importSkin", label="Import Bind Skin", annotation="Imports and binds a model to it's smooth skin",
+                  checkBox=utilityQueryToggleItem("importSkin"), command=lambda x: utilitySetToggleItem("importSkin"))
+
+    cmds.setParent(animMenu, menu=True)
+    cmds.setParent(menu, menu=True)
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem(label="Remove Namespaces", annotation="Removes all namespaces in the scene",
+                  command=lambda x: utilityRemoveNamespaces())
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem(label="Reset Scene", annotation="Resets the scene, removing the current animation curves",
+                  command=lambda x: utilityClearAnimation())
+
+
+def utilityClearAnimation():
+    # First we must remove all existing animation curves
+    # this deletes all curve channels
+    global sceneResetCache
+
+    cmds.delete(all=True, c=True)
+
+    for transPath in sceneResetCache:
+        selectList = OpenMaya.MSelectionList()
+        selectList.add(transPath)
+
+        dagPath = OpenMaya.MDagPath()
+        selectList.getDagPath(0, dagPath)
+
+        transform = OpenMaya.MFnTransform(dagPath)
+        transform.resetFromRestPosition()
+
+    sceneResetCache = {}
 
 
 def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1):
@@ -37,6 +187,20 @@ def utilityBuildPath(root, asset):
 
     root = os.path.dirname(root)
     return os.path.join(root, asset)
+
+
+def utilitySetCurveInterpolation(curvePath, mode="none"):
+    try:
+        cmds.rotationInterpolation(curvePath, convert=mode)
+    except RuntimeError:
+        pass
+
+
+def utilityGetCurveInterpolation(curvePath):
+    try:
+        cmds.rotationInterpolation(curvePath, q=True)
+    except RuntimeError:
+        return "none"
 
 
 def utilityAssignStingrayPBSSlots(materialInstance, slots, path):
@@ -150,6 +314,148 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
     return (materialInstance)
 
 
+def utilitySaveNodeData(dagPath, rotationTrack):
+    global sceneResetCache
+
+    if dagPath.fullPathName() in sceneResetCache:
+        return
+
+    sceneResetCache[dagPath.fullPathName()] = None
+
+    # We are going to save the rest position on the node
+    # so we can reset the scene later
+    transform = OpenMaya.MFnTransform(dagPath)
+    transform.setRestPosition(transform.transformation())
+
+    # Set the orientation to 0 since we animate on the rotation transform
+    if rotationTrack and cmds.objExists("%s.jo" % dagPath.fullPathName()):
+        cmds.setAttr("%s.jo" % dagPath.fullPathName(), 0, 0, 0)
+
+
+def utilityGetOrCreateCurve(name, property, curveType):
+    if not cmds.objExists("%s.%s" % (name, property)):
+        return None
+
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(name)
+
+    try:
+        nodePath = OpenMaya.MDagPath()
+        selectList.getDagPath(0, nodePath)
+    except RuntimeError:
+        return None
+
+    utilitySaveNodeData(nodePath, property in ["rx", "ry", "rz"])
+
+    propertyPlug = OpenMaya.MFnDependencyNode(
+        nodePath.node()).findPlug(property, False)
+    propertyPlug.setKeyable(True)
+    propertyPlug.setLocked(False)
+
+    inputSources = OpenMaya.MPlugArray()
+    propertyPlug.connectedTo(inputSources, True, False)
+
+    if inputSources.length() == 0:
+        # There is no curve attached to this node, so we can
+        # make a new one on top of the property
+        newCurve = OpenMayaAnim.MFnAnimCurve()
+        newCurve.create(propertyPlug, curveType)
+        return newCurve
+    elif inputSources[0].node().hasFn(OpenMaya.MFn.kAnimCurve):
+        # There is an existing curve on this node, we need to
+        # grab the curve, but then reset the rotation interpolation
+        newCurve = OpenMayaAnim.MFnAnimCurve()
+        newCurve.setObject(inputSources[0].node())
+
+        # If we have a rotation curve, it's interpolation must be reset before keying
+        if property in ["rx", "ry", "rz"] and utilityGetCurveInterpolation(newCurve.name()) != "none":
+            utilitySetCurveInterpolation(newCurve.name())
+
+        # Return the existing curve
+        return newCurve
+
+    return None
+
+
+def utilityImportQuatTrackData(tracks, timeUnit, frameBuffer, valueBuffer):
+    timeBuffer = OpenMaya.MTimeArray()
+    smallestFrame = OpenMaya.MTime()
+    largestFrame = OpenMaya.MTime()
+
+    for x in frameBuffer:
+        frame = OpenMaya.MTime(x, timeUnit)
+        if frame < smallestFrame:
+            smallestFrame = frame
+        if frame > largestFrame:
+            largestFrame = frame
+        timeBuffer.append(frame)
+
+    tempBufferX = OpenMaya.MScriptUtil()
+    tempBufferY = OpenMaya.MScriptUtil()
+    tempBufferZ = OpenMaya.MScriptUtil()
+
+    if timeBuffer.length() <= 0:
+        return (smallestFrame, largestFrame)
+
+    valuesX = [0.0] * timeBuffer.length()
+    valuesY = [0.0] * timeBuffer.length()
+    valuesZ = [0.0] * timeBuffer.length()
+
+    for i in xrange(0, len(valueBuffer), 4):
+        euler = OpenMaya.MQuaternion(
+            valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3]).asEulerRotation()
+        slot = i / 4
+        valuesX[slot] = euler.x
+        valuesY[slot] = euler.y
+        valuesZ[slot] = euler.z
+
+    tempBufferX.createFromList(valuesX, len(valuesX))
+    tempBufferY.createFromList(valuesY, len(valuesY))
+    tempBufferZ.createFromList(valuesZ, len(valuesZ))
+
+    if tracks[0] is not None:
+        tracks[0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferX.asDoublePtr(), timeBuffer.length(
+        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+
+    if tracks[1] is not None:
+        tracks[1].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferY.asDoublePtr(), timeBuffer.length(
+        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+
+    if tracks[2] is not None:
+        tracks[2].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferZ.asDoublePtr(), timeBuffer.length(
+        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+
+    return (smallestFrame, largestFrame)
+
+
+def utilityImportSingleTrackData(tracks, timeUnit, frameBuffer, valueBuffer):
+    smallestFrame = OpenMaya.MTime()
+    largestFrame = OpenMaya.MTime()
+
+    scriptUtil = OpenMaya.MScriptUtil()
+    scriptUtil.createFromList([x for x in valueBuffer], len(valueBuffer))
+
+    timeBuffer = OpenMaya.MTimeArray()
+    valueBuffer = OpenMaya.MDoubleArray(
+        scriptUtil.asDoublePtr(), len(valueBuffer))
+
+    for x in frameBuffer:
+        frame = OpenMaya.MTime(x, timeUnit)
+        if frame < smallestFrame:
+            smallestFrame = frame
+        if frame > largestFrame:
+            largestFrame = frame
+        timeBuffer.append(frame)
+
+    if tracks[0] is None or timeBuffer.length() <= 0:
+        return (smallestFrame, largestFrame)
+
+    tracks[0].addKeys(timeBuffer, valueBuffer, OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                      OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+
+    return (smallestFrame, largestFrame)
+
+
 def importSkeletonNode(skeleton):
     if skeleton is None:
         return (None, None)
@@ -229,7 +535,10 @@ def importModelNode(model, path):
     meshNode = meshTransform.create()
     meshTransform.setName(os.path.splitext(os.path.basename(path))[0])
 
-    for mesh in model.Meshes():
+    meshes = model.Meshes()
+    progress = utilityCreateProgress("Importing model...", len(meshes))
+
+    for mesh in meshes:
         newMeshTransform = OpenMaya.MFnTransform()
         newMeshNode = newMeshTransform.create(meshNode)
         newMeshTransform.setName("CastMesh")
@@ -334,7 +643,7 @@ def importModelNode(model, path):
 
         maximumInfluence = mesh.MaximumWeightInfluence()
 
-        if maximumInfluence > 0:
+        if maximumInfluence > 0 and sceneSettings["importSkin"]:
             weightBoneBuffer = mesh.VertexWeightBoneBuffer()
             weightValueBuffer = mesh.VertexWeightValueBuffer()
             weightedBones = list({paths[x] for x in weightBoneBuffer})
@@ -364,12 +673,139 @@ def importModelNode(model, path):
                 cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
                 weightedValueBuffer = [0.0] * (weightedBonesCount)
 
+        utilityStepProgress(progress)
+    utilityEndProgress(progress)
+
+
+def importCurveNode(node, path, timeUnit, transformSpace):
+    propertySwitcher = {
+        # This is special, maya can't animate a quat separate
+        "rq": ["rx", "ry", "rz"],
+        "rx": ["rx"],
+        "ry": ["ry"],
+        "rz": ["rz"],
+        "tx": ["tx"],
+        "ty": ["ty"],
+        "tz": ["tz"],
+        "sx": ["sx"],
+        "sy": ["sy"],
+        "sz": ["sz"],
+        "vb": ["v"]
+    }
+    typeSwitcher = {
+        "rq": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
+        "rx": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
+        "ry": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
+        "rz": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
+        "tx": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
+        "ty": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
+        "tz": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
+        "sx": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
+        "sy": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
+        "sz": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
+        "vb": OpenMayaAnim.MFnAnimCurve.kAnimCurveTU
+    }
+    trackSwitcher = {
+        "rq": utilityImportQuatTrackData,
+        "rx": utilityImportSingleTrackData,
+        "ry": utilityImportSingleTrackData,
+        "rz": utilityImportSingleTrackData,
+        "tx": utilityImportSingleTrackData,
+        "ty": utilityImportSingleTrackData,
+        "tz": utilityImportSingleTrackData,
+        "sx": utilityImportSingleTrackData,
+        "sy": utilityImportSingleTrackData,
+        "sz": utilityImportSingleTrackData,
+        "vb": utilityImportSingleTrackData
+    }
+
+    nodeName = node.NodeName()
+    propertyName = node.KeyPropertyName()
+
+    if not propertySwitcher.has_key(propertyName):
+        return
+
+    tracks = [utilityGetOrCreateCurve(
+        nodeName, x, typeSwitcher[propertyName]) for x in propertySwitcher[propertyName]]
+
+    keyFrameBuffer = node.KeyFrameBuffer()
+    keyValueBuffer = node.KeyValueBuffer()
+
+    (smallestFrame, largestFrame) = trackSwitcher[propertyName](
+        tracks, timeUnit, keyFrameBuffer, keyValueBuffer)
+
+    # Make sure we have at least one quaternion track to set the interpolation mode to
+    if propertyName == "rq":
+        for track in tracks:
+            if track is not None:
+                utilitySetCurveInterpolation(track.name(), "quaternion")
+
+    # Return the frame sizes [s, l] so we can adjust the scene times
+    return (smallestFrame, largestFrame)
+
+
+def importAnimationNode(node, path):
+    # We need to be sure to disable auto keyframe, because it breaks import of animations
+    # do this now so we don't forget...
+    sceneAnimationController = OpenMayaAnim.MAnimControl()
+    sceneAnimationController.setAutoKeyMode(False)
+
+    switcherLoop = {
+        None: OpenMayaAnim.MAnimControl.kPlaybackOnce,
+        0: OpenMayaAnim.MAnimControl.kPlaybackOnce,
+        1: OpenMayaAnim.MAnimControl.kPlaybackLoop,
+    }
+
+    sceneAnimationController.setPlaybackMode(switcherLoop[node.Looping()])
+
+    switcherFps = {
+        None: OpenMaya.MTime.kFilm,
+        2: OpenMaya.MTime.k2FPS,
+        3: OpenMaya.MTime.k3FPS,
+        24: OpenMaya.MTime.kFilm,
+        30: OpenMaya.MTime.kNTSCFrame,
+        60: OpenMaya.MTime.kNTSCField,
+        100: OpenMaya.MTime.k100FPS,
+        120: OpenMaya.MTime.k120FPS,
+    }
+
+    if switcherFps.has_key(int(node.Framerate())):
+        wantedFps = switcherFps[int(node.Framerate())]
+    else:
+        wantedFps = switcherFps[None]
+
+    # We need to determine the proper time to import the curves, for example
+    # the user may want to import at the current scene time, and that would require
+    # fetching once here, then passing to the curve importer.
+    wantedSmallestFrame = OpenMaya.MTime(0, wantedFps)
+    wantedLargestFrame = OpenMaya.MTime(1, wantedFps)
+
+    curves = node.ChildrenOfType(Curve)
+    progress = utilityCreateProgress("Importing animation...", len(curves))
+
+    for x in curves:
+        (smallestFrame, largestFrame) = importCurveNode(
+            x, path, wantedFps, node.TransformSpace())
+        if smallestFrame < wantedSmallestFrame:
+            wantedSmallestFrame = smallestFrame
+        if largestFrame > wantedLargestFrame:
+            wantedLargestFrame = largestFrame
+        utilityStepProgress(progress)
+
+    utilityEndProgress(progress)
+
+    # Set the animation segment
+    sceneAnimationController.setAnimationStartEndTime(
+        wantedSmallestFrame, wantedLargestFrame)
+    sceneAnimationController.setMinMaxTime(
+        wantedSmallestFrame, wantedLargestFrame)
+
 
 def importRootNode(node, path):
     for child in node.ChildrenOfType(Model):
         importModelNode(child, path)
-    # TODO: We would import animations here once we create
-    # a type to load from
+    for child in node.ChildrenOfType(Animation):
+        importAnimationNode(child, path)
 
 
 def importCast(path):
@@ -385,7 +821,7 @@ class CastFileTranslator(OpenMayaMPx.MPxFileTranslator):
         OpenMayaMPx.MPxFileTranslator.__init__(self)
 
     def haveWriteMethod(self):
-        return True
+        return False
 
     def haveReadMethod(self):
         return True
@@ -419,7 +855,8 @@ def initializePlugin(m_object):
             "Cast", None, createCastTranslator)
     except RuntimeError:
         pass
-    # __create_menu__()
+    utilityLoadSettings()
+    utilityCreateMenu()
 
 
 def uninitializePlugin(m_object):
@@ -428,4 +865,4 @@ def uninitializePlugin(m_object):
         m_plugin.deregisterFileTranslator("Cast")
     except RuntimeError:
         pass
-    # __remove_menu__()
+    utilityRemoveMenu()
