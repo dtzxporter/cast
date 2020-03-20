@@ -431,15 +431,14 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
             if tracks[2] is not None:
                 valueShifts[2] = tracks[2].evaluate(frame)
 
-            print("shifts")
-            print(valueShifts)
+            additiveQuat = OpenMaya.MEulerRotation(valueShifts[0], valueShifts[1], valueShifts[2]).asQuaternion()
+            frameQuat = OpenMaya.MQuaternion(valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
-            euler = OpenMaya.MQuaternion(
-                valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3]).asEulerRotation()
+            euler = (frameQuat * additiveQuat).asEulerRotation()
 
-            valuesX[slot] = valueShifts[0] + euler.x
-            valuesY[slot] = valueShifts[1] + euler.y
-            valuesZ[slot] = valueShifts[2] + euler.z
+            valuesX[slot] = euler.x
+            valuesY[slot] = euler.y
+            valuesZ[slot] = euler.z
 
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
