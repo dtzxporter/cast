@@ -223,7 +223,7 @@ def utilityAssignStingrayPBSSlots(materialInstance, slots, path):
         "diffuse": "use_color_map",
         "normal": "use_normal_map",
         "metal": "use_metallic_map",
-        "roughness": "TEX_roughness_map",
+        "roughness": "use_roughness_map",
         "gloss": "use_roughness_map",
         "emissive": "use_emissive_map",
         "ao": "use_ao_map"
