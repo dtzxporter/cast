@@ -27,7 +27,7 @@ def utilityRemoveNamespaces():
     namespaces = namespaceController.getNamespaces(True)
 
     for namespace in namespaces:
-        if namespace not in ["UI", "shared"]:
+        if namespace not in [":UI", ":shared"]:
             try:
                 mel.eval(
                     "namespace -removeNamespace \"%s\" -mergeNamespaceWithRoot;" % namespace)
@@ -321,19 +321,23 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
 def utilitySaveNodeData(dagPath, rotationTrack):
     global sceneResetCache
 
-    if dagPath.fullPathName() in sceneResetCache:
-        return
-
-    sceneResetCache[dagPath.fullPathName()] = None
-
-    # We are going to save the rest position on the node
-    # so we can reset the scene later
+    # Grab the transform first
     transform = OpenMaya.MFnTransform(dagPath)
-    transform.setRestPosition(transform.transformation())
+    restTransform = transform.transformation()
 
     # Set the orientation to 0 since we animate on the rotation transform
     if rotationTrack and cmds.objExists("%s.jo" % dagPath.fullPathName()):
         cmds.setAttr("%s.jo" % dagPath.fullPathName(), 0, 0, 0)
+
+    # If we already had the bone saved, ignore this
+    if dagPath.fullPathName() in sceneResetCache:
+        return
+    sceneResetCache[dagPath.fullPathName()] = None
+
+    # We are going to save the rest position on the node
+    # so we can reset the scene later
+    transform.setRestPosition(restTransform)
+    
 
 
 def utilityGetOrCreateCurve(name, property, curveType):
