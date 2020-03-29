@@ -337,7 +337,6 @@ def utilitySaveNodeData(dagPath, rotationTrack):
     # We are going to save the rest position on the node
     # so we can reset the scene later
     transform.setRestPosition(restTransform)
-    
 
 
 def utilityGetOrCreateCurve(name, property, curveType):
@@ -435,8 +434,10 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
             if tracks[2] is not None:
                 valueShifts[2] = tracks[2].evaluate(frame)
 
-            additiveQuat = OpenMaya.MEulerRotation(valueShifts[0], valueShifts[1], valueShifts[2]).asQuaternion()
-            frameQuat = OpenMaya.MQuaternion(valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
+            additiveQuat = OpenMaya.MEulerRotation(
+                valueShifts[0], valueShifts[1], valueShifts[2]).asQuaternion()
+            frameQuat = OpenMaya.MQuaternion(
+                valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
             euler = (frameQuat * additiveQuat).asEulerRotation()
 
