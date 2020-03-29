@@ -36,7 +36,7 @@ def utilityRemoveNamespaces():
 
 
 def utilitySetToggleItem(name, value=False):
-    if sceneSettings.has_key(name):
+    if name in sceneSettings:
         sceneSettings[name] = bool(
             cmds.menuItem(name, query=True, checkBox=True))
 
@@ -44,7 +44,7 @@ def utilitySetToggleItem(name, value=False):
 
 
 def utilityQueryToggleItem(name):
-    if sceneSettings.has_key(name):
+    if name in sceneSettings:
         return sceneSettings[name]
     return False
 
@@ -66,7 +66,7 @@ def utilityLoadSettings():
         diskSettings = {}
 
     for key in diskSettings:
-        if sceneSettings.has_key(key):
+        if key in sceneSettings:
             sceneSettings[key] = diskSettings[key]
 
     utilitySaveSettings()
@@ -125,7 +125,7 @@ def utilityCreateMenu():
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
 
-    modelMenu = cmds.menuItem(label="Model", subMenu=True)
+    cmds.menuItem(label="Model", subMenu=True)
 
     cmds.menuItem("importSkin", label="Import Bind Skin", annotation="Imports and binds a model to it's smooth skin",
                   checkBox=utilityQueryToggleItem("importSkin"), command=lambda x: utilitySetToggleItem("importSkin"))
@@ -248,7 +248,7 @@ def utilityAssignStingrayPBSSlots(materialInstance, slots, path):
         mel.eval("shaderfx -sfxnode %s -update" % materialInstance)
 
         # If we don't have a map for this material, skip to next one
-        if not switcher.has_key(slot):
+        if not slot in switcher:
             continue
 
         # We have a slot, lets connect it
@@ -281,7 +281,7 @@ def utilityAssignGenericSlots(materialInstance, slots, path):
                          ("%s.uvCoord" % fileNode))
 
         # If we don't have a map for this material, skip to next one
-        if not switcher.has_key(slot):
+        if not slot in switcher:
             continue
 
         # We have a slot, lets connect it
@@ -303,7 +303,7 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
         "StingrayPBS": utilityAssignStingrayPBSSlots
     }
 
-    if not switcher.has_key(type):
+    if not type in switcher:
         type = None
 
     mayaShaderType = switcher[type]
@@ -787,7 +787,7 @@ def importCurveNode(node, path, timeUnit, startFrame, transformSpace):
     nodeName = node.NodeName()
     propertyName = node.KeyPropertyName()
 
-    if not propertySwitcher.has_key(propertyName):
+    if not propertyName in propertySwitcher:
         return
 
     tracks = [utilityGetOrCreateCurve(
@@ -834,7 +834,7 @@ def importAnimationNode(node, path):
         120: OpenMaya.MTime.k120FPS,
     }
 
-    if switcherFps.has_key(int(node.Framerate())):
+    if int(node.Framerate()) in switcherFps:
         wantedFps = switcherFps[int(node.Framerate())]
     else:
         wantedFps = switcherFps[None]
