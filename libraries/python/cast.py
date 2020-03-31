@@ -59,8 +59,9 @@ class CastProperty(object):
     def load(self, file):
         header = struct.unpack("2sHI", file.read(0x8))
 
-        self.name = struct.unpack(("%ds" % header[1]), file.read(header[1]))[0]
-        self.type = CastProperty_t(header[0].strip("\0"))
+        self.name = struct.unpack(("%ds" % header[1]), file.read(header[1]))[
+            0].decode("utf-8")
+        self.type = CastProperty_t(header[0].decode("utf-8").strip('\0'))
 
         if (self.type.size == 0 and self.type.fmt == "s"):
             self.values = [CastString_t(file).value]
@@ -129,6 +130,7 @@ class Model(CastNode):
     def Materials(self):
         return self.ChildrenOfType(Material)
 
+
 class Animation(CastNode):
     def __init__(self):
         super(Animation, self).__init__()
@@ -160,6 +162,7 @@ class Animation(CastNode):
             return ts.values[0]
         return "local"
 
+
 class Curve(CastNode):
     def __init__(self):
         super(Curve, self).__init__()
@@ -169,7 +172,7 @@ class Curve(CastNode):
         if nn is not None:
             return nn.values[0]
         return None
-    
+
     def KeyPropertyName(self):
         kp = self.properties.get("kp")
         if kp is not None:
@@ -193,6 +196,7 @@ class Curve(CastNode):
         if m is not None:
             return m.values[0]
         return None
+
 
 class NotificationTrack(CastNode):
     def __init__(self):
