@@ -592,8 +592,8 @@ def importMaterialNode(path, material):
 
 def importModelNode(model, path):
     # Import skeleton for binds, materials for meshes
-    (handles, paths) = importSkeletonNode(model.Skeleton())
-    materials = [importMaterialNode(path, x) for x in model.Materials()]
+    (_handles, paths) = importSkeletonNode(model.Skeleton())
+    _materials = [importMaterialNode(path, x) for x in model.Materials()]
 
     # Import the meshes
     meshTransform = OpenMaya.MFnTransform()
@@ -631,14 +631,6 @@ def importModelNode(model, path):
         newMesh.create(vertexCount, faceCount, vertexPositionBuffer,
                        faceCountBuffer, faceBuffer, newMeshNode)
 
-        vertexNormals = mesh.VertexNormalBuffer()
-        scriptUtil = OpenMaya.MScriptUtil()
-        scriptUtil.createFromList(
-            [x for x in vertexNormals], len(vertexNormals))
-
-        vertexNormalBuffer = OpenMaya.MVectorArray(
-            scriptUtil.asFloat3Ptr(), len(vertexNormals) / 3)
-
         scriptUtil = OpenMaya.MScriptUtil()
         scriptUtil.createFromList(
             [x for x in xrange(vertexCount)], vertexCount)
@@ -646,17 +638,31 @@ def importModelNode(model, path):
         vertexIndexBuffer = OpenMaya.MIntArray(
             scriptUtil.asIntPtr(), vertexCount)
 
-        newMesh.setVertexNormals(vertexNormalBuffer, vertexIndexBuffer)
+        # Each channel after position / faces is optional
+        # meaning we should comletely ignore null buffers here
+        # even though you *should* have them
+
+        vertexNormals = mesh.VertexNormalBuffer()
+        if vertexNormals is not None:
+            scriptUtil = OpenMaya.MScriptUtil()
+            scriptUtil.createFromList(
+                [x for x in vertexNormals], len(vertexNormals))
+
+            vertexNormalBuffer = OpenMaya.MVectorArray(
+                scriptUtil.asFloat3Ptr(), len(vertexNormals) / 3)
+
+            newMesh.setVertexNormals(vertexNormalBuffer, vertexIndexBuffer)
 
         vertexColors = mesh.VertexColorBuffer()
-        scriptUtil = OpenMaya.MScriptUtil()
-        scriptUtil.createFromList([x for xs in [[(x >> i & 0xff) / 255.0 for i in (
-            24, 16, 8, 0)] for x in vertexColors] for x in xs], len(vertexColors) * 4)
+        if vertexColors is not None:
+            scriptUtil = OpenMaya.MScriptUtil()
+            scriptUtil.createFromList([x for xs in [[(x >> i & 0xff) / 255.0 for i in (
+                24, 16, 8, 0)] for x in vertexColors] for x in xs], len(vertexColors) * 4)
 
-        vertexColorBuffer = OpenMaya.MColorArray(
-            scriptUtil.asFloat4Ptr(), len(vertexColors))
+            vertexColorBuffer = OpenMaya.MColorArray(
+                scriptUtil.asFloat4Ptr(), len(vertexColors))
 
-        newMesh.setVertexColors(vertexColorBuffer, vertexIndexBuffer)
+            newMesh.setVertexColors(vertexColorBuffer, vertexIndexBuffer)
 
         uvLayerCount = mesh.UVLayerCount()
 

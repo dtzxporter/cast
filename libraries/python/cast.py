@@ -255,6 +255,12 @@ class Mesh(CastNode):
             return vn.values
         return None
 
+    def VertexTangentBuffer(self):
+        vt = self.properties.get("vt")
+        if vt is not None:
+            return vt.values
+        return None
+
     def VertexColorBuffer(self):
         vc = self.properties.get("vc")
         if vc is not None:
