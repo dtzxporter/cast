@@ -8,7 +8,7 @@ The goal of cast is to create an engine agnostic format that can be parsed and w
 
 ## 3D Engine Plugins:
 - Autodesk Maya (Beta): [Releases](https://github.com/dtzxporter/cast/releases)
-- Blender: (COMING SOON)
+- Blender (2.8+) (Beta): [Releases](https://github.com/dtzxporter/cast/releases)
 - 3DS Max: (COMING SOON)
 
 # Programming libraries:
