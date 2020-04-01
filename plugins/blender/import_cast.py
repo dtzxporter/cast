@@ -43,7 +43,7 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             "diffuse": "Base Color",
             "specular": "Specular",
             "roughness": "Roughness",
-            "emissive": "Emissive",
+            "emissive": "Emissive Color",
             "normal": "Normal",
             "ao": "Ambient Occlusion"
         }
@@ -189,7 +189,7 @@ def importModelNode(model, path):
 
             try:
                 newLoop = blendMesh.faces.new(indices)
-            except RuntimeError:
+            except ValueError:
                 continue
             else:
                 vertexToFaceVertex(newLoop)
