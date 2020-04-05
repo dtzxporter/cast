@@ -221,7 +221,8 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 </table>
 
 **Notes**:
-- Face Buffer is an index into the current meshes vertex data buffers where (0, 1, 2) are the first three vertices from this mesh.
+- `Face Buffer` is an index into the current meshes vertex data buffers where (0, 1, 2) are the first three vertices from this mesh.
+- The `Face Buffer` follows CCW (right-handed) winding order, this may be different in other apis, where you may have to remap the indices.
 - Each vertex descriptor buffer must contain the same number of elements ex: if you have 16 vertices, you must have 16 normals if they exist, 16 colors if the buffer exists. Otherwise it's assumed they are default / skipped.
 
 ### Skeleton:
