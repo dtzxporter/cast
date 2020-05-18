@@ -199,8 +199,9 @@ def importModelNode(model, path):
             weightBoneBuffer = mesh.VertexWeightBoneBuffer()
             weightValueBuffer = mesh.VertexWeightValueBuffer()
             for x, vert in enumerate(blendMesh.verts):
-                vert[vertexWeightLayer][weightBoneBuffer[x * maximumInfluence]
-                                        ] = weightValueBuffer[x * maximumInfluence]
+                if (weightValueBuffer[x * maximumInfluence] > 0.0):
+                    vert[vertexWeightLayer][weightBoneBuffer[x * maximumInfluence]
+                                            ] = weightValueBuffer[x * maximumInfluence]
 
         blendMesh.to_mesh(newMesh)
         newMesh.create_normals_split()
