@@ -91,6 +91,9 @@ class CastNode(object):
             return find[0]
         return None
 
+    def Hash(self):
+        return self.hash
+
     @staticmethod
     def load(file):
         header = struct.unpack("IIQII", file.read(0x18))
@@ -129,6 +132,9 @@ class Model(CastNode):
 
     def Materials(self):
         return self.ChildrenOfType(Material)
+
+    def BlendShapes(self):
+        return self.ChildrenOfType(BlendShape)
 
 
 class Animation(CastNode):
@@ -197,6 +203,12 @@ class Curve(CastNode):
             return m.values[0]
         return None
 
+    def AdditiveBlendWeight(self):
+        ab = self.properties.get("ab")
+        if ab is not None:
+            return ab.values[0]
+        return 1.0
+
 
 class NotificationTrack(CastNode):
     def __init__(self):
@@ -218,6 +230,12 @@ class NotificationTrack(CastNode):
 class Mesh(CastNode):
     def __init__(self):
         super(Mesh, self).__init__()
+
+    def Name(self):
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
 
     def VertexCount(self):
         vp = self.properties.get("vp")
@@ -293,6 +311,29 @@ class Mesh(CastNode):
         m = self.properties.get("m")
         if m is not None:
             return self.parentNode.ChildByHash(m.values[0])
+        return None
+
+
+class BlendShape(CastNode):
+    def __init__(self):
+        super(BlendShape, self).__init__()
+
+    def BaseShape(self):
+        b = self.properties.get("b")
+        if b is not None:
+            return self.parentNode.ChildByHash(b.values[0])
+        return None
+
+    def TargetShapes(self):
+        t = self.properties.get("t")
+        if t is not None:
+            return [self.parentNode.ChildByHash(x) for x in t.values]
+        return None
+
+    def TargetWeightScales(self):
+        ts = self.properties.get("ts")
+        if ts is not None:
+            return ts.values
         return None
 
 
@@ -400,13 +441,14 @@ typeSwitcher = {
     None: CastNode,
     0x6C646F6D: Model,
     0x6873656D: Mesh,
+    0x68736C62: BlendShape,
     0x6C656B73: Skeleton,
     0x6D696E61: Animation,
     0x76727563: Curve,
     0x6669746E: NotificationTrack,
     0x656E6F62: Bone,
     0x6C74616D: Material,
-    0x656C6966: File
+    0x656C6966: File,
 }
 
 

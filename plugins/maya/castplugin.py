@@ -22,6 +22,11 @@ sceneSettings = {
 }
 
 
+def utilityAbout():
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.0",
+                       button=['OK'], defaultButton='OK', title="About Cast")
+
+
 def utilityRemoveNamespaces():
     namespaceController = OpenMaya.MNamespace()
     namespaces = namespaceController.getNamespaces(True)
@@ -141,6 +146,8 @@ def utilityCreateMenu():
 
     cmds.menuItem(label="Reset Scene", annotation="Resets the scene, removing the current animation curves",
                   command=lambda x: utilityClearAnimation())
+    cmds.menuItem(label="About", annotation="View information about this plugin",
+                  command=lambda x: utilityAbout())
 
 
 def utilityClearAnimation():
@@ -318,16 +325,12 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
     return (materialInstance)
 
 
-def utilitySaveNodeData(dagPath, rotationTrack):
+def utilitySaveNodeData(dagPath):
     global sceneResetCache
 
     # Grab the transform first
     transform = OpenMaya.MFnTransform(dagPath)
     restTransform = transform.transformation()
-
-    # Set the orientation to 0 since we animate on the rotation transform
-    if rotationTrack and cmds.objExists("%s.jo" % dagPath.fullPathName()):
-        cmds.setAttr("%s.jo" % dagPath.fullPathName(), 0, 0, 0)
 
     # If we already had the bone saved, ignore this
     if dagPath.fullPathName() in sceneResetCache:
@@ -352,7 +355,7 @@ def utilityGetOrCreateCurve(name, property, curveType):
     except RuntimeError:
         return None
 
-    utilitySaveNodeData(nodePath, property in ["rx", "ry", "rz"])
+    utilitySaveNodeData(nodePath)
 
     propertyPlug = OpenMaya.MFnDependencyNode(
         nodePath.node()).findPlug(property, False)
@@ -384,7 +387,7 @@ def utilityGetOrCreateCurve(name, property, curveType):
     return None
 
 
-def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueBuffer, mode):
+def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
     timeBuffer = OpenMaya.MTimeArray()
     smallestFrame = OpenMaya.MTime()
     largestFrame = OpenMaya.MTime()
@@ -439,7 +442,10 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
             frameQuat = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
-            euler = (frameQuat * additiveQuat).asEulerRotation()
+            if blendWeight == 0.0:
+                euler = frameQuat.asEulerRotation()
+            else:
+                euler = (frameQuat * additiveQuat).asEulerRotation()
 
             valuesX[slot] = euler.x
             valuesY[slot] = euler.y
@@ -467,7 +473,7 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
     return (smallestFrame, largestFrame)
 
 
-def utilityImportSingleTrackData(tracks, timeUnit, frameStart, frameBuffer, valueBuffer, mode):
+def utilityImportSingleTrackData(tracks, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
     smallestFrame = OpenMaya.MTime()
     largestFrame = OpenMaya.MTime()
     timeBuffer = OpenMaya.MTimeArray()
@@ -533,16 +539,22 @@ def importSkeletonNode(skeleton):
     jointNode = jointTransform.create()
     jointTransform.setName("Joints")
 
+    progress = utilityCreateProgress("Importing skeleton...", len(bones) * 3)
+
     for i, bone in enumerate(bones):
         newBone = OpenMayaAnim.MFnIkJoint()
         newBone.create(jointNode)
         newBone.setName(bone.Name())
         handles[i] = newBone
 
+        utilityStepProgress(progress)
+
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
             cmds.parent(handles[i].fullPathName(),
                         handles[bone.ParentIndex()].fullPathName())
+
+        utilityStepProgress(progress)
 
     for i, bone in enumerate(bones):
         scaleUtility = OpenMaya.MScriptUtil()
@@ -551,7 +563,9 @@ def importSkeletonNode(skeleton):
 
         if bone.SegmentScaleCompensate() is not None:
             segmentScale = bone.SegmentScaleCompensate()
-            cmds.setAttr("%s.segmentScaleCompensate" % paths[1], segmentScale)
+            scalePlug = newBone.findPlug("segmentScaleCompensate")
+            if scalePlug is not None:
+                scalePlug.setBool(bool(segmentScale))
 
         if bone.LocalPosition() is not None:
             localPos = bone.LocalPosition()
@@ -559,13 +573,16 @@ def importSkeletonNode(skeleton):
 
             newBone.setTranslation(OpenMaya.MVector(
                 localPos[0], localPos[1], localPos[2]), OpenMaya.MSpace.kTransform)
-            newBone.setOrientation(OpenMaya.MQuaternion(
+            newBone.setRotation(OpenMaya.MQuaternion(
                 localRot[0], localRot[1], localRot[2], localRot[3]))
 
         if bone.Scale() is not None:
             scale = bone.Scale()
             scaleUtility.createFromList([scale[0], scale[1], scale[2]], 3)
             newBone.setScale(scaleUtility.asDoublePtr())
+
+        utilityStepProgress(progress)
+    utilityEndProgress(progress)
 
     return (handles, paths)
 
@@ -601,12 +618,16 @@ def importModelNode(model, path):
     meshTransform.setName(os.path.splitext(os.path.basename(path))[0])
 
     meshes = model.Meshes()
-    progress = utilityCreateProgress("Importing model...", len(meshes))
+    progress = utilityCreateProgress("Importing meshes...", len(meshes))
+    meshHandles = {}
 
     for mesh in meshes:
         newMeshTransform = OpenMaya.MFnTransform()
         newMeshNode = newMeshTransform.create(meshNode)
-        newMeshTransform.setName("CastMesh")
+        newMeshTransform.setName(mesh.Name() or "CastMesh")
+
+        # Store the mesh for reference in other nodes later
+        meshHandles[mesh.Hash()] = newMeshNode
 
         # Triangle count / vertex count
         faceCount = mesh.FaceCount()
@@ -747,6 +768,38 @@ def importModelNode(model, path):
         utilityStepProgress(progress)
     utilityEndProgress(progress)
 
+    blendShapes = model.BlendShapes()
+    progress = utilityCreateProgress("Importing shapes...", len(blendShapes))
+
+    for blendShape in blendShapes:
+        # We need one base shape and 1+ target shapes
+        if blendShape.BaseShape() is None or blendShape.BaseShape().Hash() not in meshHandles:
+            continue
+        if blendShape.TargetShapes() is None:
+            continue
+
+        # Default to 1.0 when value is not present
+        baseShape = meshHandles[blendShape.BaseShape().Hash()]
+        targetShapes = [meshHandles[x.Hash()] for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
+        targetWeightScales = blendShape.TargetWeightScales() or []
+        targetWeightScaleCount = len(targetWeightScales)
+
+        # Create the deformer on the base shape
+        blendDeformer = OpenMayaAnim.MFnBlendShapeDeformer()
+        blendDeformer.create(baseShape)
+
+        # Assign the targets
+        for i, targetShape in enumerate(targetShapes):
+            if i < targetWeightScaleCount:
+                fullWeight = targetWeightScales[i]
+            else:
+                fullWeight = 1.0
+            blendDeformer.addTarget(baseShape, i, targetShape, fullWeight)
+            
+        utilityStepProgress(progress)
+
+    utilityEndProgress(progress)
+
 
 def importCurveNode(node, path, timeUnit, startFrame, transformSpace):
     propertySwitcher = {
@@ -803,7 +856,7 @@ def importCurveNode(node, path, timeUnit, startFrame, transformSpace):
     keyValueBuffer = node.KeyValueBuffer()
 
     (smallestFrame, largestFrame) = trackSwitcher[propertyName](
-        tracks, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode())
+        tracks, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode(), node.AdditiveBlendWeight())
 
     # Make sure we have at least one quaternion track to set the interpolation mode to
     if propertyName == "rq":

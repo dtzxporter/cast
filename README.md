@@ -9,12 +9,12 @@ The goal of cast is to create an engine agnostic format that can be parsed and w
 ## 3D Engine Plugins:
 - Autodesk Maya (Beta): [Releases](https://github.com/dtzxporter/cast/releases)
 - Blender (2.8+) (Beta): [Releases](https://github.com/dtzxporter/cast/releases)
-- 3DS Max: (COMING SOON)
+- 3DS Max: (Help wanted)
 
 # Programming libraries:
-- .NET Framework: (COMING SOON)
+- .NET Framework: (Help wanted)
 - Python: [Libraries/Python](https://github.com/dtzxporter/cast/tree/master/libraries/python)
-- C++: (COMMING SOON)
+- C++: (Help wanted)
 
 ## File stucture:
 All files start with a cast header:
@@ -52,6 +52,7 @@ enum class CastId : uint32_t
 	Root = 0x746F6F72,
 	Model = 0x6C646F6D,
 	Mesh = 0x6873656D,
+	BlendShape = 0x68736C62,
 	Skeleton = 0x6C656B73,
 	Bone = 0x656E6F62,
 	Animation = 0x6D696E61,
@@ -146,11 +147,17 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
 		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
  	</tr>
 	 <tr>
   		<td>Vertex Position Buffer (vp)</td>
@@ -224,6 +231,58 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 - `Face Buffer` is an index into the current meshes vertex data buffers where (0, 1, 2) are the first three vertices from this mesh.
 - The `Face Buffer` follows CCW (right-handed) winding order, this may be different in other apis, where you may have to remap the indices.
 - Each vertex descriptor buffer must contain the same number of elements ex: if you have 16 vertices, you must have 16 normals if they exist, 16 colors if the buffer exists. Otherwise it's assumed they are default / skipped.
+
+### Blend Shape:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Model</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Base Shape (Hash of CastNode:Mesh) (b)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Target Shapes (Hashes of CastNode:Mesh) (t)</td>
+   		<td>Integer 64 (l)</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Target Weight Scales (ts)</td>
+   		<td>Float (f)</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+**Notes**:
+- At a minimum one `Base Shape` and one `Target Shape` must be present.
+- `Target Weight Scales` indicates the maximum value the target shape can deform to. The count usually will match `Target Shape(s)` but if it does not plugins should fall back to 1.0 as the default.
 
 ### Skeleton:
 <table>
@@ -568,6 +627,12 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
    		<td>String (s) [additive, absolute, relative]</td>
 		<td>False</td>
 		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Additive Blend Weight (ab)</td>
+   		<td>Float (f)</td>
+		<td>False</td>
+		<td>False</td>
  	</tr>
 </table>
 
