@@ -10,8 +10,8 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (0, 0, 0),
-    "blender": (2, 80, 0),
+    "version": (0, 90, 0),
+    "blender": (2, 90, 0),
     "location": "File > Import",
     "description": "Import Cast",
     "wiki_url": "https://github.com/dtzxporter/cast",
@@ -57,7 +57,7 @@ def register():
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
+    bpy.utils.unregister_class(ImportCast)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_cast_import)
 
 

@@ -142,17 +142,19 @@ def importModelNode(model, path):
     meshes = model.Meshes()
     for mesh in meshes:
         newMesh = bpy.data.meshes.new("polySurfaceMesh")
+
+        vertexPositions = mesh.VertexPositionBuffer()
+        newMesh.vertices.add(len(vertexPositions) / 3)
+        newMesh.vertices.foreach_set("co", vertexPositions)
+
         blendMesh = bmesh.new()
+        blendMesh.from_mesh(newMesh)
 
         vertexColorLayer = blendMesh.loops.layers.color.new("color1")
         vertexWeightLayer = blendMesh.verts.layers.deform.new()
         vertexUVLayers = [blendMesh.loops.layers.uv.new(
             "map%d" % x) for x in range(mesh.UVLayerCount())]
 
-        vertexPositions = mesh.VertexPositionBuffer()
-        for x in range(0, len(vertexPositions), 3):
-            blendMesh.verts.new(
-                Vector((vertexPositions[x], vertexPositions[x + 1], vertexPositions[x + 2])))
         blendMesh.verts.ensure_lookup_table()
 
         faceLookupMap = [1, 2, 0]
@@ -168,15 +170,12 @@ def importModelNode(model, path):
                 vertexIndex = faces[faceStart + faceLookupMap[x]]
 
                 if vertexNormals is not None:
-                    vertexNormalLayer.append((vertexNormals[vertexIndex * 3], vertexNormals[(
+                    vertexNormalLayer.extend((vertexNormals[vertexIndex * 3], vertexNormals[(
                         vertexIndex * 3) + 1], vertexNormals[(vertexIndex * 3) + 2]))
 
                 for uvLayer in range(mesh.UVLayerCount()):
-                    uv = Vector(
-                        (vertexUVs[uvLayer][vertexIndex * 2], vertexUVs[uvLayer][(vertexIndex * 2) + 1]))
-                    uv.y = 1.0 - uv.y
-
-                    loop[vertexUVLayers[uvLayer]].uv = uv
+                    loop[vertexUVLayers[uvLayer]].uv = Vector(
+                        (vertexUVs[uvLayer][vertexIndex * 2], 1.0 - vertexUVs[uvLayer][(vertexIndex * 2) + 1]))
 
                 if vertexColors is not None:
                     loop[vertexColorLayer] = [
@@ -184,8 +183,8 @@ def importModelNode(model, path):
 
         faces = mesh.FaceBuffer()
         for faceStart in range(0, len(faces), 3):
-            indices = [blendMesh.verts[faces[faceStart + faceLookupMap[0]]],
-                       blendMesh.verts[faces[faceStart + faceLookupMap[1]]], blendMesh.verts[faces[faceStart + faceLookupMap[2]]]]
+            indices = [blendMesh.verts[faces[faceStart + 1]],
+                       blendMesh.verts[faces[faceStart + 2]], blendMesh.verts[faces[faceStart]]]
 
             try:
                 newLoop = blendMesh.faces.new(indices)
@@ -195,20 +194,28 @@ def importModelNode(model, path):
                 vertexToFaceVertex(newLoop)
 
         maximumInfluence = mesh.MaximumWeightInfluence()
-        if maximumInfluence > 0:
+        if maximumInfluence > 1:  # Slower path for complex weights
             weightBoneBuffer = mesh.VertexWeightBoneBuffer()
             weightValueBuffer = mesh.VertexWeightValueBuffer()
+
             for x, vert in enumerate(blendMesh.verts):
-                if (weightValueBuffer[x * maximumInfluence] > 0.0):
-                    vert[vertexWeightLayer][weightBoneBuffer[x * maximumInfluence]
-                                            ] = weightValueBuffer[x * maximumInfluence]
+                for j in range(maximumInfluence):
+                    index = j + (x * maximumInfluence)
+                    value = weightValueBuffer[index]
+
+                    if (value > 0.0):
+                        vert[vertexWeightLayer][weightBoneBuffer[index]] = value
+        elif maximumInfluence > 0:  # Fast path for simple weighted meshes
+            weightBoneBuffer = mesh.VertexWeightBoneBuffer()
+            for x, vert in enumerate(blendMesh.verts):
+                vert[vertexWeightLayer][weightBoneBuffer[x]] = 1.0
 
         blendMesh.to_mesh(newMesh)
+        blendMesh.free()
         newMesh.create_normals_split()
 
         if len(vertexNormalLayer) > 0:
-            for x, _loop in enumerate(newMesh.loops):
-                newMesh.loops[x].normal = vertexNormalLayer[x]
+            newMesh.loops.foreach_set("normal", vertexNormalLayer)
 
         newMesh.validate(clean_customdata=False)
         clnors = array.array('f', [0.0] * (len(newMesh.loops) * 3))
@@ -228,14 +235,14 @@ def importModelNode(model, path):
         if meshMaterial is not None:
             meshObj.data.materials.append(materialArray[meshMaterial.Name()])
 
-        for bone in skeletonObj.pose.bones:
-            meshObj.vertex_groups.new(name=bone.name)
+        # for bone in skeletonObj.pose.bones:
+        #    meshObj.vertex_groups.new(name=bone.name)
 
         meshObj.parent = skeletonObj
         modifier = meshObj.modifiers.new('Armature Rig', 'ARMATURE')
         modifier.object = skeletonObj
         modifier.use_bone_envelopes = False
-        modifier.use_vertex_groups = True
+        # modifier.use_vertex_groups = True
 
 
 def importRootNode(node, path):
