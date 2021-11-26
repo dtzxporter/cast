@@ -235,14 +235,14 @@ def importModelNode(model, path):
         if meshMaterial is not None:
             meshObj.data.materials.append(materialArray[meshMaterial.Name()])
 
-        # for bone in skeletonObj.pose.bones:
-        #    meshObj.vertex_groups.new(name=bone.name)
+        for bone in skeletonObj.pose.bones:
+            meshObj.vertex_groups.new(name=bone.name)
 
         meshObj.parent = skeletonObj
         modifier = meshObj.modifiers.new('Armature Rig', 'ARMATURE')
         modifier.object = skeletonObj
         modifier.use_bone_envelopes = False
-        # modifier.use_vertex_groups = True
+        modifier.use_vertex_groups = True
 
 
 def importRootNode(node, path):
