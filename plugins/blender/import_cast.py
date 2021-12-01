@@ -147,9 +147,7 @@ def importModelNode(model, path):
     bpy.context.scene.collection.children.unlink(collection)
 
     meshes = model.Meshes()
-    numMesh = len(meshes)
-    for nxm, mesh in enumerate(meshes):
-        print("Loading mesh (%d/%d)" % (nxm, numMesh))
+    for mesh in meshes:
         newMesh = bpy.data.meshes.new("polySurfaceMesh")
         meshObj = bpy.data.objects.new(mesh.Name() or "CastMesh", newMesh)
 
