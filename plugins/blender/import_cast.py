@@ -2,8 +2,10 @@ import bpy
 import bmesh
 import os
 import array
+import time
 import math
 from mathutils import *
+from bpy_extras.io_utils import unpack_list
 from bpy_extras.image_utils import load_image
 from .cast import Cast, Model, Animation, Curve, NotificationTrack, Mesh, Skeleton, Bone, Material, File
 
@@ -67,8 +69,8 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             shader.inputs[switcher[slot]], texture.outputs["Color"])
 
 
-def importSkeletonNode(name, skeleton):
-    if skeleton is None:
+def importSkeletonNode(name, skeleton, collection):
+    if skeleton is None or len(skeleton.Bones()) == 0:
         return None
 
     armature = bpy.data.armatures.new("Joints")
@@ -77,10 +79,8 @@ def importSkeletonNode(name, skeleton):
     skeletonObj = bpy.data.objects.new(name, armature)
     skeletonObj.show_in_front = True
 
-    bpy.context.view_layer.active_layer_collection.collection.objects.link(
-        skeletonObj)
+    collection.objects.link(skeletonObj)
     bpy.context.view_layer.objects.active = skeletonObj
-
     bpy.ops.object.mode_set(mode='EDIT')
 
     bones = skeleton.Bones()
@@ -134,115 +134,114 @@ def importModelNode(model, path):
     # Extract the name of this model from the path
     modelName = os.path.splitext(os.path.basename(path))[0]
 
+    # Create a collection for our objects
+    collection = bpy.data.collections.new(modelName)
+    bpy.context.scene.collection.children.link(collection)
+
     # Import skeleton for binds, materials for meshes
-    skeletonObj = importSkeletonNode(modelName, model.Skeleton())
+    skeletonObj = importSkeletonNode(modelName, model.Skeleton(), collection)
     materialArray = {key: value for (key, value) in (
         importMaterialNode(path, x) for x in model.Materials())}
 
+    # For mesh import performance, unlink from scene until we're done
+    bpy.context.scene.collection.children.unlink(collection)
+
     meshes = model.Meshes()
-    for mesh in meshes:
+    numMesh = len(meshes)
+    for nxm, mesh in enumerate(meshes):
+        print("Loading mesh (%d/%d)" % (nxm, numMesh))
         newMesh = bpy.data.meshes.new("polySurfaceMesh")
+        meshObj = bpy.data.objects.new(mesh.Name() or "CastMesh", newMesh)
 
         vertexPositions = mesh.VertexPositionBuffer()
         newMesh.vertices.add(len(vertexPositions) / 3)
         newMesh.vertices.foreach_set("co", vertexPositions)
 
-        blendMesh = bmesh.new()
-        blendMesh.from_mesh(newMesh)
+        faces = mesh.FaceBuffer()
+        faceIndicesCount = len(faces)
+        facesCount = faceIndicesCount / 3
 
-        vertexColorLayer = blendMesh.loops.layers.color.new("color1")
-        vertexWeightLayer = blendMesh.verts.layers.deform.new()
-        vertexUVLayers = [blendMesh.loops.layers.uv.new(
-            "map%d" % x) for x in range(mesh.UVLayerCount())]
+        # Remap face indices to match blender's winding order
+        faces = unpack_list([(faces[x + 1], faces[x + 2], faces[x + 0])
+                             for x in range(0, faceIndicesCount, 3)])
 
-        blendMesh.verts.ensure_lookup_table()
+        newMesh.loops.add(faceIndicesCount)
+        newMesh.polygons.add(facesCount)
 
-        faceLookupMap = [1, 2, 0]
-        vertexNormalLayer = []
+        newMesh.loops.foreach_set("vertex_index", faces)
+        newMesh.polygons.foreach_set(
+            "loop_start", [x for x in range(0, faceIndicesCount, 3)])
+        newMesh.polygons.foreach_set(
+            "loop_total", [3 for _ in range(0, faceIndicesCount, 3)])
+        newMesh.polygons.foreach_set(
+            "material_index", [0 for _ in range(0, faceIndicesCount, 3)])
+
+        for i in range(mesh.UVLayerCount()):
+            uvBuffer = mesh.VertexUVLayerBuffer(i)
+            newMesh.uv_layers.new(do_init=False)
+            newMesh.uv_layers[i].data.foreach_set("uv", unpack_list(
+                [(uvBuffer[x * 2], 1.0 - uvBuffer[(x * 2) + 1]) for x in faces]))
+
+        vertexColors = mesh.VertexColorBuffer()
+        if vertexColors is not None:
+            newMesh.vertex_colors.new(do_init=False)
+            newMesh.vertex_colors[0].data.foreach_set("color", unpack_list([((vertexColors[x] >> 24 & 0xff) / 255.0, (vertexColors[x]
+                                                                                                                      >> 16 & 0xff) / 255.0, (vertexColors[x] >> 8 & 0xff) / 255.0, (vertexColors[x] >> 0 & 0xff) / 255.0) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
-        vertexColors = mesh.VertexColorBuffer()
-        vertexUVs = [mesh.VertexUVLayerBuffer(
-            x) for x in range(mesh.UVLayerCount())]
-
-        def vertexToFaceVertex(face):
-            for x, loop in enumerate(face.loops):
-                vertexIndex = faces[faceStart + faceLookupMap[x]]
-
-                if vertexNormals is not None:
-                    vertexNormalLayer.extend((vertexNormals[vertexIndex * 3], vertexNormals[(
-                        vertexIndex * 3) + 1], vertexNormals[(vertexIndex * 3) + 2]))
-
-                for uvLayer in range(mesh.UVLayerCount()):
-                    loop[vertexUVLayers[uvLayer]].uv = Vector(
-                        (vertexUVs[uvLayer][vertexIndex * 2], 1.0 - vertexUVs[uvLayer][(vertexIndex * 2) + 1]))
-
-                if vertexColors is not None:
-                    loop[vertexColorLayer] = [
-                        (vertexColors[vertexIndex] >> i & 0xff) / 255.0 for i in (24, 16, 8, 0)]
-
-        faces = mesh.FaceBuffer()
-        for faceStart in range(0, len(faces), 3):
-            indices = [blendMesh.verts[faces[faceStart + 1]],
-                       blendMesh.verts[faces[faceStart + 2]], blendMesh.verts[faces[faceStart]]]
-
-            try:
-                newLoop = blendMesh.faces.new(indices)
-            except ValueError:
-                continue
-            else:
-                vertexToFaceVertex(newLoop)
-
-        maximumInfluence = mesh.MaximumWeightInfluence()
-        if maximumInfluence > 1:  # Slower path for complex weights
-            weightBoneBuffer = mesh.VertexWeightBoneBuffer()
-            weightValueBuffer = mesh.VertexWeightValueBuffer()
-
-            for x, vert in enumerate(blendMesh.verts):
-                for j in range(maximumInfluence):
-                    index = j + (x * maximumInfluence)
-                    value = weightValueBuffer[index]
-
-                    if (value > 0.0):
-                        vert[vertexWeightLayer][weightBoneBuffer[index]] = value
-        elif maximumInfluence > 0:  # Fast path for simple weighted meshes
-            weightBoneBuffer = mesh.VertexWeightBoneBuffer()
-            for x, vert in enumerate(blendMesh.verts):
-                vert[vertexWeightLayer][weightBoneBuffer[x]] = 1.0
-
-        blendMesh.to_mesh(newMesh)
-        blendMesh.free()
         newMesh.create_normals_split()
-
-        if len(vertexNormalLayer) > 0:
-            newMesh.loops.foreach_set("normal", vertexNormalLayer)
+        newMesh.loops.foreach_set("normal", unpack_list(
+            [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
 
         newMesh.validate(clean_customdata=False)
         clnors = array.array('f', [0.0] * (len(newMesh.loops) * 3))
-
         newMesh.loops.foreach_get("normal", clnors)
+
         newMesh.polygons.foreach_set(
             "use_smooth", [True] * len(newMesh.polygons))
+
         newMesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
         newMesh.use_auto_smooth = True
 
-        meshObj = bpy.data.objects.new("CastMesh", newMesh)
-        bpy.context.view_layer.active_layer_collection.collection.objects.link(
-            meshObj)
-        bpy.context.view_layer.objects.active = meshObj
-
         meshMaterial = mesh.Material()
         if meshMaterial is not None:
-            meshObj.data.materials.append(materialArray[meshMaterial.Name()])
+            # TODO: This is very very slow, it would help if all meshes could share all materials
+            # (DTZxPorter: I filed a bug report: https://developer.blender.org/T93550)
+            newMesh.materials.append(materialArray[meshMaterial.Name()])
 
-        for bone in skeletonObj.pose.bones:
-            meshObj.vertex_groups.new(name=bone.name)
+        if skeletonObj is not None:
+            boneGroups = []
+            for bone in skeletonObj.pose.bones:
+                boneGroups.append(meshObj.vertex_groups.new(name=bone.name))
 
-        meshObj.parent = skeletonObj
-        modifier = meshObj.modifiers.new('Armature Rig', 'ARMATURE')
-        modifier.object = skeletonObj
-        modifier.use_bone_envelopes = False
-        modifier.use_vertex_groups = True
+            meshObj.parent = skeletonObj
+            modifier = meshObj.modifiers.new('Armature Rig', 'ARMATURE')
+            modifier.object = skeletonObj
+            modifier.use_bone_envelopes = False
+            modifier.use_vertex_groups = True
+
+            maximumInfluence = mesh.MaximumWeightInfluence()
+            if maximumInfluence > 1:  # Slower path for complex weights
+                weightBoneBuffer = mesh.VertexWeightBoneBuffer()
+                weightValueBuffer = mesh.VertexWeightValueBuffer()
+
+                for x in range(len(newMesh.vertices)):
+                    for j in range(maximumInfluence):
+                        index = j + (x * maximumInfluence)
+                        value = weightValueBuffer[index]
+
+                        if (value > 0.0):
+                            boneGroups[weightBoneBuffer[index]].add(
+                                (x,), value, "REPLACE")
+            elif maximumInfluence > 0:  # Fast path for simple weighted meshes
+                weightBoneBuffer = mesh.VertexWeightBoneBuffer()
+                for x in range(len(newMesh.vertices)):
+                    boneGroups[weightBoneBuffer[x]].add((x,), 1.0, "REPLACE")
+
+        collection.objects.link(meshObj)
+
+    # Relink the collection after the mesh is built
+    bpy.context.scene.collection.children.link(collection)
 
 
 def importRootNode(node, path):
@@ -266,5 +265,4 @@ def load(self, context, filepath=""):
 
     # Update the scene, reset view mode before returning.
     bpy.context.view_layer.update()
-    bpy.ops.object.mode_set(mode="OBJECT")
     return True
