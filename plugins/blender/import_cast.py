@@ -239,7 +239,7 @@ def importModelNode(model, path):
         collection.objects.link(meshObj)
 
     # Relink the collection after the mesh is built
-    bpy.context.scene.collection.children.link(collection)
+    bpy.context.view_layer.active_layer_collection.collection.children.link(collection)
 
 
 def importRootNode(node, path):
