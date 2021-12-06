@@ -9,7 +9,10 @@ import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
 
 # Support Python 3.0+
-if xrange is None:
+try:
+    if xrange is None:
+        xrange = range
+except NameError:
     xrange = range
 
 # Used for scene reset cache
@@ -23,7 +26,7 @@ sceneSettings = {
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.0",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.1",
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -780,7 +783,8 @@ def importModelNode(model, path):
 
         # Default to 1.0 when value is not present
         baseShape = meshHandles[blendShape.BaseShape().Hash()]
-        targetShapes = [meshHandles[x.Hash()] for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
+        targetShapes = [meshHandles[x.Hash()]
+                        for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
         targetWeightScales = blendShape.TargetWeightScales() or []
         targetWeightScaleCount = len(targetWeightScales)
 
@@ -795,7 +799,7 @@ def importModelNode(model, path):
             else:
                 fullWeight = 1.0
             blendDeformer.addTarget(baseShape, i, targetShape, fullWeight)
-            
+
         utilityStepProgress(progress)
 
     utilityEndProgress(progress)
