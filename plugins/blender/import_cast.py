@@ -152,7 +152,7 @@ def importModelNode(model, path):
         meshObj = bpy.data.objects.new(mesh.Name() or "CastMesh", newMesh)
 
         vertexPositions = mesh.VertexPositionBuffer()
-        newMesh.vertices.add(len(vertexPositions) / 3)
+        newMesh.vertices.add(int(len(vertexPositions) / 3))
         newMesh.vertices.foreach_set("co", vertexPositions)
 
         faces = mesh.FaceBuffer()
@@ -164,7 +164,7 @@ def importModelNode(model, path):
                              for x in range(0, faceIndicesCount, 3)])
 
         newMesh.loops.add(faceIndicesCount)
-        newMesh.polygons.add(facesCount)
+        newMesh.polygons.add(int(facesCount))
 
         newMesh.loops.foreach_set("vertex_index", faces)
         newMesh.polygons.foreach_set(
