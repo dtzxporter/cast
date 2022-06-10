@@ -209,8 +209,8 @@ def importModelNode(model, path):
 
         if skeletonObj is not None:
             boneGroups = []
-            for bone in skeletonObj.pose.bones:
-                boneGroups.append(meshObj.vertex_groups.new(name=bone.name))
+            for bone in model.Skeleton().Bones():
+                boneGroups.append(meshObj.vertex_groups.new(name=bone.Name()))
 
             meshObj.parent = skeletonObj
             modifier = meshObj.modifiers.new('Armature Rig', 'ARMATURE')
