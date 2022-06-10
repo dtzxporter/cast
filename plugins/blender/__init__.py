@@ -10,7 +10,9 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
+
     "version": (0, 90, 5),
+
     "blender": (2, 90, 0),
     "location": "File > Import",
     "description": "Import Cast",

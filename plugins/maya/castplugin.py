@@ -26,7 +26,7 @@ sceneSettings = {
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.1",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.2",
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -407,7 +407,7 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
     # same as absolute and is only used for translations
     if mode == "absolute" or mode == "relative" or mode is None:
         for i in xrange(0, len(valueBuffer), 4):
-            slot = i / 4
+            slot = int(i / 4)
             frame = OpenMaya.MTime(frameBuffer[slot], timeUnit) + frameStart
             if frame < smallestFrame:
                 smallestFrame = frame
@@ -423,7 +423,7 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
             valuesZ[slot] = euler.z
     elif mode == "additive":
         for i in xrange(0, len(valueBuffer), 4):
-            slot = i / 4
+            slot = int(i / 4)
             frame = OpenMaya.MTime(frameBuffer[slot], timeUnit) + frameStart
             if frame < smallestFrame:
                 smallestFrame = frame
@@ -633,8 +633,8 @@ def importModelNode(model, path):
         meshHandles[mesh.Hash()] = newMeshNode
 
         # Triangle count / vertex count
-        faceCount = mesh.FaceCount()
-        vertexCount = mesh.VertexCount()
+        faceCount = int(mesh.FaceCount())
+        vertexCount = int(mesh.VertexCount())
 
         faces = mesh.FaceBuffer()
         scriptUtil = OpenMaya.MScriptUtil()
@@ -673,7 +673,7 @@ def importModelNode(model, path):
                 [x for x in vertexNormals], len(vertexNormals))
 
             vertexNormalBuffer = OpenMaya.MVectorArray(
-                scriptUtil.asFloat3Ptr(), len(vertexNormals) / 3)
+                scriptUtil.asFloat3Ptr(), int(len(vertexNormals) / 3))
 
             newMesh.setVertexNormals(vertexNormalBuffer, vertexIndexBuffer)
 
