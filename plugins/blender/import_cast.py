@@ -183,8 +183,8 @@ def importModelNode(model, path):
         vertexColors = mesh.VertexColorBuffer()
         if vertexColors is not None:
             newMesh.vertex_colors.new(do_init=False)
-            newMesh.vertex_colors[0].data.foreach_set("color", unpack_list([((vertexColors[x] >> 24 & 0xff) / 255.0, (vertexColors[x]
-                                                                                                                      >> 16 & 0xff) / 255.0, (vertexColors[x] >> 8 & 0xff) / 255.0, (vertexColors[x] >> 0 & 0xff) / 255.0) for x in faces]))
+            newMesh.vertex_colors[0].data.foreach_set("color", unpack_list([((vertexColors[x] >> 0 & 0xff) / 255.0, (vertexColors[x]
+                                                                                                                      >> 8 & 0xff) / 255.0, (vertexColors[x] >> 16 & 0xff) / 255.0, (vertexColors[x] >> 24 & 0xff) / 255.0) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
         newMesh.create_normals_split()

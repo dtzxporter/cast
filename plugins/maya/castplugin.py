@@ -26,7 +26,7 @@ sceneSettings = {
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.2",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.3",
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -681,7 +681,7 @@ def importModelNode(model, path):
         if vertexColors is not None:
             scriptUtil = OpenMaya.MScriptUtil()
             scriptUtil.createFromList([x for xs in [[(x >> i & 0xff) / 255.0 for i in (
-                24, 16, 8, 0)] for x in vertexColors] for x in xs], len(vertexColors) * 4)
+                0, 8, 16, 24)] for x in vertexColors] for x in xs], len(vertexColors) * 4)
 
             vertexColorBuffer = OpenMaya.MColorArray(
                 scriptUtil.asFloat4Ptr(), len(vertexColors))
