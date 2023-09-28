@@ -203,8 +203,6 @@ def importModelNode(model, path):
 
         meshMaterial = mesh.Material()
         if meshMaterial is not None:
-            # TODO: This is very very slow, it would help if all meshes could share all materials
-            # (DTZxPorter: I filed a bug report: https://developer.blender.org/T93550)
             newMesh.materials.append(materialArray[meshMaterial.Name()])
 
         if skeletonObj is not None:
