@@ -945,8 +945,7 @@ def importRootNode(node, path):
 
 
 def importCast(path):
-    cast = Cast()
-    cast.load(path)
+    cast = Cast.load(path)
 
     for root in cast.Roots():
         importRootNode(root, path)

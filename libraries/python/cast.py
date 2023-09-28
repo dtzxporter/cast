@@ -458,7 +458,8 @@ class Cast(object):
     def __init__(self):
         self.rootNodes = []
 
-    def load(self, path):
+    @staticmethod
+    def load(path):
         try:
             file = open(path, "rb")
         except IOError:
@@ -470,9 +471,11 @@ class Cast(object):
             print("Invalid cast file magic")
             return
 
-        self.rootNodes = [None] * header[2]
+        cast = Cast()
+        cast.rootNodes = [None] * header[2]
+
         for i in range(header[2]):
-            self.rootNodes[i] = CastNode.load(file)
+            cast.rootNodes[i] = CastNode.load(file)
 
     def Roots(self):
         return [x for x in self.rootNodes]
