@@ -184,7 +184,7 @@ def importModelNode(model, path):
         if vertexColors is not None:
             newMesh.vertex_colors.new(do_init=False)
             newMesh.vertex_colors[0].data.foreach_set("color", unpack_list([((vertexColors[x] >> 0 & 0xff) / 255.0, (vertexColors[x]
-                                                                                                                      >> 8 & 0xff) / 255.0, (vertexColors[x] >> 16 & 0xff) / 255.0, (vertexColors[x] >> 24 & 0xff) / 255.0) for x in faces]))
+                                                                                                                     >> 8 & 0xff) / 255.0, (vertexColors[x] >> 16 & 0xff) / 255.0, (vertexColors[x] >> 24 & 0xff) / 255.0) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
         newMesh.create_normals_split()
@@ -237,7 +237,8 @@ def importModelNode(model, path):
         collection.objects.link(meshObj)
 
     # Relink the collection after the mesh is built
-    bpy.context.view_layer.active_layer_collection.collection.children.link(collection)
+    bpy.context.view_layer.active_layer_collection.collection.children.link(
+        collection)
 
 
 def importRootNode(node, path):
