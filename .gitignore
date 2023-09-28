@@ -354,3 +354,5 @@ MigrationBackup/
 *.zip
 plugins/blender/cast.py
 plugins/maya/cast.py
+.DS_Store
+copy_changes.sh
