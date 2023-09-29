@@ -26,7 +26,7 @@ sceneSettings = {
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.0.3",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.0",
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -805,7 +805,7 @@ def importModelNode(model, path):
     utilityEndProgress(progress)
 
 
-def importCurveNode(node, path, timeUnit, startFrame, transformSpace):
+def importCurveNode(node, path, timeUnit, startFrame):
     propertySwitcher = {
         # This is special, maya can't animate a quat separate
         "rq": ["rx", "ry", "rz"],
@@ -920,7 +920,7 @@ def importAnimationNode(node, path):
 
     for x in curves:
         (smallestFrame, largestFrame) = importCurveNode(
-            x, path, wantedFps, startFrame, node.TransformSpace())
+            x, path, wantedFps, startFrame)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame
         if largestFrame > wantedLargestFrame:

@@ -6,8 +6,10 @@ import time
 import math
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
-from bpy_extras.image_utils import load_image
 from .cast import Cast, Model, Animation, Curve, NotificationTrack, Mesh, Skeleton, Bone, Material, File
+
+PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
+SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
 
 
 def utilityBuildPath(root, asset):
@@ -22,7 +24,7 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
     # We will two shaders, one for metalness and one for specular
     if "metal" in slots:
         # Principled is default shader node
-        shader = material.node_tree.nodes["Principled BSDF"]
+        shader = material.node_tree.nodes[PRINCIPLED_BSDF]
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
@@ -35,9 +37,9 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
     else:
         # We need to create the specular node, removing principled first
         material.node_tree.nodes.remove(
-            material.node_tree.nodes["Principled BSDF"])
-        material_output = material.node_tree.nodes.get('Material Output')
-        shader = material.node_tree.nodes.new('ShaderNodeEeveeSpecular')
+            material.node_tree.nodes[PRINCIPLED_BSDF])
+        material_output = material.node_tree.nodes.get("Material Output")
+        shader = material.node_tree.nodes.new(SPECULAR_BSDF)
         material.node_tree.links.new(
             material_output.inputs[0], shader.outputs[0])
         switcher = {
@@ -92,11 +94,18 @@ def importSkeletonNode(name, skeleton, collection):
         newBone.tail = 0, 0.05, 0  # I am sorry but blender sucks
 
         tempQuat = bone.LocalRotation()  # Also sucks, WXYZ? => XYZW master race
-        matRotation = Quaternion(
-            (tempQuat[3], tempQuat[0], tempQuat[1], tempQuat[2])).to_matrix().to_4x4()
-        matTranslation = Matrix.Translation(Vector(bone.LocalPosition()))
+        rotation = Quaternion(
+            (tempQuat[3], tempQuat[0], tempQuat[1], tempQuat[2]))
+        
+        translation = Vector(bone.LocalPosition())
 
-        matrices[bone.Name()] = matTranslation @ matRotation
+        if bone.Scale() is not None:
+            scale = Vector(bone.Scale())
+        else:
+            scale = None
+
+        matrices[bone.Name()] = Matrix.LocRotScale(
+            translation, rotation, scale)
         handles[i] = newBone
 
     for i, bone in enumerate(bones):
@@ -241,11 +250,68 @@ def importModelNode(model, path):
         collection)
 
 
+def importCurveNode(node, path, startFrame):
+    print(node)
+
+
+def importAnimationNode(node, path):
+    # The object which the animation node should be applied to.
+    selectedObject = bpy.context.object
+    # Check that the selected object is an 'ARMATURE'.
+    if selectedObject is None or selectedObject.type != 'ARMATURE':
+        raise Exception(
+            "You must select an armature to apply the animation to.")
+
+    # Extract the name of this anim from the path
+    animName = os.path.splitext(os.path.basename(path))[0]
+
+    try:
+        selectedObject.animation_data.action
+    except:
+        selectedObject.animation_data_create()
+
+    # Ensure that all pose bones have rotation quaternion values.
+    for bone in selectedObject.pose.bones.data.bones:
+        bone.rotation_mode = 'QUATERNION'
+
+    bpy.ops.object.mode_set(mode='POSE')
+
+    action = bpy.data.actions.new(animName)
+    selectedObject.animation_data.action = action
+    selectedObject.animation_data.use_fake_user = True
+
+    scene = bpy.context.scene
+    scene.render.fps = int(node.Framerate())
+
+    # We need to determine the proper time to import the curves, for example
+    # the user may want to import at the current scene time, and that would require
+    # fetching once here, then passing to the curve importer.
+    wantedSmallestFrame = 0
+    wantedLargestFrame = 1
+
+    curves = node.ChildrenOfType(Curve)
+
+    for x in curves:
+        (smallestFrame, largestFrame) = importCurveNode(x, path, 0)
+        if smallestFrame < wantedSmallestFrame:
+            wantedSmallestFrame = smallestFrame
+        if largestFrame > wantedLargestFrame:
+            wantedLargestFrame = largestFrame
+
+    # Set the animation segment
+    scene.frame_current = 0
+    scene.frame_start = wantedSmallestFrame
+    scene.frame_end = wantedLargestFrame
+
+    bpy.context.evaluated_depsgraph_get().update()
+    bpy.ops.object.mode_set(mode='POSE')
+
+
 def importRootNode(node, path):
     for child in node.ChildrenOfType(Model):
         importModelNode(child, path)
-    # for child in node.ChildrenOfType(Animation):
-    #     importAnimationNode(child, path)
+    for child in node.ChildrenOfType(Animation):
+        importAnimationNode(child, path)
 
 
 def importCast(path):
@@ -259,4 +325,3 @@ def load(self, context, filepath=""):
     importCast(filepath)
 
     bpy.context.view_layer.update()
-    return True
