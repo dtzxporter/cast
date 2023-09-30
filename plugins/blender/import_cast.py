@@ -433,6 +433,14 @@ def importCurveNode(node, fcurves, poseBones, path, startFrame):
     return trackSwitcher[propertyName](tracks, poseBones, nodeName, propertyName, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode())
 
 
+def importNotificationTrackNode(node, action):
+    frameBuffer = node.KeyFrameBuffer()
+
+    for x in frameBuffer:
+        notetrack = action.pose_markers.new(node.Name())
+        notetrack.frame = x
+
+
 def importAnimationNode(node, path):
     # The object which the animation node should be applied to.
     selectedObject = bpy.context.object
@@ -481,6 +489,13 @@ def importAnimationNode(node, path):
     for x in curves:
         (smallestFrame, largestFrame) = importCurveNode(
             x, action.fcurves, poseBones, path, 0)
+        if smallestFrame < wantedSmallestFrame:
+            wantedSmallestFrame = smallestFrame
+        if largestFrame > wantedLargestFrame:
+            wantedLargestFrame = largestFrame
+
+    for x in node.ChildrenOfType(NotificationTrack):
+        (smallestFrame, largestFrame) = importNotificationTrackNode(x, action)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame
         if largestFrame > wantedLargestFrame:
