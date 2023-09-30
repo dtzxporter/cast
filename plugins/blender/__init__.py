@@ -10,7 +10,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (0, 90, 6),
+    "version": (1, 0, 0),
     "blender": (2, 90, 0),
     "location": "File > Import",
     "description": "Import Cast",
@@ -33,13 +33,14 @@ class ImportCast(bpy.types.Operator, ImportHelper):
 
     def execute(self, context):
         from . import import_cast
-        result = import_cast.load(
-            self, context, **self.as_keywords(ignore=("filter_glob", "files")))
-        if result:
+        try:
+            import_cast.load(
+                self, context, **self.as_keywords(ignore=("filter_glob", "files")))
+
             self.report({'INFO'}, 'Cast has been loaded')
             return {'FINISHED'}
-        else:
-            self.report({'ERROR'}, 'Failed to load Cast')
+        except Exception as e:
+            self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
 
     @classmethod

@@ -458,21 +458,24 @@ class Cast(object):
     def __init__(self):
         self.rootNodes = []
 
-    def load(self, path):
+    @staticmethod
+    def load(path):
         try:
             file = open(path, "rb")
         except IOError:
-            print("Could not open file for reading: %s\n" % path)
-            return
+            raise Exception("Could not open file for reading: %s\n" % path)
 
         header = struct.unpack("IIII", file.read(0x10))
         if header[0] != 0x74736163:
-            print("Invalid cast file magic")
-            return
+            raise Exception("Invalid cast file magic")
 
-        self.rootNodes = [None] * header[2]
+        cast = Cast()
+        cast.rootNodes = [None] * header[2]
+
         for i in range(header[2]):
-            self.rootNodes[i] = CastNode.load(file)
+            cast.rootNodes[i] = CastNode.load(file)
+
+        return cast
 
     def Roots(self):
         return [x for x in self.rootNodes]
