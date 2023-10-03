@@ -162,12 +162,6 @@ class Animation(CastNode):
             return lo.values[0] == 1
         return False
 
-    def TransformSpace(self):
-        ts = self.properties.get("ts")
-        if ts is not None:
-            return ts.values[0]
-        return "local"
-
 
 class Curve(CastNode):
     def __init__(self):

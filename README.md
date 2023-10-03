@@ -565,12 +565,6 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<td>False</td>
 		<td>False</td>
  	</tr>
-	 <tr>
-  		<td>Transform Space (ts)</td>
-   		<td>String (s) [local, world]</td>
-		<td>False</td>
-		<td>False</td>
- 	</tr>
 </table>
 
 ### Curve:
