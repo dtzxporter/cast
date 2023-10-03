@@ -16,6 +16,9 @@ The goal of cast is to create an engine agnostic format that can be parsed and w
 - Python: [Libraries/Python](https://github.com/dtzxporter/cast/tree/master/libraries/python)
 - C++: (Help wanted)
 
+# Coming from SEAnim/SEModel:
+- SECast, a lossless converter to cast: [SECast](https://dtzxporter.com/tools/secast)
+
 ## File stucture:
 All files start with a cast header:
 ```c++
