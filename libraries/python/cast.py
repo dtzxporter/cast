@@ -1,5 +1,16 @@
 import struct
 
+castHashBase = 0x534E495752545250
+
+
+def castNextHash():
+    global castHashBase
+
+    hash = castHashBase
+    castHashBase += 1
+
+    return hash
+
 
 class CastString_t(object):
     __slots__ = ("value")
@@ -18,31 +29,39 @@ class CastString_t(object):
             b = file.read(1)
         self.value = bytes.decode("utf-8")
 
+    def save(self, file):
+        file.write(self.value.encode("utf-8"))
+        file.write(b'\x00')
+
 
 class CastProperty_t(object):
-    __slots__ = ("size", "fmt")
+    __slots__ = ("size", "fmt", "identifier", "array")
 
     def __init__(self, identifier=None):
         switcher = {
-            'b': [1, "B"],
-            'h': [2, "H"],
-            'i': [4, "I"],
-            'l': [8, "Q"],
-            'f': [4, "f"],
-            'd': [8, "d"],
-            's': [0, "s"],
-            '2v': [8, "2f"],        # byteswapped for performance
-            '3v': [12, "3f"],      # byteswapped for performance
-            '4v': [16, "4f"]      # byteswapped for performance
+            'b': [1, "B", 1],
+            'h': [2, "H", 1],
+            'i': [4, "I", 1],
+            'l': [8, "Q", 1],
+            'f': [4, "f", 1],
+            'd': [8, "d", 1],
+            's': [0, "s", 1],
+            '2v': [8, "2f", 2],
+            '3v': [12, "3f", 3],
+            '4v': [16, "4f", 4]
         }
 
         if identifier is None:
             self.size = 0
             self.fmt = ""
+            self.identifier = None
+            self.array = 1
             return
 
         self.size = switcher[identifier][0]
         self.fmt = switcher[identifier][1]
+        self.array = switcher[identifier][2]
+        self.identifier = identifier
 
 
 class CastProperty(object):
@@ -70,16 +89,45 @@ class CastProperty(object):
             self.values = struct.unpack(
                 self.type.fmt * header[2], file.read(self.type.size * header[2]))
 
+    def save(self, file):
+        identifier = self.type.identifier.encode("utf-8")
+        name = self.name.encode("utf-8")
+
+        file.write(struct.pack(
+            "2sHI", identifier, len(name), int(len(self.values) / self.type.array)))
+        file.write(name)
+
+        if self.type.size == 0 and self.type.fmt == "s":
+            string = CastString_t()
+            string.value = self.values[0]
+
+            string.save(file)
+        else:
+            file.write(struct.pack(self.type.fmt *
+                       int(len(self.values) / self.type.array), *self.values))
+
+    def length(self):
+        result = 0x8
+
+        result += len(self.name.encode("utf-8"))
+
+        if self.type.size == 0 and self.type.fmt == "s":
+            result += len(self.values[0].encode("utf-8")) + 1
+        else:
+            result += self.type.size * int(len(self.values) / self.type.array)
+
+        return result
+
 
 class CastNode(object):
     __slots__ = ("identifier", "hash", "parentNode",
                  "childNodes", "properties")
 
-    def __init__(self):
+    def __init__(self, identifier=0):
         self.childNodes = []
         self.properties = {}
-        self.identifier = 0
-        self.hash = 0
+        self.identifier = identifier
+        self.hash = castNextHash()
         self.parentNode = None
 
     def ChildrenOfType(self, pType):
@@ -116,10 +164,29 @@ class CastNode(object):
 
         return node
 
+    def save(self, file):
+        file.write(struct.pack("IIQII", self.identifier, self.length(),
+                   self.hash, len(self.properties), len(self.childNodes)))
+
+        for property in self.properties.values():
+            property.save(file)
+        for childNode in self.childNodes:
+            childNode.save(file)
+
+    def length(self):
+        result = 0x18
+
+        for property in self.properties.values():
+            result += property.length()
+        for childNode in self.childNodes:
+            result += childNode.length()
+
+        return result
+
 
 class Model(CastNode):
     def __init__(self):
-        super(Model, self).__init__()
+        super(Model, self).__init__(0x6C646F6D)
 
     def Skeleton(self):
         find = self.ChildrenOfType(Skeleton)
@@ -139,7 +206,7 @@ class Model(CastNode):
 
 class Animation(CastNode):
     def __init__(self):
-        super(Animation, self).__init__()
+        super(Animation, self).__init__(0x6D696E61)
 
     def Skeleton(self):
         find = self.ChildrenOfType(Skeleton)
@@ -165,7 +232,7 @@ class Animation(CastNode):
 
 class Curve(CastNode):
     def __init__(self):
-        super(Curve, self).__init__()
+        super(Curve, self).__init__(0x76727563)
 
     def NodeName(self):
         nn = self.properties.get("nn")
@@ -206,7 +273,7 @@ class Curve(CastNode):
 
 class NotificationTrack(CastNode):
     def __init__(self):
-        super(NotificationTrack, self).__init__()
+        super(NotificationTrack, self).__init__(0x6669746E)
 
     def Name(self):
         n = self.properties.get("n")
@@ -223,7 +290,7 @@ class NotificationTrack(CastNode):
 
 class Mesh(CastNode):
     def __init__(self):
-        super(Mesh, self).__init__()
+        super(Mesh, self).__init__(0x6873656D)
 
     def Name(self):
         n = self.properties.get("n")
@@ -310,7 +377,7 @@ class Mesh(CastNode):
 
 class BlendShape(CastNode):
     def __init__(self):
-        super(BlendShape, self).__init__()
+        super(BlendShape, self).__init__(0x68736C62)
 
     def BaseShape(self):
         b = self.properties.get("b")
@@ -333,7 +400,7 @@ class BlendShape(CastNode):
 
 class Skeleton(CastNode):
     def __init__(self):
-        super(Skeleton, self).__init__()
+        super(Skeleton, self).__init__(0x6C656B73)
 
     def Bones(self):
         return self.ChildrenOfType(Bone)
@@ -341,7 +408,7 @@ class Skeleton(CastNode):
 
 class Bone(CastNode):
     def __init__(self):
-        super(Bone, self).__init__()
+        super(Bone, self).__init__(0x656E6F62)
 
     def Name(self):
         name = self.properties.get("n")
@@ -398,7 +465,7 @@ class Bone(CastNode):
 
 class Material(CastNode):
     def __init__(self):
-        super(Material, self).__init__()
+        super(Material, self).__init__(0x6C74616D)
 
     def Name(self):
         name = self.properties.get("n")
@@ -422,7 +489,7 @@ class Material(CastNode):
 
 class File(CastNode):
     def __init__(self):
-        super(File, self).__init__()
+        super(File, self).__init__(0x656C6966)
 
     def Path(self):
         path = self.properties.get("p")
@@ -452,6 +519,9 @@ class Cast(object):
     def __init__(self):
         self.rootNodes = []
 
+    def Roots(self):
+        return [x for x in self.rootNodes]
+
     @staticmethod
     def load(path):
         try:
@@ -471,5 +541,14 @@ class Cast(object):
 
         return cast
 
-    def Roots(self):
-        return [x for x in self.rootNodes]
+    def save(self, path):
+        try:
+            file = open(path, "wb")
+        except IOError:
+            raise Exception("Could not create file for writing: %s\n" % path)
+
+        file.write(struct.pack(
+            "IIII", 0x74736163, 0x1, len(self.rootNodes), 0))
+
+        for rootNode in self.rootNodes:
+            rootNode.save(file)
