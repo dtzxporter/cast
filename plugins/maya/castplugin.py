@@ -26,7 +26,7 @@ sceneSettings = {
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.0",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.1",
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -328,6 +328,29 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
     return (materialInstance)
 
 
+def utilityGetRestData(restTransform, component):
+    if component == "rotation":
+        rotation = OpenMaya.MQuaternion()
+        restTransform.getRotation(rotation, OpenMaya.MSpace.kTransform)
+        return rotation.asEulerRotation()
+    elif component == "rotation_quaternion":
+        rotation = OpenMaya.MQuaternion()
+        restTransform.getRotation(rotation, OpenMaya.MSpace.kTransform)
+        return rotation
+    elif component == "translation":
+        return restTransform.getTranslation(OpenMaya.MSpace.kTransform)
+    elif component == "scale":
+        scale = OpenMaya.MScriptUtil()
+        scale.createFromList([1.0, 1.0, 1.0], 3)
+        scalePtr = scale.asDoublePtr()
+
+        restTransform.getScale(scalePtr)
+
+        return (OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 0), OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 1), OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 2))
+    else:
+        raise Exception("Invalid component was specified!")
+
+
 def utilitySaveNodeData(dagPath):
     global sceneResetCache
 
@@ -344,6 +367,9 @@ def utilitySaveNodeData(dagPath):
     # so we can reset the scene later
     transform.setRestPosition(restTransform)
 
+    # Required to handle relative transforms.
+    return restTransform
+
 
 def utilityGetOrCreateCurve(name, property, curveType):
     if not cmds.objExists("%s.%s" % (name, property)):
@@ -358,7 +384,7 @@ def utilityGetOrCreateCurve(name, property, curveType):
     except RuntimeError:
         return None
 
-    utilitySaveNodeData(nodePath)
+    restTransform = utilitySaveNodeData(nodePath)
 
     propertyPlug = OpenMaya.MFnDependencyNode(
         nodePath.node()).findPlug(property, False)
@@ -373,7 +399,7 @@ def utilityGetOrCreateCurve(name, property, curveType):
         # make a new one on top of the property
         newCurve = OpenMayaAnim.MFnAnimCurve()
         newCurve.create(propertyPlug, curveType)
-        return newCurve
+        return (newCurve, restTransform)
     elif inputSources[0].node().hasFn(OpenMaya.MFn.kAnimCurve):
         # There is an existing curve on this node, we need to
         # grab the curve, but then reset the rotation interpolation
@@ -385,12 +411,12 @@ def utilityGetOrCreateCurve(name, property, curveType):
             utilitySetCurveInterpolation(newCurve.name())
 
         # Return the existing curve
-        return newCurve
+        return (newCurve, restTransform)
 
     return None
 
 
-def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
+def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
     timeBuffer = OpenMaya.MTimeArray()
     smallestFrame = OpenMaya.MTime()
     largestFrame = OpenMaya.MTime()
@@ -403,9 +429,7 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
     valuesY = [0.0] * len(frameBuffer)
     valuesZ = [0.0] * len(frameBuffer)
 
-    # Default tracks are absolute, however, relative behavior here is the
-    # same as absolute and is only used for translations
-    if mode == "absolute" or mode == "relative" or mode is None:
+    if mode == "absolute" or mode is None:
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
             frame = OpenMaya.MTime(frameBuffer[slot], timeUnit) + frameStart
@@ -434,11 +458,11 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
             valueShifts = [0.0, 0.0, 0.0]
 
             if tracks[0] is not None:
-                valueShifts[0] = tracks[0].evaluate(frame)
+                valueShifts[0] = tracks[0][0].evaluate(frame)
             if tracks[1] is not None:
-                valueShifts[1] = tracks[1].evaluate(frame)
+                valueShifts[1] = tracks[1][0].evaluate(frame)
             if tracks[2] is not None:
-                valueShifts[2] = tracks[2].evaluate(frame)
+                valueShifts[2] = tracks[2][0].evaluate(frame)
 
             additiveQuat = OpenMaya.MEulerRotation(
                 valueShifts[0], valueShifts[1], valueShifts[2]).asQuaternion()
@@ -453,6 +477,26 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
             valuesX[slot] = euler.x
             valuesY[slot] = euler.y
             valuesZ[slot] = euler.z
+    elif mode == "relative":
+        rest = utilityGetRestData(tracks[0][1], "rotation_quaternion")
+
+        for i in xrange(0, len(valueBuffer), 4):
+            slot = int(i / 4)
+            frame = OpenMaya.MTime(frameBuffer[slot], timeUnit) + frameStart
+            if frame < smallestFrame:
+                smallestFrame = frame
+            if frame > largestFrame:
+                largestFrame = frame
+            timeBuffer.append(frame)
+
+            frame = OpenMaya.MQuaternion(
+                valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
+
+            euler = (rest * frame).asEulerRotation()
+
+            valuesX[slot] = euler.x
+            valuesY[slot] = euler.y
+            valuesZ[slot] = euler.z
 
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
@@ -462,21 +506,21 @@ def utilityImportQuatTrackData(tracks, timeUnit, frameStart, frameBuffer, valueB
     tempBufferZ.createFromList(valuesZ, len(valuesZ))
 
     if tracks[0] is not None:
-        tracks[0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferX.asDoublePtr(), timeBuffer.length(
+        tracks[0][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferX.asDoublePtr(), timeBuffer.length(
         )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
     if tracks[1] is not None:
-        tracks[1].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferY.asDoublePtr(), timeBuffer.length(
+        tracks[1][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferY.asDoublePtr(), timeBuffer.length(
         )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
     if tracks[2] is not None:
-        tracks[2].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferZ.asDoublePtr(), timeBuffer.length(
+        tracks[2][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferZ.asDoublePtr(), timeBuffer.length(
         )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
     return (smallestFrame, largestFrame)
 
 
-def utilityImportSingleTrackData(tracks, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
+def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
     smallestFrame = OpenMaya.MTime()
     largestFrame = OpenMaya.MTime()
     timeBuffer = OpenMaya.MTimeArray()
@@ -485,6 +529,9 @@ def utilityImportSingleTrackData(tracks, timeUnit, frameStart, frameBuffer, valu
     # We must have one track here
     if tracks[0] is None:
         return (smallestFrame, largestFrame)
+
+    track = tracks[0][0]
+    restTransform = tracks[0][1]
 
     # Default track mode is absolute meaning that the
     # values are what they should be in the curve already
@@ -508,7 +555,7 @@ def utilityImportSingleTrackData(tracks, timeUnit, frameStart, frameBuffer, valu
 
         for i, x in enumerate(frameBuffer):
             frame = OpenMaya.MTime(x, timeUnit) + frameStart
-            sample = tracks[0].evaluate(frame)
+            sample = track.evaluate(frame)
             curveValueBuffer[i] = sample + valueBuffer[i]
 
             if frame < smallestFrame:
@@ -519,13 +566,40 @@ def utilityImportSingleTrackData(tracks, timeUnit, frameStart, frameBuffer, valu
     # Relative curves are applied against the resting position value in the scene
     # we will add it to the rest position
     elif mode == "relative":
-        raise Exception("Not supported yet: Relative Single Track Curve")
+        curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
+
+        restSwitcher = {
+            "rx": lambda _: utilityGetRestData(restTransform, "rotation")[0],
+            "ry": lambda _: utilityGetRestData(restTransform, "rotation")[1],
+            "rz": lambda _: utilityGetRestData(restTransform, "rotation")[2],
+            "tx": lambda _: utilityGetRestData(restTransform, "translation")[0],
+            "ty": lambda _: utilityGetRestData(restTransform, "translation")[1],
+            "tz": lambda _: utilityGetRestData(restTransform, "translation")[2],
+            "sx": lambda _: utilityGetRestData(restTransform, "scale")[0],
+            "sy": lambda _: utilityGetRestData(restTransform, "scale")[1],
+            "sz": lambda _: utilityGetRestData(restTransform, "scale")[2],
+        }
+
+        if property in restSwitcher:
+            rest = restSwitcher[property]()
+        else:
+            rest = 0.0
+
+        for i, x in enumerate(frameBuffer):
+            frame = OpenMaya.MTime(x, timeUnit) + frameStart
+            curveValueBuffer[i] = rest + valueBuffer[i]
+
+            if frame < smallestFrame:
+                smallestFrame = frame
+            if frame > largestFrame:
+                largestFrame = frame
+            timeBuffer.append(frame)
 
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
 
-    tracks[0].addKeys(timeBuffer, curveValueBuffer, OpenMayaAnim.MFnAnimCurve.kTangentLinear,
-                      OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+    track.addKeys(timeBuffer, curveValueBuffer, OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                  OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
     return (smallestFrame, largestFrame)
 
@@ -807,7 +881,6 @@ def importModelNode(model, path):
 
 def importCurveNode(node, path, timeUnit, startFrame):
     propertySwitcher = {
-        # This is special, maya can't animate a quat separate
         "rq": ["rx", "ry", "rz"],
         "rx": ["rx"],
         "ry": ["ry"],
@@ -860,7 +933,7 @@ def importCurveNode(node, path, timeUnit, startFrame):
     keyValueBuffer = node.KeyValueBuffer()
 
     (smallestFrame, largestFrame) = trackSwitcher[propertyName](
-        tracks, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode(), node.AdditiveBlendWeight())
+        tracks, propertyName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode(), node.AdditiveBlendWeight())
 
     # Make sure we have at least one quaternion track to set the interpolation mode to
     if propertyName == "rq":
