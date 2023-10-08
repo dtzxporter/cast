@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.IO;
 using System.Text;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Cast
 {
@@ -29,6 +29,10 @@ namespace Cast
                     return new Model();
                 case 0x6C656B73:
                     return new Skeleton();
+                case 0x656E6F62:
+                    return new Bone();
+                case 0x6873656D:
+                    return new Mesh();
                 default:
                     return new CastNode(Identifier);
             }
@@ -106,7 +110,7 @@ namespace Cast
 
         public static byte[] StringToBytes(string Value)
         {
-            return Encoding.UTF8.GetBytes(Value.Replace("\0", ""));
+            return Encoding.UTF8.GetBytes(Value);
         }
     }
 
@@ -199,12 +203,18 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A 2 component (XY) vector.
+    /// </summary>
     public class Vector2
     {
         public float X { get; set; }
         public float Y { get; set; }
     }
 
+    /// <summary>
+    /// A 3 component (XYZ) vector.
+    /// </summary>
     public class Vector3
     {
         public float X { get; set; }
@@ -212,6 +222,9 @@ namespace Cast
         public float Z { get; set; }
     }
 
+    /// <summary>
+    /// A 4 component (XYZW) vector.
+    /// </summary>
     public class Vector4
     {
         public float X { get; set; }
@@ -220,10 +233,111 @@ namespace Cast
         public float W { get; set; }
     }
 
+    public class Bone : CastNode
+    {
+        public Bone()
+            : base(0x656E6F62)
+        {
+        }
+
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public int ParentIndex()
+        {
+            if (Properties.TryGetValue("p", out CastProperty Value))
+            {
+                return unchecked((int)Value.Values[0]);
+            }
+
+            return -1;
+        }
+
+        public bool SegmentScaleCompensate()
+        {
+            if (Properties.TryGetValue("ssc", out CastProperty Value))
+            {
+                return (int)Value.Values[0] == 1;
+            }
+
+            return false;
+        }
+
+        public Vector3 LocalPosition()
+        {
+            if (Properties.TryGetValue("lp", out CastProperty Value))
+            {
+                return (Vector3)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public Vector4 LocalRotation()
+        {
+            if (Properties.TryGetValue("lr", out CastProperty Value))
+            {
+                return (Vector4)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public Vector3 WorldPosition()
+        {
+            if (Properties.TryGetValue("wp", out CastProperty Value))
+            {
+                return (Vector3)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public Vector4 WorldRotation()
+        {
+            if (Properties.TryGetValue("wr", out CastProperty Value))
+            {
+                return (Vector4)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public Vector3 Scale()
+        {
+            if (Properties.TryGetValue("s", out CastProperty Value))
+            {
+                return (Vector3)Value.Values[0];
+            }
+
+            return null;
+        }
+    }
+
     public class Skeleton : CastNode
     {
         public Skeleton()
             : base(0x6C656B73)
+        {
+        }
+
+        public List<Bone> Bones()
+        {
+            return ChildrenOfType<Bone>();
+        }
+    }
+
+    public class Mesh : CastNode
+    {
+        public Mesh()
+            : base(0x6873656D)
         {
         }
     }
@@ -246,6 +360,11 @@ namespace Cast
             }
 
             return null;
+        }
+
+        public List<Mesh> Meshes()
+        {
+            return ChildrenOfType<Mesh>();
         }
     }
 
@@ -375,9 +494,9 @@ namespace Cast
             RootNodes = new List<CastNode>();
         }
 
-        public static CastFile Load(string Path)
+        public static CastFile Load(Stream IOStream)
         {
-            var Reader = new BinaryReader(File.OpenRead(Path));
+            var Reader = new BinaryReader(IOStream);
             var Header = CastHeader.Load(Reader);
 
             if (Header.Magic != 0x74736163)
@@ -397,9 +516,14 @@ namespace Cast
             return Result;
         }
 
-        public void Save(string Path)
+        public static CastFile Load(string Path)
         {
-            var Writer = new BinaryWriter(File.Create(Path));
+            return Load(File.OpenRead(Path));
+        }
+
+        public void Save(Stream IOStream)
+        {
+            var Writer = new BinaryWriter(IOStream);
             var Header = new CastHeader
             {
                 RootNodeCount = (uint)RootNodes.Count
@@ -411,6 +535,11 @@ namespace Cast
             {
                 RootNode.Save(Writer);
             }
+        }
+
+        public void Save(string Path)
+        {
+            Save(File.Create(Path));
         }
     }
 }
