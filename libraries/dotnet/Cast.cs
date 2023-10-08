@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Cast
@@ -29,6 +29,12 @@ namespace Cast
                     return new Model();
                 case 0x6C656B73:
                     return new Skeleton();
+                case 0x6873656D:
+                    return new Mesh();
+                case 0x6C74616D:
+                    return new Material();
+                case 0x656E6F62:
+                    return new Bone();
                 default:
                     return new CastNode(Identifier);
             }
@@ -42,9 +48,9 @@ namespace Cast
                 case "b":
                     return Reader.ReadByte();
                 case "h":
-                    return Reader.ReadUInt16();
+                    return Reader.ReadInt16();
                 case "i":
-                    return Reader.ReadUInt32();
+                    return Reader.ReadInt32();
                 case "l":
                     return Reader.ReadUInt64();
                 case "f":
@@ -226,8 +232,41 @@ namespace Cast
             : base(0x6C656B73)
         {
         }
+
+        public List<Bone> Bones()
+        {
+            var Result = ChildrenOfType<Bone>();
+            if (Result.Count > 0)
+            {
+                return Result;
+            }
+            return null;
+        }
     }
 
+    public class Bone : CastNode
+    {
+        public Bone()
+            : base(0x656E6F62)
+        {
+        }
+    }
+
+    public class Mesh : CastNode
+    {
+        public Mesh()
+            : base(0x6873656D)
+        {
+        }
+    }
+
+    public class Material : CastNode
+    {
+        public Material()
+            : base(0x6C74616D)
+        {
+        }
+    }
 
     public class Model : CastNode
     {
@@ -349,8 +388,11 @@ namespace Cast
 
                 Node.Properties.Add(Property.Name, Property);
             }
-
             Node.ChildNodes.Capacity = (int)Header.ChildCount;
+            
+            //Check if the Header has a hash, and set the node hash to it if it does
+            if (Header.NodeHash != 0)
+                Node.Hash = Header.NodeHash;
 
             for (var i = 0; i < Header.ChildCount; i++)
             {
@@ -378,6 +420,29 @@ namespace Cast
         public static CastFile Load(string Path)
         {
             var Reader = new BinaryReader(File.OpenRead(Path));
+            var Header = CastHeader.Load(Reader);
+
+            if (Header.Magic != 0x74736163)
+            {
+                throw new Exception("Invalid cast file magic");
+            }
+
+            var Result = new CastFile();
+
+            Result.RootNodes.Capacity = (int)Header.RootNodeCount;
+
+            for (var i = 0; i < Header.RootNodeCount; i++)
+            {
+                Result.RootNodes.Add(CastNode.Load(Reader));
+            }
+
+            return Result;
+        }
+
+        //Load cast model from stream
+        public static CastFile Load(Stream s)
+        {
+            var Reader = new BinaryReader(s);
             var Header = CastHeader.Load(Reader);
 
             if (Header.Magic != 0x74736163)
