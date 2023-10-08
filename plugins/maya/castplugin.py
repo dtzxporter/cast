@@ -22,11 +22,12 @@ sceneResetCache = {}
 sceneSettings = {
     "importAtTime": False,
     "importSkin": True,
+    "importReset": False,
 }
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.1",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.2",
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -129,6 +130,9 @@ def utilityCreateMenu():
 
     cmds.menuItem("importAtTime", label="Import At Scene Time", annotation="Import animations starting at the current scene time",
                   checkBox=utilityQueryToggleItem("importAtTime"), command=lambda x: utilitySetToggleItem("importAtTime"))
+
+    cmds.menuItem("importReset", label="Import Resets Scene", annotation="Importing animations clears all existing animations in the scene",
+                  checkBox=utilityQueryToggleItem("importReset"), command=lambda x: utilitySetToggleItem("importReset"))
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
@@ -950,6 +954,10 @@ def importAnimationNode(node, path):
     # do this now so we don't forget...
     sceneAnimationController = OpenMayaAnim.MAnimControl()
     sceneAnimationController.setAutoKeyMode(False)
+
+    # Check if the user requests the scene be cleared for each import.
+    if utilityQueryToggleItem("importReset"):
+        utilityClearAnimation()
 
     switcherLoop = {
         None: OpenMayaAnim.MAnimControl.kPlaybackOnce,
