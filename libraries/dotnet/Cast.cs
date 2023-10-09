@@ -33,6 +33,8 @@ namespace Cast
                     return new Bone();
                 case 0x6873656D:
                     return new Mesh();
+                case 0x6C74616D:
+                    return new Material();
                 default:
                     return new CastNode(Identifier);
             }
@@ -340,6 +342,202 @@ namespace Cast
             : base(0x6873656D)
         {
         }
+
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public int VertexCount()
+        {
+            if (Properties.TryGetValue("vp", out CastProperty Value))
+            {
+                return Value.Values.Count;
+            }
+
+            return 0;
+        }
+
+        public int FaceCount()
+        {
+            if (Properties.TryGetValue("f", out CastProperty Value))
+            {
+                return Value.Values.Count / 3;
+            }
+
+            return 0;
+        }
+
+        public int UVLayerCount()
+        {
+            if (Properties.TryGetValue("ul", out CastProperty Value))
+            {
+                return (int)Value.Values[0];
+            }
+
+            return 0;
+        }
+
+        public int MaximumWeightInfluence()
+        {
+            if (Properties.TryGetValue("mi", out CastProperty Value))
+            {
+                return (int)Value.Values[0];
+            }
+
+            return 0;
+        }
+
+        public IEnumerable<int> FaceBuffer()
+        {
+            if (Properties.TryGetValue("f", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (int)Item;
+                }
+            }
+        }
+
+        public IEnumerable<Vector3> VertexPositionBuffer()
+        {
+            if (Properties.TryGetValue("vp", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (Vector3)Item;
+                }
+            }
+        }
+
+        public IEnumerable<Vector3> VertexNormalBuffer()
+        {
+            if (Properties.TryGetValue("vn", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (Vector3)Item;
+                }
+            }
+        }
+
+        public IEnumerable<Vector3> VertexTangentBuffer()
+        {
+            if (Properties.TryGetValue("vt", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (Vector3)Item;
+                }
+            }
+        }
+
+        public IEnumerable<uint> VertexColorBuffer()
+        {
+            if (Properties.TryGetValue("vc", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (uint)Item;
+                }
+            }
+        }
+
+        public IEnumerable<Vector2> VertexUVLayerBuffer(int Index)
+        {
+            if (Properties.TryGetValue("u" + Index, out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (Vector2)Item;
+                }
+            }
+        }
+
+        public IEnumerable<int> VertexWeightBoneBuffer()
+        {
+            if (Properties.TryGetValue("wb", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (int)Item;
+                }
+            }
+        }
+
+        public IEnumerable<float> VertexWeightValueBuffer()
+        {
+            if (Properties.TryGetValue("wv", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (float)Item;
+                }
+            }
+        }
+
+        public Material Material()
+        {
+            if (Properties.TryGetValue("m", out CastProperty Value))
+            {
+                return (Material)ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+    }
+
+    public class Material : CastNode
+    {
+        public Material()
+            : base(0x6C74616D)
+        {
+        }
+
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public string Type()
+        {
+            if (Properties.TryGetValue("t", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public Dictionary<string, CastNode> Slots()
+        {
+            var Result = new Dictionary<string, CastNode>();
+
+            foreach (var Slot in Properties)
+            {
+                if (Slot.Value.Name == "n" || Slot.Value.Name == "t")
+                {
+                    continue;
+                }
+
+                if (!Result.ContainsKey(Slot.Value.Name))
+                {
+                    Result.Add(Slot.Value.Name, ChildByHash((ulong)Slot.Value.Values[0]));
+                }
+            }
+
+            return Result;
+        }
     }
 
 
@@ -365,6 +563,11 @@ namespace Cast
         public List<Mesh> Meshes()
         {
             return ChildrenOfType<Mesh>();
+        }
+
+        public List<Material> Materials()
+        {
+            return ChildrenOfType<Material>();
         }
     }
 
@@ -457,6 +660,8 @@ namespace Cast
             var Header = CastNodeHeader.Load(Reader);
             var Node = Globals.CastNodeSwitcher(Header.Identifier);
 
+            Node.Hash = Header.NodeHash;
+
             for (var i = 0; i < Header.PropertyCount; i++)
             {
                 var Property = CastProperty.Load(Reader);
@@ -473,7 +678,11 @@ namespace Cast
 
             for (var i = 0; i < Header.ChildCount; i++)
             {
-                Node.ChildNodes.Add(Load(Reader));
+                var ChildNode = Load(Reader);
+
+                ChildNode.ParentNode = Node;
+
+                Node.ChildNodes.Add(ChildNode);
             }
 
             return Node;
