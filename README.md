@@ -12,7 +12,8 @@ The goal of cast is to create an engine agnostic format that can be parsed and w
 - 3DS Max: (Help wanted)
 
 # Programming libraries:
-- .NET Framework (W.I.P): [Libraries/DotNet](https://github.com/dtzxporter/cast/tree/master/libraries/dotnet)
+- .NET Framework (Reference): [Libraries/DotNet](https://github.com/dtzxporter/cast/tree/master/libraries/dotnet)
+- .NET Framework (by Scobalula): [Cast.NET](https://github.com/Scobalula/Cast.NET)
 - Python: [Libraries/Python](https://github.com/dtzxporter/cast/tree/master/libraries/python)
 - C++: (Help wanted)
 
