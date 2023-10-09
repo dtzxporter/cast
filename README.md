@@ -388,6 +388,10 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 
+**Notes**:
+- `Segment Scale Compensate` should default to `True` when not specified.
+- `Scale` is always local to the current bone.
+
 ### Material:
 <table>
 	<tr>

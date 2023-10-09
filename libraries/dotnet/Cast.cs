@@ -31,6 +31,12 @@ namespace Cast
                     return new Mesh();
                 case 0x6C74616D:
                     return new Material();
+                case 0x656C6966:
+                    return new File();
+                case 0x6D696E61:
+                    return new Animation();
+                case 0x76727563:
+                    return new Curve();
                 default:
                     return new CastNode(Identifier);
             }
@@ -265,7 +271,7 @@ namespace Cast
                 return (int)Value.Values[0] == 1;
             }
 
-            return false;
+            return true;
         }
 
         public Vector3 LocalPosition()
@@ -319,6 +325,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A collection of bones for a model or animation.
+    /// </summary>
     public class Skeleton : CastNode
     {
         public Skeleton()
@@ -332,6 +341,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A 3d mesh for a model.
+    /// </summary>
     public class Mesh : CastNode
     {
         public Mesh()
@@ -488,6 +500,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// Material contains a collection of slot:file mappings.
+    /// </summary>
     public class Material : CastNode
     {
         public Material()
@@ -515,9 +530,9 @@ namespace Cast
             return null;
         }
 
-        public Dictionary<string, CastNode> Slots()
+        public Dictionary<string, File> Slots()
         {
-            var Result = new Dictionary<string, CastNode>();
+            var Result = new Dictionary<string, File>();
 
             foreach (var Slot in Properties)
             {
@@ -528,11 +543,102 @@ namespace Cast
 
                 if (!Result.ContainsKey(Slot.Value.Name))
                 {
-                    Result.Add(Slot.Value.Name, ChildByHash((ulong)Slot.Value.Values[0]));
+                    Result.Add(Slot.Value.Name, (File)ChildByHash((ulong)Slot.Value.Values[0]));
                 }
             }
 
             return Result;
+        }
+    }
+
+    public class Animation : CastNode
+    {
+        public Animation()
+            : base(0x6D696E61)
+        {
+        }
+
+        public Skeleton Skeleton()
+        {
+            var Result = ChildrenOfType<Skeleton>();
+
+            if (Result.Count > 0)
+            {
+                return Result[0];
+            }
+
+            return null;
+        }
+
+        public List<Curve> Curves()
+        {
+            return ChildrenOfType<Curve>();
+        }
+
+        public float Framerate()
+        {
+            if (Properties.TryGetValue("fr", out CastProperty Value))
+            {
+                return (float)Value.Values[0];
+            }
+
+            return 30.0f;
+        }
+
+        public bool Looping()
+        {
+            if (Properties.TryGetValue("lo", out CastProperty Value))
+            {
+                return (bool)Value.Values[0];
+            }
+
+            return false;
+        }
+    }
+
+    public class Curve : CastNode
+    {
+        public Curve()
+            : base(0x76727563)
+        {
+        }
+
+        public string NodeName()
+        {
+            if (Properties.TryGetValue("nn", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public string KeyPropertyName()
+        {
+            if (Properties.TryGetValue("kp", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+    }
+
+    public class File : CastNode
+    {
+        public File()
+            : base(0x656C6966)
+        {
+        }
+
+        public string Path()
+        {
+            if (Properties.TryGetValue("p", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
         }
     }
 
@@ -692,6 +798,9 @@ namespace Cast
 
     public class CastFile
     {
+        /// <summary>
+        /// A collection of root nodes in this file.
+        /// </summary>
         public List<CastNode> RootNodes { get; set; }
 
         public CastFile()
@@ -699,6 +808,12 @@ namespace Cast
             RootNodes = new List<CastNode>();
         }
 
+        /// <summary>
+        /// Loads a cast file from the given stream.
+        /// </summary>
+        /// <param name="IOStream"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public static CastFile Load(Stream IOStream)
         {
             var Reader = new BinaryReader(IOStream);
@@ -721,11 +836,20 @@ namespace Cast
             return Result;
         }
 
+        /// <summary>
+        /// Loads a cast file from the given path.
+        /// </summary>
+        /// <param name="Path"></param>
+        /// <returns></returns>
         public static CastFile Load(string Path)
         {
-            return Load(File.OpenRead(Path));
+            return Load(System.IO.File.OpenRead(Path));
         }
 
+        /// <summary>
+        /// Saves a cast file to the given stream.
+        /// </summary>
+        /// <param name="IOStream"></param>
         public void Save(Stream IOStream)
         {
             var Writer = new BinaryWriter(IOStream);
@@ -742,9 +866,13 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// Saves a cast file to the given path.
+        /// </summary>
+        /// <param name="Path"></param>
         public void Save(string Path)
         {
-            Save(File.Create(Path));
+            Save(System.IO.File.Create(Path));
         }
     }
 }
