@@ -476,7 +476,7 @@ def importAnimationNode(node, path):
     wantedSmallestFrame = 0
     wantedLargestFrame = 1
 
-    curves = node.ChildrenOfType(Curve)
+    curves = node.Curves()
 
     # Create a list of pose bones that match the curves..
     poseBones = {}
@@ -494,7 +494,7 @@ def importAnimationNode(node, path):
         if largestFrame > wantedLargestFrame:
             wantedLargestFrame = largestFrame
 
-    for x in node.ChildrenOfType(NotificationTrack):
+    for x in node.Notifications():
         (smallestFrame, largestFrame) = importNotificationTrackNode(x, action)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame

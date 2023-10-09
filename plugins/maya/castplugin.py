@@ -996,7 +996,7 @@ def importAnimationNode(node, path):
     wantedSmallestFrame = OpenMaya.MTime(0, wantedFps)
     wantedLargestFrame = OpenMaya.MTime(1, wantedFps)
 
-    curves = node.ChildrenOfType(Curve)
+    curves = node.Curves()
     progress = utilityCreateProgress("Importing animation...", len(curves))
 
     for x in curves:

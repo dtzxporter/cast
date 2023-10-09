@@ -216,6 +216,9 @@ class Animation(CastNode):
 
     def Curves(self):
         return self.ChildrenOfType(Curve)
+    
+    def Notifications(self):
+        return self.ChildrenOfType(NotificationTrack)
 
     def Framerate(self):
         fr = self.properties.get("fr")
