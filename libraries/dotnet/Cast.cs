@@ -9,15 +9,11 @@ namespace Cast
     class Globals
     {
         private static ulong NEXT_HASH = 0;
-        private static readonly object HASH_LOCK = new object();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong CastNextHash()
         {
-            lock (HASH_LOCK)
-            {
-                return NEXT_HASH++;
-            }
+            return NEXT_HASH++;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
