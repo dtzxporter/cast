@@ -37,6 +37,10 @@ namespace Cast
                     return new Animation();
                 case 0x76727563:
                     return new Curve();
+                case 0x6669746E:
+                    return new NotificationTrack();
+                case 0x68736C62:
+                    return new BlendShape();
                 default:
                     return new CastNode(Identifier);
             }
@@ -235,6 +239,46 @@ namespace Cast
         public float Y { get; set; }
         public float Z { get; set; }
         public float W { get; set; }
+    }
+
+    public class BlendShape : CastNode
+    {
+        public BlendShape()
+            : base(0x68736C62)
+        {
+        }
+
+        public Mesh BaseShape()
+        {
+            if (Properties.TryGetValue("b", out CastProperty Value))
+            {
+                return (Mesh)ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        public IEnumerable<Mesh> TargetShapes()
+        {
+            if (Properties.TryGetValue("t", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (Mesh)ChildByHash((ulong)Item);
+                }
+            }
+        }
+
+        public IEnumerable<float> TargetWeightScales()
+        {
+            if (Properties.TryGetValue("ts", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (float)Item;
+                }
+            }
+        }
     }
 
     public class Bone : CastNode
@@ -575,6 +619,11 @@ namespace Cast
             return ChildrenOfType<Curve>();
         }
 
+        public List<NotificationTrack> Notifications()
+        {
+            return ChildrenOfType<NotificationTrack>();
+        }
+
         public float Framerate()
         {
             if (Properties.TryGetValue("fr", out CastProperty Value))
@@ -621,6 +670,77 @@ namespace Cast
             }
 
             return null;
+        }
+
+        public IEnumerable<int> KeyFrameBuffer()
+        {
+            if (Properties.TryGetValue("kb", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (int)Item;
+                }
+            }
+        }
+
+        public IEnumerable<T> KeyValueBuffer<T>()
+        {
+            if (Properties.TryGetValue("kv", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (T)Item;
+                }
+            }
+        }
+
+        public string Mode()
+        {
+            if (Properties.TryGetValue("m", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public float AdditiveblendWeight()
+        {
+            if (Properties.TryGetValue("ab", out CastProperty Value))
+            {
+                return (float)Value.Values[0];
+            }
+
+            return 1.0f;
+        }
+    }
+
+    public class NotificationTrack : CastNode
+    {
+        public NotificationTrack()
+            : base(0x6669746E)
+        {
+        }
+
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        public IEnumerable<int> KeyFrameBuffer()
+        {
+            if (Properties.TryGetValue("kb", out CastProperty Value))
+            {
+                foreach (var Item in Value.Values)
+                {
+                    yield return (int)Item;
+                }
+            }
         }
     }
 
@@ -670,6 +790,11 @@ namespace Cast
         public List<Material> Materials()
         {
             return ChildrenOfType<Material>();
+        }
+
+        public List<BlendShape> BlendShapes()
+        {
+            return ChildrenOfType<BlendShape>();
         }
     }
 
