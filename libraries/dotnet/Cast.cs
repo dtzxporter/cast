@@ -248,6 +248,16 @@ namespace Cast
         {
         }
 
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+            
+            return null;
+        }
+
         public Mesh BaseShape()
         {
             if (Properties.TryGetValue("b", out CastProperty Value))

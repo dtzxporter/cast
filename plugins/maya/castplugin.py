@@ -27,7 +27,7 @@ sceneSettings = {
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.2",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.3",
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -707,9 +707,6 @@ def importModelNode(model, path):
         newMeshNode = newMeshTransform.create(meshNode)
         newMeshTransform.setName(mesh.Name() or "CastMesh")
 
-        # Store the mesh for reference in other nodes later
-        meshHandles[mesh.Hash()] = newMeshNode
-
         # Triangle count / vertex count
         faceCount = int(mesh.FaceCount())
         vertexCount = int(mesh.VertexCount())
@@ -730,8 +727,9 @@ def importModelNode(model, path):
             scriptUtil.asFloat4Ptr(), vertexCount)
 
         newMesh = OpenMaya.MFnMesh()
-        newMesh.create(vertexCount, faceCount, vertexPositionBuffer,
-                       faceCountBuffer, faceBuffer, newMeshNode)
+        # Store the mesh for reference in other nodes later
+        meshHandles[mesh.Hash()] = newMesh.create(vertexCount, faceCount, vertexPositionBuffer,
+                                                  faceCountBuffer, faceBuffer, newMeshNode)
 
         scriptUtil = OpenMaya.MScriptUtil()
         scriptUtil.createFromList(
@@ -869,6 +867,9 @@ def importModelNode(model, path):
         # Create the deformer on the base shape
         blendDeformer = OpenMayaAnim.MFnBlendShapeDeformer()
         blendDeformer.create(baseShape)
+
+        if blendShape.Name() is not None:
+            blendDeformer.setName(blendShape.Name())
 
         # Assign the targets
         for i, targetShape in enumerate(targetShapes):

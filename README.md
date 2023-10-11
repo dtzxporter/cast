@@ -264,19 +264,25 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<th>IsArray</th>
 		<th>Required</th>
  	</tr>
-	 <tr>
+	<tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
   		<td>Base Shape (Hash of CastNode:Mesh) (b)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Target Shapes (Hashes of CastNode:Mesh) (t)</td>
    		<td>Integer 64 (l)</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Target Weight Scales (ts)</td>
    		<td>Float (f)</td>
 		<td>True</td>

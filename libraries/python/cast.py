@@ -104,7 +104,7 @@ class CastProperty(object):
             string.save(file)
         else:
             file.write(struct.pack(self.type.fmt *
-                       int(len(self.values) / self.type.array), *self.values))
+                                   int(len(self.values) / self.type.array), *self.values))
 
     def length(self):
         result = 0x8
@@ -166,7 +166,7 @@ class CastNode(object):
 
     def save(self, file):
         file.write(struct.pack("IIQII", self.identifier, self.length(),
-                   self.hash, len(self.properties), len(self.childNodes)))
+                               self.hash, len(self.properties), len(self.childNodes)))
 
         for property in self.properties.values():
             property.save(file)
@@ -216,7 +216,7 @@ class Animation(CastNode):
 
     def Curves(self):
         return self.ChildrenOfType(Curve)
-    
+
     def Notifications(self):
         return self.ChildrenOfType(NotificationTrack)
 
@@ -381,6 +381,12 @@ class Mesh(CastNode):
 class BlendShape(CastNode):
     def __init__(self):
         super(BlendShape, self).__init__(0x68736C62)
+
+    def Name(self):
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
 
     def BaseShape(self):
         b = self.properties.get("b")
