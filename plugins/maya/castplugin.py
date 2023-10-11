@@ -103,6 +103,17 @@ def utilityCreateProgress(status="", maximum=0):
     return instance
 
 
+def utilitySetVisibility(object, visible):
+    dag = OpenMaya.MFnDagNode(object)
+    while not cmds.attributeQuery("visibility", node=dag.fullPathName(), exists=True):
+        try:
+            parent = dag.parent(0)
+            dag = OpenMaya.MFnDagNode(parent)
+        except RuntimeError:
+            return
+    cmds.setAttr("%s.visibility" % dag.fullPathName(), visible)
+
+
 def utilityStepProgress(instance):
     try:
         cmds.progressBar(instance, edit=True, step=1)
@@ -730,6 +741,7 @@ def importModelNode(model, path):
         # Store the mesh for reference in other nodes later
         meshHandles[mesh.Hash()] = newMesh.create(vertexCount, faceCount, vertexPositionBuffer,
                                                   faceCountBuffer, faceBuffer, newMeshNode)
+        newMesh.setName(mesh.Name() or "CastShape")
 
         scriptUtil = OpenMaya.MScriptUtil()
         scriptUtil.createFromList(
@@ -878,6 +890,9 @@ def importModelNode(model, path):
             else:
                 fullWeight = 1.0
             blendDeformer.addTarget(baseShape, i, targetShape, fullWeight)
+            blendTargetParent = OpenMaya.MFnDagNode(targetShape).parent(0)
+            # Sets the parent meshes transform to invisible, to hide the target.
+            utilitySetVisibility(blendTargetParent, False)
 
         utilityStepProgress(progress)
 
