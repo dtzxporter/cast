@@ -41,6 +41,8 @@ namespace Cast
                     return new NotificationTrack();
                 case 0x68736C62:
                     return new BlendShape();
+                case 0x746F6F72:
+                    return new Root();
                 default:
                     return new CastNode(Identifier);
             }
@@ -772,6 +774,13 @@ namespace Cast
         }
     }
 
+    public class Root : CastNode
+    {
+        public Root()
+            : base(0x746F6F72)
+        {
+        }
+    }
 
     public class Model : CastNode
     {

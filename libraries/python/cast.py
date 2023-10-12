@@ -507,8 +507,14 @@ class File(CastNode):
         return None
 
 
+class Root(CastNode):
+    def __init__(self):
+        super(Root, self).__init__(0x746F6F72)
+
+
 typeSwitcher = {
     None: CastNode,
+    0x746F6F72: Root,
     0x6C646F6D: Model,
     0x6873656D: Mesh,
     0x68736C62: BlendShape,
