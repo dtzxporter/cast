@@ -687,7 +687,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 	 <tr>
   		<td>Key Frame Buffer (kb)</td>
-   		<td>Byte (b), Short (h), Integer 32 (i), Float (f)</td>
+   		<td>Byte (b), Short (h), Integer 32 (i)</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
