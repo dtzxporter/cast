@@ -7,8 +7,8 @@ The goal of cast is to create an engine agnostic format that can be parsed and w
 </p>
 
 ## 3D Engine Plugins:
-- Autodesk Maya (Beta): [Releases](https://github.com/dtzxporter/cast/releases)
-- Blender (2.8+) (Beta): [Releases](https://github.com/dtzxporter/cast/releases)
+- Autodesk Maya (2012+): [Releases](https://github.com/dtzxporter/cast/releases)
+- Blender (2.8+): [Releases](https://github.com/dtzxporter/cast/releases)
 - 3DS Max: (Help wanted)
 
 # Programming libraries:
@@ -643,6 +643,13 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<td>False</td>
  	</tr>
 </table>
+
+**Notes**:
+- All curve keyframes are in object/node space.
+- The `Mode` determines how each curve keyframe is applied to the node.
+  - `additive`: The keyframe is added to the current scene frame value of the nodes property.
+  - `absolute`: The keyframe is the exact value for the given frame.
+  - `relative`: The keyframe is added to the rest position value of the nodes property.
 
 ### NotificationTrack:
 <table>
