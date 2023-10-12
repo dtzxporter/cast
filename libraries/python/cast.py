@@ -12,6 +12,17 @@ def castNextHash():
     return hash
 
 
+def castTypeForMaximum(values):
+    maximum = max(values)
+
+    if maximum <= 0xFF:
+        return "b"
+    elif maximum <= 0xFFFF:
+        return "h"
+    else:
+        return "i"
+
+
 class CastString_t(object):
     __slots__ = ("value")
 
@@ -67,9 +78,9 @@ class CastProperty_t(object):
 class CastProperty(object):
     __slots__ = ("name", "type", "values")
 
-    def __init__(self, file=None):
-        self.name = ""
-        self.type = CastProperty_t()
+    def __init__(self, file=None, name=None, type=None):
+        self.name = name or ""
+        self.type = CastProperty_t(type)
         self.values = []
 
         if file is not None:
@@ -142,6 +153,16 @@ class CastNode(object):
     def Hash(self):
         return self.hash
 
+    def CreateProperty(self, name, type):
+        property = CastProperty(file=None, name=name, type=type)
+        self.properties[name] = property
+        return property
+
+    def CreateChild(self, child):
+        child.parentNode = self
+        self.childNodes.append(child)
+        return child
+
     @staticmethod
     def load(file):
         header = struct.unpack("IIQII", file.read(0x18))
@@ -194,14 +215,26 @@ class Model(CastNode):
             return find[0]
         return None
 
+    def CreateSkeleton(self):
+        return self.CreateChild(Skeleton())
+
     def Meshes(self):
         return self.ChildrenOfType(Mesh)
+
+    def CreateMesh(self):
+        return self.CreateChild(Mesh())
 
     def Materials(self):
         return self.ChildrenOfType(Material)
 
+    def CreateMaterial(self):
+        return self.CreateChild(Material())
+
     def BlendShapes(self):
         return self.ChildrenOfType(BlendShape)
+
+    def CreateBlendShape(self):
+        return self.CreateChild(BlendShape())
 
 
 class Animation(CastNode):
@@ -214,11 +247,20 @@ class Animation(CastNode):
             return find[0]
         return None
 
+    def CreateSkeleton(self):
+        return self.CreateChild(Skeleton())
+
     def Curves(self):
         return self.ChildrenOfType(Curve)
 
+    def CreateCurve(self):
+        return self.CreateChild(Curve())
+
     def Notifications(self):
         return self.ChildrenOfType(NotificationTrack)
+
+    def CreateNotification(self):
+        return self.CreateChild(NotificationTrack())
 
     def Framerate(self):
         fr = self.properties.get("fr")
@@ -226,11 +268,20 @@ class Animation(CastNode):
             return fr.values[0]
         return None
 
+    def SetFramerate(self, framerate):
+        self.CreateProperty("fr", "f").values = [framerate]
+
     def Looping(self):
         lo = self.properties.get("lo")
         if lo is not None:
             return lo.values[0] == 1
         return False
+
+    def SetLooping(self, enabled):
+        if enabled:
+            self.CreateProperty("lo", "b").values = [1]
+        else:
+            self.CreateProperty("lo", "b").values = [0]
 
 
 class Curve(CastNode):
@@ -243,11 +294,17 @@ class Curve(CastNode):
             return nn.values[0]
         return None
 
+    def SetNodeName(self, name):
+        self.CreateProperty("nn", "s").values = [name]
+
     def KeyPropertyName(self):
         kp = self.properties.get("kp")
         if kp is not None:
             return kp.values[0]
         return None
+
+    def SetKeyPropertyName(self, name):
+        self.CreateProperty("kp", "s").values = [name]
 
     def KeyFrameBuffer(self):
         kb = self.properties.get("kb")
@@ -255,11 +312,24 @@ class Curve(CastNode):
             return kb.values
         return None
 
+    def SetKeyFrameBuffer(self, values):
+        self.CreateProperty("kb", castTypeForMaximum(
+            values)).values = list(values)
+
     def KeyValueBuffer(self):
         kv = self.properties.get("kv")
         if kv is not None:
             return kv.values
         return None
+
+    def SetFloatKeyValueBuffer(self, values):
+        self.CreateProperty("kv", "f").values = list(values)
+
+    def SetVec4KeyValueBuffer(self, values):
+        self.CreateProperty("kv", "4v").values = list(sum(values, ()))
+
+    def SetByteKeyValueBuffer(self, values):
+        self.CreateProperty("kv", "b").values = list(values)
 
     def Mode(self):
         m = self.properties.get("m")
@@ -267,11 +337,17 @@ class Curve(CastNode):
             return m.values[0]
         return None
 
+    def SetMode(self, mode):
+        self.CreateProperty("m", "s").values = [mode]
+
     def AdditiveBlendWeight(self):
         ab = self.properties.get("ab")
         if ab is not None:
             return ab.values[0]
         return 1.0
+
+    def SetAdditiveBlendWeight(self, value):
+        self.CreateProperty("ab", "f").values = [value]
 
 
 class NotificationTrack(CastNode):
@@ -284,11 +360,18 @@ class NotificationTrack(CastNode):
             return n.values[0]
         return None
 
+    def SetName(self, name):
+        self.CreateProperty("n", "s").values = [name]
+
     def KeyFrameBuffer(self):
         kb = self.properties.get("kb")
         if kb is not None:
             return kb.values
         return None
+
+    def SetKeyFrameBuffer(self, values):
+        self.CreateProperty("kb", castTypeForMaximum(
+            values)).values = list(values)
 
 
 class Mesh(CastNode):
@@ -300,6 +383,9 @@ class Mesh(CastNode):
         if n is not None:
             return n.values[0]
         return None
+
+    def SetName(self, name):
+        self.CreateProperty("n", "s").values = [name]
 
     def VertexCount(self):
         vp = self.properties.get("vp")
@@ -317,11 +403,17 @@ class Mesh(CastNode):
             return uc.values[0]
         return 0
 
+    def SetUVLayerCount(self, count):
+        self.CreateProperty("ul", "b").values = [count]
+
     def MaximumWeightInfluence(self):
         mi = self.properties.get("mi")
         if mi is not None:
             return mi.values[0]
         return 0
+
+    def SetMaximumWeightInfluence(self, maximum):
+        self.CreateProperty("mi", "b").values = [maximum]
 
     def FaceBuffer(self):
         f = self.properties.get("f")
@@ -329,11 +421,18 @@ class Mesh(CastNode):
             return f.values
         return None
 
+    def SetFaceBuffer(self, values):
+        self.CreateProperty("f", castTypeForMaximum(values)
+                            ).values = list(values)
+
     def VertexPositionBuffer(self):
         vp = self.properties.get("vp")
         if vp is not None:
             return vp.values
         return None
+
+    def SetVertexPositionBuffer(self, values):
+        self.CreateProperty("vp", "3v").values = list(sum(values, ()))
 
     def VertexNormalBuffer(self):
         vn = self.properties.get("vn")
@@ -341,11 +440,17 @@ class Mesh(CastNode):
             return vn.values
         return None
 
+    def SetVertexNormalBuffer(self, values):
+        self.CreateProperty("vn", "3v").values = list(sum(values, ()))
+
     def VertexTangentBuffer(self):
         vt = self.properties.get("vt")
         if vt is not None:
             return vt.values
         return None
+
+    def SetVertexTangentBuffer(self, values):
+        self.CreateProperty("vt", "3v").values = list(sum(values, ()))
 
     def VertexColorBuffer(self):
         vc = self.properties.get("vc")
@@ -353,11 +458,17 @@ class Mesh(CastNode):
             return vc.values
         return None
 
+    def SetVertexColorBuffer(self, values):
+        self.CreateProperty("vc", "i").values = list(values)
+
     def VertexUVLayerBuffer(self, index):
         ul = self.properties.get("u%d" % index)
         if ul is not None:
             return ul.values
         return None
+
+    def SetVertexUVLayerBuffer(self, index, values):
+        self.CreateProperty("u%d" % index, "2v").values = list(sum(values, ()))
 
     def VertexWeightBoneBuffer(self):
         wb = self.properties.get("wb")
@@ -365,17 +476,27 @@ class Mesh(CastNode):
             return wb.values
         return None
 
+    def SetVertexWeightBoneBuffer(self, values):
+        self.CreateProperty("wb", castTypeForMaximum(
+            values)).values = list(values)
+
     def VertexWeightValueBuffer(self):
         wv = self.properties.get("wv")
         if wv is not None:
             return wv.values
         return None
 
+    def SetVertexWeightValueBuffer(self, values):
+        self.CreateProperty("wv", "f").values = list(values)
+
     def Material(self):
         m = self.properties.get("m")
         if m is not None:
             return self.parentNode.ChildByHash(m.values[0])
         return None
+
+    def SetMaterial(self, hash):
+        self.CreateProperty("m", "l").values = [hash]
 
 
 class BlendShape(CastNode):
@@ -388,11 +509,17 @@ class BlendShape(CastNode):
             return n.values[0]
         return None
 
+    def SetName(self, name):
+        self.CreateProperty("n", "s").values = [name]
+
     def BaseShape(self):
         b = self.properties.get("b")
         if b is not None:
             return self.parentNode.ChildByHash(b.values[0])
         return None
+
+    def SetBaseShape(self, hash):
+        self.CreateProperty("b", "l").values = [hash]
 
     def TargetShapes(self):
         t = self.properties.get("t")
@@ -400,11 +527,17 @@ class BlendShape(CastNode):
             return [self.parentNode.ChildByHash(x) for x in t.values]
         return None
 
+    def SetTargetShapes(self, hashes):
+        self.CreateProperty("t", "l").values = list(hashes)
+
     def TargetWeightScales(self):
         ts = self.properties.get("ts")
         if ts is not None:
             return ts.values
         return None
+
+    def SetTargetWeightScales(self, scales):
+        self.CreateProperty("ts", "f").values = list(scales)
 
 
 class Skeleton(CastNode):
@@ -413,6 +546,9 @@ class Skeleton(CastNode):
 
     def Bones(self):
         return self.ChildrenOfType(Bone)
+
+    def CreateBone(self):
+        return self.CreateChild(Bone())
 
 
 class Bone(CastNode):
@@ -425,6 +561,9 @@ class Bone(CastNode):
             return name.values[0]
         return None
 
+    def SetName(self, name):
+        self.CreateProperty("n", "s").values = [name]
+
     def ParentIndex(self):
         parent = self.properties.get("p")
         if parent is not None:
@@ -435,11 +574,20 @@ class Bone(CastNode):
             return (parentUnsigned ^ 0x80000000) - 0x80000000
         return -1
 
+    def SetParentIndex(self, index):
+        self.CreateProperty("p", "i").values = [index]
+
     def SegmentScaleCompensate(self):
         ssc = self.properties.get("ssc")
         if ssc is not None:
             return ssc.values[0] == 1
         return None
+
+    def SetSegmentScaleCompensate(self, enabled):
+        if enabled:
+            self.CreateProperty("ssc", "b").values = [1]
+        else:
+            self.CreateProperty("ssc", "b").values = [0]
 
     def LocalPosition(self):
         localPos = self.properties.get("lp")
@@ -447,11 +595,17 @@ class Bone(CastNode):
             return localPos.values
         return None
 
+    def SetLocalPosition(self, position):
+        self.CreateProperty("lp", "3v").values = list(position)
+
     def LocalRotation(self):
         localRot = self.properties.get("lr")
         if localRot is not None:
             return localRot.values
         return None
+
+    def SetLocalRotation(self, rotation):
+        self.CreateProperty("lr", "4v").values = list(rotation)
 
     def WorldPosition(self):
         worldPos = self.properties.get("wp")
@@ -459,17 +613,26 @@ class Bone(CastNode):
             return worldPos.values
         return None
 
+    def SetWorldPosition(self, position):
+        self.CreateProperty("wp", "3v").values = list(position)
+
     def WorldRotation(self):
         worldRot = self.properties.get("wr")
         if worldRot is not None:
             return worldRot.values
         return None
 
+    def SetWorldRotation(self, rotation):
+        self.CreateProperty("wr", "4v").values = list(rotation)
+
     def Scale(self):
         scale = self.properties.get("s")
         if scale is not None:
             return scale.values
         return None
+
+    def SetScale(self, scale):
+        self.CreateProperty("s", "3v").values = list(scale)
 
 
 class Material(CastNode):
@@ -482,11 +645,17 @@ class Material(CastNode):
             return name.values[0]
         return None
 
+    def SetName(self, name):
+        self.CreateProperty("n", "s").values = [name]
+
     def Type(self):
         tp = self.properties.get("t")
         if tp is not None:
             return tp.values[0]
         return None
+
+    def SetType(self, type):
+        self.CreateProperty("t", "s").values = [type]
 
     def Slots(self):
         slots = {}
@@ -494,6 +663,12 @@ class Material(CastNode):
             if slot != "n" and slot != "t":
                 slots[slot] = self.ChildByHash(self.properties[slot].values[0])
         return slots
+
+    def SetSlot(self, slot, hash):
+        self.CreateProperty(slot, "l").values = [hash]
+
+    def CreateFile(self):
+        return self.CreateChild(File())
 
 
 class File(CastNode):
@@ -505,6 +680,9 @@ class File(CastNode):
         if path is not None:
             return path.values[0]
         return None
+
+    def SetPath(self, path):
+        self.CreateProperty("p", "s").values = [path]
 
 
 class Root(CastNode):
@@ -536,6 +714,11 @@ class Cast(object):
 
     def Roots(self):
         return [x for x in self.rootNodes]
+
+    def CreateRoot(self):
+        root = Root()
+        self.rootNodes.append(root)
+        return root
 
     @staticmethod
     def load(path):
