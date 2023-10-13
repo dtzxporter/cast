@@ -653,6 +653,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
   - `additive`: The keyframe is added to the current scene frame value of the nodes property.
   - `absolute`: The keyframe is the exact value for the given frame.
   - `relative`: The keyframe is added to the rest position value of the nodes property.
+- The properties `rx`, `ry`, and `rz` are euler rotations expressed in degrees.
 
 ### NotificationTrack:
 <table>

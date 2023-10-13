@@ -689,6 +689,12 @@ class Root(CastNode):
     def __init__(self):
         super(Root, self).__init__(0x746F6F72)
 
+    def CreateModel(self):
+        return self.CreateChild(Model())
+
+    def CreateAnimation(self):
+        return self.CreateChild(Animation())
+
 
 typeSwitcher = {
     None: CastNode,

@@ -10,10 +10,10 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 0, 0),
+    "version": (1, 0, 1),
     "blender": (2, 90, 0),
     "location": "File > Import",
-    "description": "Import Cast",
+    "description": "Import & Export Cast",
     "wiki_url": "https://github.com/dtzxporter/cast",
     "tracker_url": "https://github.com/dtzxporter/cast/issues",
     "category": "Import-Export"
@@ -48,18 +48,71 @@ class ImportCast(bpy.types.Operator, ImportHelper):
         return True
 
 
+class ExportCast(bpy.types.Operator, ExportHelper):
+    bl_idname = "export_scene.cast"
+    bl_label = "Export Cast"
+    bl_description = "Export a Cast file"
+    bl_options = {'PRESET'}
+
+    filename_ext = ".cast"
+    filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
+
+    files: CollectionProperty(type=bpy.types.PropertyGroup)
+
+    export_selected: BoolProperty(
+        name="Export Selected", description="Whether or not to only export the selected object", default=False)
+
+    incl_model: BoolProperty(
+        name="Include Models", description="Whether or not to export model data", default=True)
+
+    incl_animation: BoolProperty(
+        name="Include Animations", description="Whether or not to export animation data", default=True)
+
+    is_looped: BoolProperty(
+        name="Looped", description="Mark the animation as looping", default=False)
+
+    def draw(self, context):
+        self.layout.prop(self, "export_selected")
+        self.layout.prop(self, "incl_model")
+        self.layout.prop(self, "incl_animation")
+        self.layout.prop(self, "is_looped")
+
+    def execute(self, context):
+        from . import export_cast
+        try:
+            export_cast.save(self, context, self.filepath)
+
+            self.report({'INFO'}, 'Cast has been exported')
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, str(e))
+            return {'CANCELLED'}
+
+    @classmethod
+    def poll(self, context):
+        return True
+
+
 def menu_func_cast_import(self, context):
     self.layout.operator(ImportCast.bl_idname, text="Cast (.cast)")
 
 
+def menu_func_cast_export(self, context):
+    self.layout.operator(ExportCast.bl_idname, text="Cast (.cast)")
+
+
 def register():
     bpy.utils.register_class(ImportCast)
+    bpy.utils.register_class(ExportCast)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_cast_import)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_cast_export)
 
 
 def unregister():
     bpy.utils.unregister_class(ImportCast)
+    bpy.utils.unregister_class(ExportCast)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_cast_import)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_cast_export)
 
 
 if __name__ == "__main__":
