@@ -145,10 +145,15 @@ def exportAction(self, context, root, objects, action):
 
                 keyvalues = []
 
+                if property == "location":
+                    scale = self.scale
+                else:
+                    scale = 1.0
+
                 for keyframe in keyframes:
                     context.scene.frame_set(keyframe)
                     keyvalues.append(utilityGetSimpleKeyValue(
-                        target, property)[index])
+                        target, property)[index] * scale)
 
                 curveNode.SetFloatKeyValueBuffer(keyvalues)
 

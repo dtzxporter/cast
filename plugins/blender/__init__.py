@@ -71,11 +71,15 @@ class ExportCast(bpy.types.Operator, ExportHelper):
     is_looped: BoolProperty(
         name="Looped", description="Mark the animation as looping", default=False)
 
+    scale: FloatProperty(
+        name="Scale", description="Apply a scale modifier to any meshes, bones, or animation data", default=1.0)
+
     def draw(self, context):
         self.layout.prop(self, "export_selected")
         self.layout.prop(self, "incl_model")
         self.layout.prop(self, "incl_animation")
         self.layout.prop(self, "is_looped")
+        self.layout.prop(self, "scale")
 
     def execute(self, context):
         from . import export_cast
