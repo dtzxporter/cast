@@ -1,4 +1,4 @@
-# Cast | A new open-source container for models, animations, and materials
+# Cast | A new open-source container for models, animations, and more
 
 The goal of cast is to create an engine agnostic format that can be parsed and written with ease. In addition, cast should have very similar output on any engine.
 
