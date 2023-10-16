@@ -25,9 +25,11 @@ sceneSettings = {
     "importReset": False,
 }
 
+version = "1.13"
+
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version 1.1.3",
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version %s" % version,
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -1081,7 +1083,7 @@ def createCastTranslator():
 
 
 def initializePlugin(m_object):
-    m_plugin = OpenMayaMPx.MFnPlugin(m_object, "DTZxPorter", "1.0", "Any")
+    m_plugin = OpenMayaMPx.MFnPlugin(m_object, "DTZxPorter", version, "Any")
     try:
         m_plugin.registerFileTranslator(
             "Cast", None, createCastTranslator)
