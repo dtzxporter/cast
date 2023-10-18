@@ -8,7 +8,7 @@ namespace Cast
 {
     class Globals
     {
-        private static ulong NEXT_HASH = 0;
+        private static ulong NEXT_HASH = 0x534E495752545250;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong CastNextHash()
@@ -88,6 +88,74 @@ namespace Cast
                         Z = Reader.ReadSingle(),
                         W = Reader.ReadSingle(),
                     };
+                default:
+                    throw new Exception("Unsupported cast property type");
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static uint CastPropertyByteLength(string Type)
+        {
+            switch (Type)
+            {
+                case "b":
+                    return 1u;
+                case "h":
+                    return 2u;
+                case "i":
+                case "f":
+                    return 4u;
+                case "l":
+                case "d":
+                case "2v":
+                    return 8u;
+                case "3v":
+                    return 12u;
+                case "4v":
+                    return 16u;
+                default:
+                    throw new Exception("Unsupported cast property type");
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CastPropertyWrite(BinaryWriter Writer, string Type, object Value)
+        {
+            switch (Type)
+            {
+                case "b":
+                    Writer.Write((byte)Value);
+                    break;
+                case "h":
+                    Writer.Write((ushort)Value);
+                    break;
+                case "i":
+                    Writer.Write((uint)Value);
+                    break;
+                case "l":
+                    Writer.Write((ulong)Value);
+                    break;
+                case "f":
+                    Writer.Write((float)Value);
+                    break;
+                case "d":
+                    Writer.Write((double)Value);
+                    break;
+                case "2v":
+                    Writer.Write(((Vector2)Value).X);
+                    Writer.Write(((Vector2)Value).Y);
+                    break;
+                case "3v":
+                    Writer.Write(((Vector3)Value).X);
+                    Writer.Write(((Vector3)Value).Y);
+                    Writer.Write(((Vector3)Value).Z);
+                    break;
+                case "4v":
+                    Writer.Write(((Vector4)Value).X);
+                    Writer.Write(((Vector4)Value).Y);
+                    Writer.Write(((Vector4)Value).Z);
+                    Writer.Write(((Vector4)Value).W);
+                    break;
                 default:
                     throw new Exception("Unsupported cast property type");
             }
@@ -256,7 +324,7 @@ namespace Cast
             {
                 return (string)Value.Values[0];
             }
-            
+
             return null;
         }
 
@@ -850,7 +918,54 @@ namespace Cast
 
         public void Save(BinaryWriter Writer)
         {
-            // TODO: Property save.
+            var PropertyName = Encoding.UTF8.GetBytes(Name);
+            var PropertyType = Encoding.UTF8.GetBytes(Type);
+
+            if (PropertyType.Length == 1)
+            {
+                PropertyType = new byte[2] { PropertyType[0], 0x0 };
+            }
+
+            var PropertyHeader = new CastPropertyHeader()
+            {
+                Type = PropertyType,
+                NameLength = (ushort)PropertyName.Length,
+                ValueCount = (uint)Values.Count,
+            };
+
+            PropertyHeader.Save(Writer);
+
+            Writer.Write(PropertyName);
+
+            if (Type == "s")
+            {
+                Globals.WriteNullTerminatedString(Writer, (string)Values[0]);
+            }
+            else
+            {
+                foreach (var Value in Values)
+                {
+                    Globals.CastPropertyWrite(Writer, Type, Value);
+                }
+            }
+        }
+
+        public uint Length()
+        {
+            var Result = 0x8u;
+
+            Result += (uint)Encoding.UTF8.GetByteCount(Name);
+
+            if (Type == "s")
+            {
+                Result += (uint)Encoding.UTF8.GetByteCount((string)Values[0]) + 1;
+            }
+            else
+            {
+                Result += Globals.CastPropertyByteLength(Type) * (uint)Values.Count;
+            }
+
+            return Result;
         }
     }
 
@@ -936,7 +1051,43 @@ namespace Cast
 
         public void Save(BinaryWriter Writer)
         {
-            // TODO: Node save.
+            var Header = new CastNodeHeader()
+            {
+                Identifier = Identifier,
+                NodeSize = Length(),
+                NodeHash = Hash,
+                PropertyCount = (uint)Properties.Count,
+                ChildCount = (uint)ChildNodes.Count,
+            };
+
+            Header.Save(Writer);
+
+            foreach (var Property in Properties)
+            {
+                Property.Value.Save(Writer);
+            }
+
+            foreach (var ChildNode in ChildNodes)
+            {
+                ChildNode.Save(Writer);
+            }
+        }
+
+        public uint Length()
+        {
+            var Result = 0x18u;
+
+            foreach (var Property in Properties)
+            {
+                Result += Property.Value.Length();
+            }
+
+            foreach (var ChildNode in ChildNodes)
+            {
+                Result += ChildNode.Length();
+            }
+
+            return Result;
         }
     }
 
@@ -987,7 +1138,10 @@ namespace Cast
         /// <returns></returns>
         public static CastFile Load(string Path)
         {
-            return Load(System.IO.File.OpenRead(Path));
+            using (var File = System.IO.File.OpenRead(Path))
+            {
+                return Load(File);
+            }
         }
 
         /// <summary>
@@ -1016,7 +1170,10 @@ namespace Cast
         /// <param name="Path"></param>
         public void Save(string Path)
         {
-            Save(System.IO.File.Create(Path));
+            using (var File = System.IO.File.Create(Path))
+            {
+                Save(File);
+            }
         }
     }
 }
