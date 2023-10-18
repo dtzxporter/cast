@@ -25,6 +25,7 @@ sceneSettings = {
     "importReset": False,
 }
 
+# Shared version number
 version = "1.13"
 
 
