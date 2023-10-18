@@ -107,7 +107,7 @@ namespace Cast
             return Encoding.UTF8.GetString(Buffer.ToArray());
         }
 
-        public static void WriteNullTerminatedStrring(BinaryWriter Writer, string Value)
+        public static void WriteNullTerminatedString(BinaryWriter Writer, string Value)
         {
             Writer.Write(Encoding.UTF8.GetBytes(Value));
             Writer.Write((byte)0x0);
