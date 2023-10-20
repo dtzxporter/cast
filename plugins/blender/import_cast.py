@@ -153,6 +153,10 @@ def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, 
 
     bone = poseBones[name]
 
+    # Cast rx, ry, rz is in degrees, blender needs radians
+    if property in ["rx", "ry", "rz"]:
+        valueBuffer = [math.radians(x) for x in valueBuffer]
+
     # Translation properties are based on the scene value, so we have to compute the delta and key that
     # instead of the keyframe value. It also requires us to have the other components, hence splat.
     if property in ["tx", "ty", "tz"]:

@@ -1,6 +1,7 @@
 import os
 import os.path
 import json
+import math
 from cast import Cast, Model, Animation, Curve, NotificationTrack, Mesh, Skeleton, Bone, Material, File
 import maya.mel as mel
 import maya.cmds as cmds
@@ -26,7 +27,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.14"
+version = "1.15"
 
 
 def utilityAbout():
@@ -539,6 +540,10 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     largestFrame = OpenMaya.MTime()
     timeBuffer = OpenMaya.MTimeArray()
     scriptUtil = OpenMaya.MScriptUtil()
+
+    # Cast rx, ry, rz is in degrees, maya needs radians
+    if property in ["rx", "ry", "rz"]:
+        valueBuffer = [math.radians(x) for x in valueBuffer]
 
     # We must have one track here
     if tracks[0] is None:
