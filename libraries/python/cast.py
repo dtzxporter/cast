@@ -415,6 +415,15 @@ class Mesh(CastNode):
     def SetMaximumWeightInfluence(self, maximum):
         self.CreateProperty("mi", "b").values = [maximum]
 
+    def SkinningMethod(self):
+        sm = self.properties.get("sm")
+        if sm is not None:
+            return sm.values[0]
+        return "linear"
+
+    def SetSkinningMethod(self, method):
+        self.CreateProperty("sm", "s").values = [method]
+
     def FaceBuffer(self):
         f = self.properties.get("f")
         if f is not None:

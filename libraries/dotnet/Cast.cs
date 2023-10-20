@@ -613,6 +613,16 @@ namespace Cast
             }
         }
 
+        public string SkinningMethod()
+        {
+            if (Properties.TryGetValue("sm", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return "linear";
+        }
+
         public Material Material()
         {
             if (Properties.TryGetValue("m", out CastProperty Value))
@@ -784,7 +794,7 @@ namespace Cast
             return null;
         }
 
-        public float AdditiveblendWeight()
+        public float AdditiveBlendWeight()
         {
             if (Properties.TryGetValue("ab", out CastProperty Value))
             {
