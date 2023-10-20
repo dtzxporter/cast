@@ -26,7 +26,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.13"
+version = "1.14"
 
 
 def utilityAbout():
@@ -348,13 +348,9 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
 
 def utilityGetRestData(restTransform, component):
     if component == "rotation":
-        rotation = OpenMaya.MQuaternion()
-        restTransform.getRotation(rotation, OpenMaya.MSpace.kTransform)
-        return rotation.asEulerRotation()
+        return restTransform.eulerRotation()
     elif component == "rotation_quaternion":
-        rotation = OpenMaya.MQuaternion()
-        restTransform.getRotation(rotation, OpenMaya.MSpace.kTransform)
-        return rotation
+        return restTransform.rotation()
     elif component == "translation":
         return restTransform.getTranslation(OpenMaya.MSpace.kTransform)
     elif component == "scale":
@@ -587,15 +583,15 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
         restSwitcher = {
-            "rx": lambda _: utilityGetRestData(restTransform, "rotation")[0],
-            "ry": lambda _: utilityGetRestData(restTransform, "rotation")[1],
-            "rz": lambda _: utilityGetRestData(restTransform, "rotation")[2],
-            "tx": lambda _: utilityGetRestData(restTransform, "translation")[0],
-            "ty": lambda _: utilityGetRestData(restTransform, "translation")[1],
-            "tz": lambda _: utilityGetRestData(restTransform, "translation")[2],
-            "sx": lambda _: utilityGetRestData(restTransform, "scale")[0],
-            "sy": lambda _: utilityGetRestData(restTransform, "scale")[1],
-            "sz": lambda _: utilityGetRestData(restTransform, "scale")[2],
+            "rx": lambda: utilityGetRestData(restTransform, "rotation")[0],
+            "ry": lambda: utilityGetRestData(restTransform, "rotation")[1],
+            "rz": lambda: utilityGetRestData(restTransform, "rotation")[2],
+            "tx": lambda: utilityGetRestData(restTransform, "translation")[0],
+            "ty": lambda: utilityGetRestData(restTransform, "translation")[1],
+            "tz": lambda: utilityGetRestData(restTransform, "translation")[2],
+            "sx": lambda: utilityGetRestData(restTransform, "scale")[0],
+            "sy": lambda: utilityGetRestData(restTransform, "scale")[1],
+            "sz": lambda: utilityGetRestData(restTransform, "scale")[2],
         }
 
         if property in restSwitcher:
