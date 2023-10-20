@@ -27,7 +27,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.15"
+version = "1.16"
 
 
 def utilityAbout():
@@ -376,7 +376,7 @@ def utilitySaveNodeData(dagPath):
     # If we already had the bone saved, just return it's saved rest position.
     if dagPath.fullPathName() in sceneResetCache:
         return transform.restPosition()
-    
+
     sceneResetCache[dagPath.fullPathName()] = None
 
     # We are going to save the rest position on the node
@@ -494,7 +494,10 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
             valuesY[slot] = euler.y
             valuesZ[slot] = euler.z
     elif mode == "relative":
-        rest = utilityGetRestData(tracks[0][1], "rotation_quaternion")
+        if tracks[0] is not None:
+            rest = utilityGetRestData(tracks[0][1], "rotation_quaternion")
+        else:
+            rest = OpenMaya.MQuaternion()
 
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
