@@ -373,9 +373,10 @@ def utilitySaveNodeData(dagPath):
     transform = OpenMaya.MFnTransform(dagPath)
     restTransform = transform.transformation()
 
-    # If we already had the bone saved, ignore this
+    # If we already had the bone saved, just return it's saved rest position.
     if dagPath.fullPathName() in sceneResetCache:
-        return
+        return transform.restPosition()
+    
     sceneResetCache[dagPath.fullPathName()] = None
 
     # We are going to save the rest position on the node
@@ -963,7 +964,7 @@ def importCurveNode(node, path, timeUnit, startFrame):
     if propertyName == "rq":
         for track in tracks:
             if track is not None:
-                utilitySetCurveInterpolation(track.name(), "quaternion")
+                utilitySetCurveInterpolation(track[0].name(), "quaternion")
 
     # Return the frame sizes [s, l] so we can adjust the scene times
     return (smallestFrame, largestFrame)
