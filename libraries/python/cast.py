@@ -485,12 +485,14 @@ class Mesh(CastNode):
         self.CreateProperty("mi", "b").values = [maximum]
 
     def SkinningMethod(self):
+        """The skinning method used for this mesh."""
         sm = self.properties.get("sm")
         if sm is not None:
             return sm.values[0]
         return "linear"
 
     def SetSkinningMethod(self, method):
+        """Sets the skinning method used for this mesh."""
         self.CreateProperty("sm", "s").values = [method]
 
     def FaceBuffer(self):
