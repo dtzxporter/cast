@@ -56,6 +56,45 @@ def utilitySetToggleItem(name, value=False):
     utilitySaveSettings()
 
 
+def utilityLerp(a, b, time):
+    return (a + time * (b - a))
+
+
+def utilitySlerp(qa, qb, t):
+    qm = OpenMaya.MQuaternion()
+
+    cosHalfTheta = qa.w * qb.w + qa.x * qb.x + qa.y * qb.y + qa.z * qb.z
+
+    if abs(cosHalfTheta) >= 1.0:
+        qm.w = qa.w
+        qm.x = qa.x
+        qm.y = qa.y
+        qm.z = qa.z
+
+        return qa
+
+    halfTheta = math.acos(cosHalfTheta)
+    sinHalfTheta = math.sqrt(1.0 - cosHalfTheta * cosHalfTheta)
+
+    if math.fabs(sinHalfTheta) < 0.001:
+        qm.w = qa.w * 0.5 + qb.w * 0.5
+        qm.x = qa.x * 0.5 + qb.x * 0.5
+        qm.y = qa.y * 0.5 + qb.y * 0.5
+        qm.z = qa.z * 0.5 + qb.z * 0.5
+
+        return qm
+
+    ratioA = math.sin((1 - t) * halfTheta) / sinHalfTheta
+    ratioB = math.sin(t * halfTheta) / sinHalfTheta
+
+    qm.w = qa.w * ratioA + qb.w * ratioB
+    qm.x = qa.x * ratioA + qb.x * ratioB
+    qm.y = qa.y * ratioA + qb.y * ratioB
+    qm.z = qa.z * ratioA + qb.z * ratioB
+
+    return qm
+
+
 def utilityQueryToggleItem(name):
     if name in sceneSettings:
         return sceneSettings[name]
@@ -195,7 +234,7 @@ def utilityClearAnimation():
     sceneResetCache = {}
 
 
-def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1):
+def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMethod="linear"):
     skinParams = [x for x in bones]
     skinParams.append(newMesh.fullPathName())
 
@@ -211,7 +250,14 @@ def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1):
     clusterObject = OpenMaya.MObject()
     selectList.getDependNode(0, clusterObject)
 
-    return OpenMayaAnim.MFnSkinCluster(clusterObject)
+    cluster = OpenMayaAnim.MFnSkinCluster(clusterObject)
+
+    if skinningMethod == "linear":
+        cmds.setAttr("%s.skinningMethod" % cluster.name(), 0)
+    elif skinningMethod == "quaternion":
+        cmds.setAttr("%s.skinningMethod" % cluster.name(), 1)
+
+    return cluster
 
 
 def utilityBuildPath(root, asset):
@@ -347,6 +393,15 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
     return (materialInstance)
 
 
+def utilityGetTrackEndTime(track):
+    numKeyframes = track.numKeys()
+
+    if numKeyframes > 0:
+        return track.time(numKeyframes - 1)
+    else:
+        return OpenMaya.MTime()
+
+
 def utilityGetRestData(restTransform, component):
     if component == "rotation":
         return restTransform.eulerRotation()
@@ -445,16 +500,19 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     valuesY = [0.0] * len(frameBuffer)
     valuesZ = [0.0] * len(frameBuffer)
 
+    for frame in frameBuffer:
+        time = OpenMaya.MTime(frame, timeUnit) + frameStart
+
+        if time < smallestFrame:
+            smallestFrame = time
+        if time > largestFrame:
+            largestFrame = time
+
+        timeBuffer.append(time)
+
     if mode == "absolute" or mode is None:
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
-            frame = OpenMaya.MTime(frameBuffer[slot], timeUnit) + frameStart
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-            timeBuffer.append(frame)
-
             euler = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3]).asEulerRotation()
 
@@ -464,31 +522,24 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     elif mode == "additive":
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
-            frame = OpenMaya.MTime(frameBuffer[slot], timeUnit) + frameStart
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-            timeBuffer.append(frame)
+            eulerSamples = [0.0, 0.0, 0.0]
 
-            valueShifts = [0.0, 0.0, 0.0]
+            frame = timeBuffer[slot]
 
             if tracks[0] is not None:
-                valueShifts[0] = tracks[0][0].evaluate(frame)
+                eulerSamples[0] = tracks[0][0].evaluate(frame)
             if tracks[1] is not None:
-                valueShifts[1] = tracks[1][0].evaluate(frame)
+                eulerSamples[1] = tracks[1][0].evaluate(frame)
             if tracks[2] is not None:
-                valueShifts[2] = tracks[2][0].evaluate(frame)
+                eulerSamples[2] = tracks[2][0].evaluate(frame)
 
             additiveQuat = OpenMaya.MEulerRotation(
-                valueShifts[0], valueShifts[1], valueShifts[2]).asQuaternion()
+                eulerSamples[0], eulerSamples[1], eulerSamples[2]).asQuaternion()
             frameQuat = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
-            if blendWeight == 0.0:
-                euler = frameQuat.asEulerRotation()
-            else:
-                euler = (frameQuat * additiveQuat).asEulerRotation()
+            euler = utilitySlerp(
+                additiveQuat, (frameQuat * additiveQuat), blendWeight).asEulerRotation()
 
             valuesX[slot] = euler.x
             valuesY[slot] = euler.y
@@ -501,13 +552,6 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
 
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
-            frame = OpenMaya.MTime(frameBuffer[slot], timeUnit) + frameStart
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-            timeBuffer.append(frame)
-
             frame = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
@@ -556,6 +600,16 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     track = tracks[0][0]
     restTransform = tracks[0][1]
 
+    for frame in frameBuffer:
+        time = OpenMaya.MTime(frame, timeUnit) + frameStart
+
+        if time < smallestFrame:
+            smallestFrame = time
+        if time > largestFrame:
+            largestFrame = time
+
+        timeBuffer.append(time)
+
     # Default track mode is absolute meaning that the
     # values are what they should be in the curve already
     if mode == "absolute" or mode is None:
@@ -563,29 +617,16 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
 
         curveValueBuffer = OpenMaya.MDoubleArray(
             scriptUtil.asDoublePtr(), len(valueBuffer))
-
-        for x in frameBuffer:
-            frame = OpenMaya.MTime(x, timeUnit) + frameStart
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-            timeBuffer.append(frame)
     # Additive curves are applied to any existing curve value in the scene
     # so we will add it to the sample at the given time
     elif mode == "additive":
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
-        for i, x in enumerate(frameBuffer):
-            frame = OpenMaya.MTime(x, timeUnit) + frameStart
-            sample = track.evaluate(frame)
-            curveValueBuffer[i] = sample + valueBuffer[i]
+        for i, value in enumerate(valueBuffer):
+            sample = track.evaluate(timeBuffer[i])
 
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-            timeBuffer.append(frame)
+            curveValueBuffer[i] = utilityLerp(
+                sample, sample + value, blendWeight)
     # Relative curves are applied against the resting position value in the scene
     # we will add it to the rest position
     elif mode == "relative":
@@ -608,15 +649,8 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         else:
             rest = 0.0
 
-        for i, x in enumerate(frameBuffer):
-            frame = OpenMaya.MTime(x, timeUnit) + frameStart
-            curveValueBuffer[i] = rest + valueBuffer[i]
-
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-            timeBuffer.append(frame)
+        for i, value in enumerate(valueBuffer):
+            curveValueBuffer[i] = rest + value
 
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
@@ -833,6 +867,7 @@ def importModelNode(model, path):
                 faceCountBuffer, faceIndexBuffer, newUVName)
 
         maximumInfluence = mesh.MaximumWeightInfluence()
+        skinningMethod = mesh.SkinningMethod()
 
         if maximumInfluence > 0 and sceneSettings["importSkin"]:
             weightBoneBuffer = mesh.VertexWeightBoneBuffer()
@@ -841,7 +876,7 @@ def importModelNode(model, path):
             weightedBonesCount = len(weightedBones)
 
             skinCluster = utilityCreateSkinCluster(
-                newMesh, weightedBones, maximumInfluence)
+                newMesh, weightedBones, maximumInfluence, skinningMethod)
 
             weightedRemap = {paths.index(
                 x): i for i, x in enumerate(weightedBones)}

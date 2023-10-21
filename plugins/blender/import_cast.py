@@ -371,6 +371,13 @@ def importModelNode(model, path):
             modifier.use_bone_envelopes = False
             modifier.use_vertex_groups = True
 
+            skinningMethod = mesh.SkinningMethod()
+
+            if skinningMethod == "linear":
+                modifier.use_deform_preserve_volume = False
+            elif skinningMethod == "quaternion":
+                modifier.use_deform_preserve_volume = True
+
             maximumInfluence = mesh.MaximumWeightInfluence()
             if maximumInfluence > 1:  # Slower path for complex weights
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()

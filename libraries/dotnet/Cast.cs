@@ -412,7 +412,7 @@ namespace Cast
         {
             if (Properties.TryGetValue("p", out CastProperty Value))
             {
-                return unchecked((int)Value.Values[0]);
+                return unchecked((int)(uint)Value.Values[0]);
             }
 
             return -1;
@@ -722,6 +722,20 @@ namespace Cast
                     yield return (float)Item;
                 }
             }
+        }
+
+        /// <summary>
+        /// The method used for skinning this mesh.
+        /// </summary>
+        /// <returns></returns>
+        public string SkinningMethod()
+        {
+            if (Properties.TryGetValue("sm", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return "linear";
         }
 
         /// <summary>
