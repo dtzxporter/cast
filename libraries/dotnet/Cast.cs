@@ -311,6 +311,9 @@ namespace Cast
         public float W { get; set; }
     }
 
+    /// <summary>
+    /// A blend shape deformer that defines a base mesh shape, and corrosponding target mesh shapes.
+    /// </summary>
     public class BlendShape : CastNode
     {
         public BlendShape()
@@ -318,6 +321,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The name of this blend shape deformer.
+        /// </summary>
+        /// <returns></returns>
         public string Name()
         {
             if (Properties.TryGetValue("n", out CastProperty Value))
@@ -328,6 +335,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The base mesh shape.
+        /// </summary>
+        /// <returns></returns>
         public Mesh BaseShape()
         {
             if (Properties.TryGetValue("b", out CastProperty Value))
@@ -338,6 +349,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// A collection of target mesh shapes.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<Mesh> TargetShapes()
         {
             if (Properties.TryGetValue("t", out CastProperty Value))
@@ -349,6 +364,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// A collection of target mesh scale values.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<float> TargetWeightScales()
         {
             if (Properties.TryGetValue("ts", out CastProperty Value))
@@ -361,6 +380,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A 3d bone that belongs to a <see cref="Skeleton"/>.
+    /// </summary>
     public class Bone : CastNode
     {
         public Bone()
@@ -368,6 +390,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The name of this bone.
+        /// </summary>
+        /// <returns></returns>
         public string Name()
         {
             if (Properties.TryGetValue("n", out CastProperty Value))
@@ -378,6 +404,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The index of the parent bone in the skeleton. -1 is a root bone.
+        /// </summary>
+        /// <returns></returns>
         public int ParentIndex()
         {
             if (Properties.TryGetValue("p", out CastProperty Value))
@@ -388,6 +418,10 @@ namespace Cast
             return -1;
         }
 
+        /// <summary>
+        /// Whether or not children bones are effected by the scale of this bone.
+        /// </summary>
+        /// <returns></returns>
         public bool SegmentScaleCompensate()
         {
             if (Properties.TryGetValue("ssc", out CastProperty Value))
@@ -398,6 +432,10 @@ namespace Cast
             return true;
         }
 
+        /// <summary>
+        /// The local space position of this bone.
+        /// </summary>
+        /// <returns></returns>
         public Vector3 LocalPosition()
         {
             if (Properties.TryGetValue("lp", out CastProperty Value))
@@ -408,6 +446,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The local space rotation of this bone.
+        /// </summary>
+        /// <returns></returns>
         public Vector4 LocalRotation()
         {
             if (Properties.TryGetValue("lr", out CastProperty Value))
@@ -418,6 +460,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The world position of this bone.
+        /// </summary>
+        /// <returns></returns>
         public Vector3 WorldPosition()
         {
             if (Properties.TryGetValue("wp", out CastProperty Value))
@@ -428,6 +474,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The world rotation of this bone.
+        /// </summary>
+        /// <returns></returns>
         public Vector4 WorldRotation()
         {
             if (Properties.TryGetValue("wr", out CastProperty Value))
@@ -438,6 +488,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The scale of this bone.
+        /// </summary>
+        /// <returns></returns>
         public Vector3 Scale()
         {
             if (Properties.TryGetValue("s", out CastProperty Value))
@@ -459,6 +513,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The collection of bones in this skeleton.
+        /// </summary>
+        /// <returns></returns>
         public List<Bone> Bones()
         {
             return ChildrenOfType<Bone>();
@@ -475,6 +533,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The name of this mesh.
+        /// </summary>
+        /// <returns></returns>
         public string Name()
         {
             if (Properties.TryGetValue("n", out CastProperty Value))
@@ -485,6 +547,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The number of vertices in this mesh.
+        /// </summary>
+        /// <returns></returns>
         public int VertexCount()
         {
             if (Properties.TryGetValue("vp", out CastProperty Value))
@@ -495,6 +561,10 @@ namespace Cast
             return 0;
         }
 
+        /// <summary>
+        /// The number of faces in this mesh.
+        /// </summary>
+        /// <returns></returns>
         public int FaceCount()
         {
             if (Properties.TryGetValue("f", out CastProperty Value))
@@ -505,6 +575,10 @@ namespace Cast
             return 0;
         }
 
+        /// <summary>
+        /// The number of uv layers in this mesh.
+        /// </summary>
+        /// <returns></returns>
         public int UVLayerCount()
         {
             if (Properties.TryGetValue("ul", out CastProperty Value))
@@ -515,6 +589,10 @@ namespace Cast
             return 0;
         }
 
+        /// <summary>
+        /// The maximum weight influence for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public int MaximumWeightInfluence()
         {
             if (Properties.TryGetValue("mi", out CastProperty Value))
@@ -525,6 +603,10 @@ namespace Cast
             return 0;
         }
 
+        /// <summary>
+        /// The collection of faces for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<int> FaceBuffer()
         {
             if (Properties.TryGetValue("f", out CastProperty Value))
@@ -536,6 +618,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The collection of vertex positions for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<Vector3> VertexPositionBuffer()
         {
             if (Properties.TryGetValue("vp", out CastProperty Value))
@@ -547,6 +633,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The collection of vertex normals for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<Vector3> VertexNormalBuffer()
         {
             if (Properties.TryGetValue("vn", out CastProperty Value))
@@ -558,6 +648,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The collection of vertex tangents for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<Vector3> VertexTangentBuffer()
         {
             if (Properties.TryGetValue("vt", out CastProperty Value))
@@ -569,6 +663,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The collection of vertex colors for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<uint> VertexColorBuffer()
         {
             if (Properties.TryGetValue("vc", out CastProperty Value))
@@ -580,6 +678,11 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The uv layer collection for the given layer index.
+        /// </summary>
+        /// <param name="Index">The uv layer index, starting from 0</param>
+        /// <returns></returns>
         public IEnumerable<Vector2> VertexUVLayerBuffer(int Index)
         {
             if (Properties.TryGetValue("u" + Index, out CastProperty Value))
@@ -591,6 +694,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The collection of weight bone indices for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<int> VertexWeightBoneBuffer()
         {
             if (Properties.TryGetValue("wb", out CastProperty Value))
@@ -602,6 +709,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The collection of weight bone values for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<float> VertexWeightValueBuffer()
         {
             if (Properties.TryGetValue("wv", out CastProperty Value))
@@ -613,6 +724,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The material for this mesh.
+        /// </summary>
+        /// <returns></returns>
         public Material Material()
         {
             if (Properties.TryGetValue("m", out CastProperty Value))
@@ -634,6 +749,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The name for this material.
+        /// </summary>
+        /// <returns></returns>
         public string Name()
         {
             if (Properties.TryGetValue("n", out CastProperty Value))
@@ -644,6 +763,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The type of this material (pbr).
+        /// </summary>
+        /// <returns></returns>
         public string Type()
         {
             if (Properties.TryGetValue("t", out CastProperty Value))
@@ -654,6 +777,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// A collection of slots for this material.
+        /// </summary>
+        /// <returns></returns>
         public Dictionary<string, File> Slots()
         {
             var Result = new Dictionary<string, File>();
@@ -675,6 +802,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A 3d animation and it's collection of curves.
+    /// </summary>
     public class Animation : CastNode
     {
         public Animation()
@@ -682,6 +812,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The skeleton embedded in this animation.
+        /// </summary>
+        /// <returns></returns>
         public Skeleton Skeleton()
         {
             var Result = ChildrenOfType<Skeleton>();
@@ -694,16 +828,28 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The collection of curves for this animation.
+        /// </summary>
+        /// <returns></returns>
         public List<Curve> Curves()
         {
             return ChildrenOfType<Curve>();
         }
 
+        /// <summary>
+        /// The collection of notification tracks for this animation.
+        /// </summary>
+        /// <returns></returns>
         public List<NotificationTrack> Notifications()
         {
             return ChildrenOfType<NotificationTrack>();
         }
 
+        /// <summary>
+        /// The framerate this animation plays at.
+        /// </summary>
+        /// <returns></returns>
         public float Framerate()
         {
             if (Properties.TryGetValue("fr", out CastProperty Value))
@@ -714,6 +860,10 @@ namespace Cast
             return 30.0f;
         }
 
+        /// <summary>
+        /// Whether or not this animation should loop.
+        /// </summary>
+        /// <returns></returns>
         public bool Looping()
         {
             if (Properties.TryGetValue("lo", out CastProperty Value))
@@ -725,6 +875,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A curve from an animation that animates a node's property.
+    /// </summary>
     public class Curve : CastNode
     {
         public Curve()
@@ -732,6 +885,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The name of the node to animate.
+        /// </summary>
+        /// <returns></returns>
         public string NodeName()
         {
             if (Properties.TryGetValue("nn", out CastProperty Value))
@@ -742,6 +899,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The property of the node to animate.
+        /// </summary>
+        /// <returns></returns>
         public string KeyPropertyName()
         {
             if (Properties.TryGetValue("kp", out CastProperty Value))
@@ -752,6 +913,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// The collection of keyframes.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<int> KeyFrameBuffer()
         {
             if (Properties.TryGetValue("kb", out CastProperty Value))
@@ -763,6 +928,11 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The collection of keyframe values.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public IEnumerable<T> KeyValueBuffer<T>()
         {
             if (Properties.TryGetValue("kv", out CastProperty Value))
@@ -774,6 +944,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// The mode for this animation.
+        /// </summary>
+        /// <returns></returns>
         public string Mode()
         {
             if (Properties.TryGetValue("m", out CastProperty Value))
@@ -784,7 +958,11 @@ namespace Cast
             return null;
         }
 
-        public float AdditiveblendWeight()
+        /// <summary>
+        /// The weight to use when blending this animation.
+        /// </summary>
+        /// <returns></returns>
+        public float AdditiveBlendWeight()
         {
             if (Properties.TryGetValue("ab", out CastProperty Value))
             {
@@ -795,6 +973,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// The notification track for an animation.
+    /// </summary>
     public class NotificationTrack : CastNode
     {
         public NotificationTrack()
@@ -802,6 +983,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The name of the notification.
+        /// </summary>
+        /// <returns></returns>
         public string Name()
         {
             if (Properties.TryGetValue("n", out CastProperty Value))
@@ -812,6 +997,10 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// A collection of keyframes this notification fires on.
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<int> KeyFrameBuffer()
         {
             if (Properties.TryGetValue("kb", out CastProperty Value))
@@ -824,6 +1013,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// An external file reference.
+    /// </summary>
     public class File : CastNode
     {
         public File()
@@ -831,6 +1023,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The path of this file reference.
+        /// </summary>
+        /// <returns></returns>
         public string Path()
         {
             if (Properties.TryGetValue("p", out CastProperty Value))
@@ -842,6 +1038,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A root node.
+    /// </summary>
     public class Root : CastNode
     {
         public Root()
@@ -850,6 +1049,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A 3d model with meshes, materials, and a skeleton.
+    /// </summary>
     public class Model : CastNode
     {
         public Model()
@@ -857,6 +1059,10 @@ namespace Cast
         {
         }
 
+        /// <summary>
+        /// The skeleton embedded in this model.
+        /// </summary>
+        /// <returns></returns>
         public Skeleton Skeleton()
         {
             var Result = ChildrenOfType<Skeleton>();
@@ -869,26 +1075,50 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// A collection of meshes for this model.
+        /// </summary>
+        /// <returns></returns>
         public List<Mesh> Meshes()
         {
             return ChildrenOfType<Mesh>();
         }
 
+        /// <summary>
+        /// A collection of materials for this model.
+        /// </summary>
+        /// <returns></returns>
         public List<Material> Materials()
         {
             return ChildrenOfType<Material>();
         }
 
+        /// <summary>
+        /// A collection of blend shapes for this model.
+        /// </summary>
+        /// <returns></returns>
         public List<BlendShape> BlendShapes()
         {
             return ChildrenOfType<BlendShape>();
         }
     }
 
+    /// <summary>
+    /// A single property for a cast node.
+    /// </summary>
     public class CastProperty
     {
+        /// <summary>
+        /// The name for this property.
+        /// </summary>
         public string Name { get; set; }
+        /// <summary>
+        /// The value type for this property.
+        /// </summary>
         public string Type { get; set; }
+        /// <summary>
+        /// A collection of values for this property.
+        /// </summary>
         public List<object> Values { get; set; }
 
         public CastProperty(string Name, string Type)
@@ -899,6 +1129,11 @@ namespace Cast
             Values = new List<object>();
         }
 
+        /// <summary>
+        /// Loads a cast property from the given reader.
+        /// </summary>
+        /// <param name="Reader"></param>
+        /// <returns></returns>
         public static CastProperty Load(BinaryReader Reader)
         {
             var Header = CastPropertyHeader.Load(Reader);
@@ -916,6 +1151,10 @@ namespace Cast
             return Property;
         }
 
+        /// <summary>
+        /// Saves this cast property to the given writer.
+        /// </summary>
+        /// <param name="Writer"></param>
         public void Save(BinaryWriter Writer)
         {
             var PropertyName = Encoding.UTF8.GetBytes(Name);
@@ -950,6 +1189,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// Returns the length in bytes of this cast property.
+        /// </summary>
+        /// <returns></returns>
         public uint Length()
         {
             var Result = 0x8u;
@@ -969,13 +1212,31 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// A single generic cast node.
+    /// </summary>
     public class CastNode
     {
+        /// <summary>
+        /// The unique identifier for this node.
+        /// </summary>
         public uint Identifier { get; set; }
+        /// <summary>
+        /// The unique hash for this node.
+        /// </summary>
         public ulong Hash { get; set; }
+        /// <summary>
+        /// A collection of properties.
+        /// </summary>
         public Dictionary<string, CastProperty> Properties { get; set; }
+        /// <summary>
+        /// A collection of child nodes.
+        /// </summary>
         public List<CastNode> ChildNodes { get; set; }
 
+        /// <summary>
+        /// The parent node if this node is not a root node.
+        /// </summary>
         public CastNode ParentNode { get; set; }
 
         public CastNode(uint Identifier)
@@ -988,6 +1249,11 @@ namespace Cast
             ParentNode = null;
         }
 
+        /// <summary>
+        /// Finds all children that match the given type.
+        /// </summary>
+        /// <typeparam name="T">The type to match.</typeparam>
+        /// <returns></returns>
         public List<T> ChildrenOfType<T>()
         {
             var Result = new List<T>();
@@ -1003,6 +1269,11 @@ namespace Cast
             return Result;
         }
 
+        /// <summary>
+        /// Finds a child by the given hash.
+        /// </summary>
+        /// <param name="Hash"></param>
+        /// <returns></returns>
         public CastNode ChildByHash(ulong Hash)
         {
             foreach (var Child in ChildNodes)
@@ -1016,6 +1287,11 @@ namespace Cast
             return null;
         }
 
+        /// <summary>
+        /// Loads a cast node from the given reader.
+        /// </summary>
+        /// <param name="Reader"></param>
+        /// <returns></returns>
         public static CastNode Load(BinaryReader Reader)
         {
             var Header = CastNodeHeader.Load(Reader);
@@ -1049,6 +1325,10 @@ namespace Cast
             return Node;
         }
 
+        /// <summary>
+        /// Saves this cast node to the given writer.
+        /// </summary>
+        /// <param name="Writer"></param>
         public void Save(BinaryWriter Writer)
         {
             var Header = new CastNodeHeader()
@@ -1073,6 +1353,10 @@ namespace Cast
             }
         }
 
+        /// <summary>
+        /// Returns the length in bytes of this cast node.
+        /// </summary>
+        /// <returns></returns>
         public uint Length()
         {
             var Result = 0x18u;
@@ -1091,6 +1375,9 @@ namespace Cast
         }
     }
 
+    /// <summary>
+    /// The container file that holds cast nodes.
+    /// </summary>
     public class CastFile
     {
         /// <summary>
