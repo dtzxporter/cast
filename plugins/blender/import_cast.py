@@ -445,11 +445,21 @@ def importCurveNode(node, fcurves, poseBones, path, startFrame):
 
 
 def importNotificationTrackNode(node, action):
+    smallestFrame = 0
+    largestFrame = 0
+
     frameBuffer = node.KeyFrameBuffer()
 
-    for x in frameBuffer:
+    for frame in frameBuffer:
         notetrack = action.pose_markers.new(node.Name())
-        notetrack.frame = x
+        notetrack.frame = frame
+
+        if frame < smallestFrame:
+            smallestFrame = frame
+        if frame > largestFrame:
+            largestFrame = frame
+
+    return (smallestFrame, largestFrame)
 
 
 def importAnimationNode(node, path):
