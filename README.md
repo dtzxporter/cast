@@ -243,6 +243,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 **Notes**:
 - `Face Buffer` is an index into the current meshes vertex data buffers where (0, 1, 2) are the first three vertices from this mesh.
 - The `Face Buffer` follows CCW (right-handed) winding order, this may be different in other apis, where you may have to remap the indices.
+- If a face contains an invalid index combination `(0, 1, 1), (0, 1, 0), (0, 0, 0)` where two or more indices are the same, it is acceptable for the user processing these faces to ignore them in order to properly render the mesh. It would be wise to present the user with a warning stating that this happened.
 - Each vertex descriptor buffer must contain the same number of elements ex: if you have 16 vertices, you must have 16 normals if they exist, 16 colors if the buffer exists. Otherwise it's assumed they are default / skipped.
 - The default skinning method is `linear`. When set to `quaternion` dual quaternion skinning is used.
 
