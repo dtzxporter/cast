@@ -10,7 +10,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 0, 4),
+    "version": (1, 0, 5),
     "blender": (2, 90, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -68,6 +68,9 @@ class ExportCast(bpy.types.Operator, ExportHelper):
     incl_animation: BoolProperty(
         name="Include Animations", description="Whether or not to export animation data", default=True)
 
+    incl_notetracks: BoolProperty(
+        name="Include Notetracks", description="Whether or not to export pose markers as notetracks", default=True)
+
     is_looped: BoolProperty(
         name="Looped", description="Mark the animation as looping", default=False)
 
@@ -78,6 +81,7 @@ class ExportCast(bpy.types.Operator, ExportHelper):
         self.layout.prop(self, "export_selected")
         self.layout.prop(self, "incl_model")
         self.layout.prop(self, "incl_animation")
+        self.layout.prop(self, "incl_notetracks")
         self.layout.prop(self, "is_looped")
         self.layout.prop(self, "scale")
 

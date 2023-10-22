@@ -161,6 +161,22 @@ def exportAction(self, context, root, objects, action):
 
         progress.leave_substeps()
 
+        # Pull in the pose_markers as notetracks based on their name:[frames].
+        if self.incl_notetracks:
+            notetracks = {}
+
+            for poseMarker in action.pose_markers:
+                if poseMarker.name in notetracks:
+                    notetracks[poseMarker.name].append(int(poseMarker.frame))
+                else:
+                    notetracks[poseMarker.name] = [int(poseMarker.frame)]
+
+            # Generate the notetrack curves.
+            for name, frames in notetracks.items():
+                track = animation.CreateNotification()
+                track.SetName(name)
+                track.SetKeyFrameBuffer(frames)
+
 
 def save(self, context, filepath=""):
     # The currently selected object.
