@@ -765,6 +765,32 @@ def importModelNode(model, path):
         vertexCount = int(mesh.VertexCount())
 
         faces = mesh.FaceBuffer()
+
+        # Remove any degenerate faces before giving it to the mesh.
+        for i in xrange(len(faces) - 3, -1, -3):
+            remove = False
+
+            if faces[i] == faces[i + 1]:
+                faceCount -= 1
+                remove = True
+            elif faces[i] == faces[i + 2]:
+                faceCount -= 1
+                remove = True
+            elif faces[i + 1] == faces[i + 2]:
+                faceCount -= 1
+                remove = True
+
+            if remove:
+                del faces[i + 2]
+                del faces[i + 1]
+                del faces[i]
+
+        # Warn the user that this took place.
+        facesRemoved = int(mesh.FaceCount()) - faceCount
+
+        if facesRemoved > 0:
+            cmds.warning("Removed %d degenerate faces from %s" % (facesRemoved, newMeshTransform.name()))
+
         scriptUtil = OpenMaya.MScriptUtil()
         scriptUtil.createFromList([x for x in faces], len(faces))
 
@@ -793,7 +819,7 @@ def importModelNode(model, path):
             scriptUtil.asIntPtr(), vertexCount)
 
         # Each channel after position / faces is optional
-        # meaning we should comletely ignore null buffers here
+        # meaning we should completely ignore null buffers here
         # even though you *should* have them
 
         vertexNormals = mesh.VertexNormalBuffer()
