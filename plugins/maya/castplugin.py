@@ -784,7 +784,8 @@ def importModelNode(model, path):
 
         # Warn the user that this took place.
         if facesRemoved > 0:
-            cmds.warning("Removed %d degenerate faces from %s" % (facesRemoved, newMeshTransform.name()))
+            cmds.warning("Removed %d degenerate faces from %s" %
+                         (facesRemoved, newMeshTransform.name()))
 
         # Triangle count / vertex count
         faceCount = int(mesh.FaceCount())
