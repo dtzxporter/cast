@@ -760,24 +760,21 @@ def importModelNode(model, path):
         newMeshNode = newMeshTransform.create(meshNode)
         newMeshTransform.setName(mesh.Name() or "CastMesh")
 
-        # Triangle count / vertex count
-        faceCount = int(mesh.FaceCount())
-        vertexCount = int(mesh.VertexCount())
-
         faces = mesh.FaceBuffer()
+        facesRemoved = 0
 
         # Remove any degenerate faces before giving it to the mesh.
         for i in xrange(len(faces) - 3, -1, -3):
             remove = False
 
             if faces[i] == faces[i + 1]:
-                faceCount -= 1
+                facesRemoved += 1
                 remove = True
             elif faces[i] == faces[i + 2]:
-                faceCount -= 1
+                facesRemoved += 1
                 remove = True
             elif faces[i + 1] == faces[i + 2]:
-                faceCount -= 1
+                facesRemoved += 1
                 remove = True
 
             if remove:
@@ -786,10 +783,12 @@ def importModelNode(model, path):
                 del faces[i]
 
         # Warn the user that this took place.
-        facesRemoved = int(mesh.FaceCount()) - faceCount
-
         if facesRemoved > 0:
             cmds.warning("Removed %d degenerate faces from %s" % (facesRemoved, newMeshTransform.name()))
+
+        # Triangle count / vertex count
+        faceCount = int(mesh.FaceCount())
+        vertexCount = int(mesh.VertexCount())
 
         scriptUtil = OpenMaya.MScriptUtil()
         scriptUtil.createFromList([x for x in faces], len(faces))
