@@ -1,0 +1,6 @@
+{
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/libraries/python",
+    ]
+}

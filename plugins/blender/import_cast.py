@@ -1,12 +1,10 @@
 import bpy
-import bmesh
 import os
 import array
-import time
 import math
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
-from .cast import Cast, Model, Animation, Curve, NotificationTrack, Mesh, Skeleton, Bone, Material, File
+from .cast import Cast, Model, Animation, File
 
 PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
 SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
@@ -388,7 +386,7 @@ def importModelNode(model, path):
                         index = j + (x * maximumInfluence)
                         value = weightValueBuffer[index]
 
-                        if (value > 0.0):
+                        if value > 0.0:
                             boneGroups[weightBoneBuffer[index]].add(
                                 (x,), value, "REPLACE")
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes

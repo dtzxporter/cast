@@ -1,10 +1,6 @@
 import bpy
-import bmesh
 import bpy_types
 from bpy_extras.wm_utils.progress_report import ProgressReport
-import os
-import array
-import time
 import math
 from mathutils import *
 from .cast import Cast
