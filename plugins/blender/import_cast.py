@@ -29,6 +29,7 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             "specular": "Specular",
             "metal": "Metallic",
             "roughness": "Roughness",
+            "gloss": "Roughness",
             "normal": "Normal",
             "emissive": "Emission"
         }
@@ -45,6 +46,7 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             "diffuse": "Base Color",
             "specular": "Specular",
             "roughness": "Roughness",
+            "gloss": "Roughness",
             "emissive": "Emissive Color",
             "normal": "Normal",
             "ao": "Ambient Occlusion"
@@ -65,8 +67,21 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
         except RuntimeError:
             pass
 
-        material.node_tree.links.new(
-            shader.inputs[switcher[slot]], texture.outputs["Color"])
+        if slot == "normal":
+            normalMap = material.node_tree.nodes.new("ShaderNodeNormalMap")
+            material.node_tree.links.new(
+                normalMap.inputs["Color"], texture.outputs["Color"])
+            material.node_tree.links.new(
+                shader.inputs[switcher[slot]], normalMap.outputs["Normal"])
+        elif slot == "gloss":
+            invert = material.node_tree.nodes.new("ShaderNodeInvert")
+            material.node_tree.links.new(
+                invert.inputs["Color"], texture.outputs["Color"])
+            material.node_tree.links.new(
+                shader.inputs[switcher[slot]], invert.outputs["Color"])
+        else:
+            material.node_tree.links.new(
+                shader.inputs[switcher[slot]], texture.outputs["Color"])
 
 
 def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
