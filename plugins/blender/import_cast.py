@@ -283,7 +283,7 @@ def importMaterialNode(path, material):
     return material.Name(), materialNew
 
 
-def importModelNode(model, path):
+def importModelNode(self, model, path):
     # Extract the name of this model from the path
     modelName = os.path.splitext(os.path.basename(path))[0]
 
@@ -300,9 +300,14 @@ def importModelNode(model, path):
     bpy.context.scene.collection.children.unlink(collection)
 
     meshes = model.Meshes()
+    meshHandles = {}
+
     for mesh in meshes:
         newMesh = bpy.data.meshes.new("polySurfaceMesh")
         meshObj = bpy.data.objects.new(mesh.Name() or "CastMesh", newMesh)
+
+        # Store for later creating blend shapes if necessary.
+        meshHandles[mesh.Hash()] = (meshObj, newMesh)
 
         vertexPositions = mesh.VertexPositionBuffer()
         newMesh.vertices.add(int(len(vertexPositions) / 3))
@@ -395,6 +400,45 @@ def importModelNode(model, path):
                     boneGroups[weightBoneBuffer[x]].add((x,), 1.0, "REPLACE")
 
         collection.objects.link(meshObj)
+
+    blendShapes = model.BlendShapes()
+
+    for blendShape in blendShapes:
+        # We need one base shape and 1+ target shapes
+        if blendShape.BaseShape() is None or blendShape.BaseShape().Hash() not in meshHandles:
+            continue
+        if blendShape.TargetShapes() is None:
+            continue
+
+        baseShape = meshHandles[blendShape.BaseShape().Hash()]
+        targetShapes = [meshHandles[x.Hash()]
+                        for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
+        targetWeightScales = blendShape.TargetWeightScales() or []
+        targetWeightScaleCount = len(targetWeightScales)
+
+        basis = baseShape[0].shape_key_add(name="Basis")
+        basis.interpolation = "KEY_LINEAR"
+
+        for i, shape in enumerate(targetShapes):
+            if len(basis.data) != len(shape[1].vertices):
+                self.report(
+                    {'WARNING'}, "Unable to create blend shape \"%s\" with a different number of vertices." % shape[0].name)
+                continue
+
+            newShape = baseShape[0].shape_key_add(
+                name=shape[0].name, from_mix=False)
+            newShape.interpolation = "KEY_LINEAR"
+
+            if i < targetWeightScaleCount:
+                if targetWeightScales[i] > 10.0:
+                    self.report(
+                        {'WARNING'}, "Clamping blend shape \"%s\" scale to 10.0." % shape[0].name)
+                newShape.slider_max = min(10.0, targetWeightScales[i])
+
+            for v, value in enumerate(shape[1].vertices):
+                newShape.data[v].co = value.co
+
+            shape[0].hide_viewport = True
 
     # Relink the collection after the mesh is built
     bpy.context.view_layer.active_layer_collection.collection.children.link(
@@ -529,21 +573,21 @@ def importAnimationNode(node, path):
     bpy.ops.object.mode_set(mode='POSE')
 
 
-def importRootNode(node, path):
+def importRootNode(self, node, path):
     for child in node.ChildrenOfType(Model):
-        importModelNode(child, path)
+        importModelNode(self, child, path)
     for child in node.ChildrenOfType(Animation):
         importAnimationNode(child, path)
 
 
-def importCast(path):
+def importCast(self, path):
     cast = Cast.load(path)
 
     for root in cast.Roots():
-        importRootNode(root, path)
+        importRootNode(self, root, path)
 
 
 def load(self, context, filepath=""):
-    importCast(filepath)
+    importCast(self, filepath)
 
     bpy.context.view_layer.update()
