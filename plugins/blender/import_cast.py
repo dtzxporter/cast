@@ -68,6 +68,9 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             pass
 
         if slot == "normal":
+            if texture.image is not None:
+                texture.image.colorspace_settings.name = "Non-Color"
+
             normalMap = material.node_tree.nodes.new("ShaderNodeNormalMap")
             material.node_tree.links.new(
                 normalMap.inputs["Color"], texture.outputs["Color"])
