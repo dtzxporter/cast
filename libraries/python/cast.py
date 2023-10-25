@@ -774,7 +774,7 @@ class Bone(CastNode):
 
 
 class IKHandle(CastNode):
-    """Defines an ik chain and it's constraints in the skeleton."""
+    """Defines an ik chain and its constraints in the skeleton."""
 
     def __init__(self):
         super(IKHandle, self).__init__(0x64686B69)

@@ -27,6 +27,8 @@ namespace Cast
                     return new Skeleton();
                 case 0x656E6F62:
                     return new Bone();
+                case 0x64686B69:
+                    return new IKHandle();
                 case 0x6873656D:
                     return new Mesh();
                 case 0x6C74616D:
@@ -504,6 +506,115 @@ namespace Cast
     }
 
     /// <summary>
+    /// Defines an ik chain and its constraints in the skeleton.
+    /// </summary>
+    public class IKHandle : CastNode
+    {
+        public IKHandle()
+            : base(0x64686B69)
+        {
+        }
+
+        /// <summary>
+        /// The name of this ik handle.
+        /// </summary>
+        /// <returns></returns>
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The bone which starts the chain.
+        /// </summary>
+        /// <returns></returns>
+        public Bone StartBone()
+        {
+            if (Properties.TryGetValue("sb", out CastProperty Value))
+            {
+                return (Bone)ParentNode.ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The bone which ends the chain.
+        /// </summary>
+        /// <returns></returns>
+        public Bone EndBone()
+        {
+            if (Properties.TryGetValue("eb", out CastProperty Value))
+            {
+                return (Bone)ParentNode.ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The bone that acts as a target for the chain.
+        /// </summary>
+        /// <returns></returns>
+        public Bone TargetBone()
+        {
+            if (Properties.TryGetValue("tb", out CastProperty Value))
+            {
+                return (Bone)ParentNode.ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The bone that acts as a pole vector for this chain.
+        /// </summary>
+        /// <returns></returns>
+        public Bone PoleVectorBone()
+        {
+            if (Properties.TryGetValue("pv", out CastProperty Value))
+            {
+                return (Bone)ParentNode.ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The bone that acts as the pole (twist) for this chain.
+        /// </summary>
+        /// <returns></returns>
+        public Bone PoleBone()
+        {
+            if (Properties.TryGetValue("pb", out CastProperty Value))
+            {
+                return (Bone)ParentNode.ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Whether or not the target rotation effects the chain.
+        /// </summary>
+        /// <returns></returns>
+        public bool UseTargetRotation()
+        {
+            if (Properties.TryGetValue("tr", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] == 1;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
     /// A collection of bones for a model or animation.
     /// </summary>
     public class Skeleton : CastNode
@@ -520,6 +631,15 @@ namespace Cast
         public List<Bone> Bones()
         {
             return ChildrenOfType<Bone>();
+        }
+
+        /// <summary>
+        /// The collection of ik handles in this skeleton.
+        /// </summary>
+        /// <returns></returns>
+        public List<IKHandle> IKHandles()
+        {
+            return ChildrenOfType<IKHandle>();
         }
     }
 

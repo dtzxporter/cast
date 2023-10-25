@@ -24,10 +24,11 @@ sceneSettings = {
     "importAtTime": False,
     "importSkin": True,
     "importReset": False,
+    "importIK": True,
 }
 
 # Shared version number
-version = "1.17"
+version = "1.18"
 
 
 def utilityAbout():
@@ -195,6 +196,9 @@ def utilityCreateMenu():
 
     cmds.menuItem("importSkin", label="Import Bind Skin", annotation="Imports and binds a model to it's smooth skin",
                   checkBox=utilityQueryToggleItem("importSkin"), command=lambda x: utilitySetToggleItem("importSkin"))
+
+    cmds.menuItem("importIK", label="Import IK Handles", annotation="Imports and configures ik handles for the models skeleton",
+                  checkBox=utilityQueryToggleItem("importIK"), command=lambda x: utilitySetToggleItem("importIK"))
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
@@ -661,6 +665,85 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     return (smallestFrame, largestFrame)
 
 
+def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
+    if skeleton is None:
+        return
+
+    bones = skeleton.Bones()
+
+    for handle in skeleton.IKHandles():
+        startBone = handles[indexes[handle.StartBone().Hash()]]
+        endBone = handles[indexes[handle.EndBone().Hash()]]
+
+        # For every bone in the chain, we need to copy the `rotate` to `jointOrient` because
+        # the ik solver is going to override the value for `rotate.`
+        stopBonePath = paths[indexes[handle.StartBone().Hash()]]
+        currentBonePath = paths[indexes[handle.EndBone().Hash()]]
+        currentBone = handle.EndBone()
+
+        while True:
+            bone = handles[indexes[currentBone.Hash()]]
+            boneRotation = OpenMaya.MQuaternion()
+
+            bone.getRotation(boneRotation)
+            bone.setOrientation(boneRotation)
+            bone.setRotation(OpenMaya.MQuaternion())
+
+            if currentBonePath == stopBonePath:
+                break
+            if currentBone.ParentIndex() > -1:
+                currentBonePath = paths[currentBone.ParentIndex()]
+                currentBone = bones[currentBone.ParentIndex()]
+            else:
+                break
+
+        startBonePath = OpenMaya.MDagPath()
+        endBonePath = OpenMaya.MDagPath()
+
+        startBone.getPath(startBonePath)
+        endBone.getPath(endBonePath)
+
+        ikHandle = OpenMayaAnim.MFnIkHandle()
+        ikHandle.create(startBonePath, endBonePath)
+        ikHandle.setName(handle.Name() or "CastIKHandle")
+
+        # For whatever reason, if we don't "turn it on and off again" it doesn't work...
+        cmds.ikHandle(ikHandle.fullPathName(), e=True, solver="ikSCsolver")
+        cmds.ikHandle(ikHandle.fullPathName(), e=True, solver="ikRPsolver")
+
+        targetBone = handle.TargetBone()
+
+        if targetBone is not None:
+            cmds.parent(ikHandle.fullPathName(),
+                        paths[indexes[targetBone.Hash()]])
+
+            if handle.UseTargetRotation():
+                cmds.orientConstraint(
+                    paths[indexes[targetBone.Hash()]], endBonePath.fullPathName())
+        else:
+            cmds.parent(ikHandle.fullPathName(), jointTransform.fullPathName())
+
+        cmds.setAttr("%s.poleVector" % ikHandle.fullPathName(), 0, 0, 0)
+        cmds.setAttr("%s.twist" % ikHandle.fullPathName(), 0)
+
+        poleVectorBone = handle.PoleVectorBone()
+
+        if poleVectorBone is not None:
+            cmds.connectAttr(
+                "%s.translate" % paths[indexes[poleVectorBone.Hash()]],
+                "%s.poleVector" % ikHandle.fullPathName())
+
+        poleBone = handle.PoleBone()
+
+        if poleBone is not None:
+            cmds.connectAttr(
+                "%s.rotateX" % paths[indexes[poleBone.Hash()]],
+                "%s.twist" % ikHandle.fullPathName())
+
+        cmds.setAttr("%s.translate" % ikHandle.fullPathName(), 0, 0, 0)
+        cmds.setAttr("%s.rotate" % ikHandle.fullPathName(), 0, 0, 0)
+
+
 def importSkeletonNode(skeleton):
     if skeleton is None:
         return (None, None)
@@ -668,6 +751,7 @@ def importSkeletonNode(skeleton):
     bones = skeleton.Bones()
     handles = [None] * len(bones)
     paths = [None] * len(bones)
+    indexes = {}
 
     jointTransform = OpenMaya.MFnTransform()
     jointNode = jointTransform.create()
@@ -680,6 +764,7 @@ def importSkeletonNode(skeleton):
         newBone.create(jointNode)
         newBone.setName(bone.Name())
         handles[i] = newBone
+        indexes[bone.Hash()] = i
 
         utilityStepProgress(progress)
 
@@ -718,7 +803,7 @@ def importSkeletonNode(skeleton):
         utilityStepProgress(progress)
     utilityEndProgress(progress)
 
-    return (handles, paths)
+    return (handles, paths, indexes, jointTransform)
 
 
 def importMaterialNode(path, material):
@@ -743,7 +828,7 @@ def importMaterialNode(path, material):
 
 def importModelNode(model, path):
     # Import skeleton for binds, materials for meshes
-    (_handles, paths) = importSkeletonNode(model.Skeleton())
+    (handles, paths, indexes, jointTransform) = importSkeletonNode(model.Skeleton())
     _materials = [importMaterialNode(path, x) for x in model.Materials()]
 
     # Import the meshes
@@ -964,8 +1049,13 @@ def importModelNode(model, path):
             utilitySetVisibility(blendTargetParent, False)
 
         utilityStepProgress(progress)
-
     utilityEndProgress(progress)
+
+    # Import any ik handles now that the meshes are bound because the constraints may
+    # effect the bind pose of the joints causing the meshes to deform incorrectly.
+    if sceneSettings["importIK"]:
+        importSkeletonIKNode(model.Skeleton(), handles,
+                             paths, indexes, jointTransform)
 
 
 def importCurveNode(node, path, timeUnit, startFrame):

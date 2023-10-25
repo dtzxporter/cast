@@ -23,6 +23,9 @@ The goal of cast is to create an engine agnostic format that can be parsed and w
 # Coming from SEAnim/SEModel:
 - SECast, a lossless converter to cast: [SECast](https://dtzxporter.com/tools/secast)
 
+# FAQ:
+- Frequently asked questions: [FAQ](FAQ.md)
+
 ## File stucture:
 All files start with a cast header:
 ```c++
