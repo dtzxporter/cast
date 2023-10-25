@@ -662,6 +662,14 @@ class Skeleton(CastNode):
         """Creates a new bone in this skeleton."""
         return self.CreateChild(Bone())
 
+    def IKHandles(self):
+        """The collection of ik handles in this skeleton."""
+        return self.ChildrenOfType(IKHandle)
+
+    def CreateIKHandle(self):
+        """Creates a new ik handle in this skeleton."""
+        return self.CreateChild(IKHandle())
+
 
 class Bone(CastNode):
     """A 3d bone that belongs to a skeleton."""
@@ -765,6 +773,93 @@ class Bone(CastNode):
         self.CreateProperty("s", "3v").values = list(scale)
 
 
+class IKHandle(CastNode):
+    """Defines an ik chain and it's constraints in the skeleton."""
+
+    def __init__(self):
+        super(IKHandle, self).__init__(0x64686B69)
+
+    def Name(self):
+        """The name of this ik handle."""
+        name = self.properties.get("n")
+        if name is not None:
+            return name.values[0]
+        return None
+
+    def SetName(self, name):
+        """Sets the name for this ik handle."""
+        self.CreateProperty("n", "s").values = [name]
+
+    def StartBone(self):
+        """The bone which starts the chain."""
+        sb = self.properties.get("sb")
+        if sb is not None:
+            return self.parentNode.ChildByHash(sb.values[0])
+        return None
+
+    def SetStartBone(self, hash):
+        """Sets the bone which starts the chain."""
+        self.CreateProperty("sb", "l").values = [hash]
+
+    def EndBone(self):
+        """The bone which ends the chain."""
+        eb = self.properties.get("eb")
+        if eb is not None:
+            return self.parentNode.ChildByHash(eb.values[0])
+        return None
+
+    def SetEndBone(self, hash):
+        """Sets the bone which ends the chain."""
+        self.CreateProperty("eb", "l").values = [hash]
+
+    def TargetBone(self):
+        """The bone that acts as a target for the chain."""
+        tb = self.properties.get("tb")
+        if tb is not None:
+            return self.parentNode.ChildByHash(tb.values[0])
+        return None
+
+    def SetTargetBone(self, hash):
+        """Sets the bone that acts as a target for the chain."""
+        self.CreateProperty("tb", "l").values = [hash]
+
+    def PoleVectorBone(self):
+        """The bone that acts as a pole vector for this chain."""
+        pv = self.properties.get("pv")
+        if pv is not None:
+            return self.parentNode.ChildByHash(pv.values[0])
+        return None
+
+    def SetPoleVectorBone(self, hash):
+        """Sets the bone that acts as a pole vector for this chain."""
+        self.CreateProperty("pv", "l").values = [hash]
+
+    def PoleBone(self):
+        """The bone that acts as the pole (twist) for this chain."""
+        pb = self.properties.get("pb")
+        if pb is not None:
+            return self.parentNode.ChildByHash(pb.values[0])
+        return None
+
+    def SetPoleBone(self, hash):
+        """Sets the bone that acts as the pole (twist) for this chain."""
+        self.CreateProperty("pb", "l").values = [hash]
+
+    def UseTargetRotation(self):
+        """Whether or not the target rotation effects the chain."""
+        tr = self.properties.get("tr")
+        if tr is not None:
+            return tr.values[0] == 1
+        return False
+
+    def SetUseTargetRotation(self, enabled):
+        """Sets whether or not the target rotation effects the chain."""
+        if enabled:
+            self.CreateProperty("tr", "b").values = [1]
+        else:
+            self.CreateProperty("tr", "b").values = [0]
+
+
 class Material(CastNode):
     """Material contains a collection of slot:file mappings."""
 
@@ -854,6 +949,7 @@ typeSwitcher = {
     0x76727563: Curve,
     0x6669746E: NotificationTrack,
     0x656E6F62: Bone,
+    0x64686B69: IKHandle,
     0x6C74616D: Material,
     0x656C6966: File,
 }

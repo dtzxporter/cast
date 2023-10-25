@@ -62,6 +62,7 @@ enum class CastId : uint32_t
 	BlendShape = 0x68736C62,
 	Skeleton = 0x6C656B73,
 	Bone = 0x656E6F62,
+	IKHandle = 0x64686B69,
 	Animation = 0x6D696E61,
 	Curve = 0x76727563,
 	NotificationTrack = 0x6669746E,
@@ -349,7 +350,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
@@ -408,6 +409,82 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 **Notes**:
 - `Segment Scale Compensate` should default to `True` when not specified.
 - `Scale` is always local to the current bone.
+
+### IKHandle:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Skeleton</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Start Bone Hash (sb)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>End Bone Hash (eb)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	 <tr>
+  		<td>Target Bone Hash (tb)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Pole Vector Bone Hash (pv)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	  <tr>
+  		<td>Pole Bone Hash (pb)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Use Target Rotation (tr)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+**Notes**:
+- `Use Target Rotation` should default to `False` when not specified.
+- `Pole Bone` must only effect the twist of the chain, in general you either have a `Pole Bone` or a `Pole Vector Bone`.
 
 ### Material:
 <table>
