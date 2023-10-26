@@ -25,15 +25,171 @@ sceneSettings = {
     "importSkin": True,
     "importReset": False,
     "importIK": True,
+    "exportAnim": True,
+    "exportModel": True,
 }
 
 # Shared version number
-version = "1.18"
+version = "1.19"
 
 
 def utilityAbout():
     cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version %s" % version,
                        button=['OK'], defaultButton='OK', title="About Cast")
+
+
+def utilityGetNotetracks():
+    if not cmds.objExists("CastNotetracks"):
+        cmds.rename(cmds.spaceLocator(), "CastNotetracks")
+
+    if not cmds.objExists("CastNotetracks.Notetracks"):
+        cmds.addAttr("CastNotetracks", longName="Notetracks",
+                     dataType="string", storable=True)
+        cmds.setAttr("CastNotetracks.Notetracks", "{}", type="string")
+
+    return json.loads(cmds.getAttr("CastNotetracks.Notetracks"))
+
+
+def utilityClearNotetracks():
+    if cmds.objExists("CastNotetracks"):
+        cmds.delete("CastNotetracks")
+
+    notetracks = cmds.textScrollList(
+        "CastNotetrackList", query=True, allItems=True)
+
+    if notetracks:
+        for note in notetracks:
+            cmds.textScrollList("CastNotetrackList",
+                                edit=True, removeItem=note)
+
+
+def utilityCreateNotetrack():
+    frame = int(cmds.currentTime(query=True))
+
+    if cmds.promptDialog(title="Cast - Create Notification", message="Enter in the new notification name:\t\t  ") != "Confirm":
+        return
+
+    name = cmds.promptDialog(query=True, text=True)
+
+    if utilityAddNotetrack(name, frame):
+        notifications = []
+        notetracks = utilityGetNotetracks()
+
+        for note in notetracks:
+            for frame in notetracks[note]:
+                notifications.append((frame, note))
+
+        sortedNotifications = []
+
+        for notification in sorted(notifications, key=lambda note: note[0]):
+            sortedNotifications.append("[%d\t] %s" %
+                                       (notification[0], notification[1]))
+        cmds.textScrollList("CastNotetrackList", edit=True, removeAll=True)
+        cmds.textScrollList("CastNotetrackList", edit=True,
+                            append=sortedNotifications)
+
+
+def utilityAddNotetrack(name, frame):
+    current = utilityGetNotetracks()
+
+    if name not in current:
+        current[name] = []
+
+    result = False
+
+    if frame not in current[name]:
+        current[name].append(frame)
+        result = True
+
+    cmds.setAttr("CastNotetracks.Notetracks",
+                 json.dumps(current), type="string")
+
+    return result
+
+
+def utilityRemoveSelectedNotetracks():
+    existing = utilityGetNotetracks()
+    selected = cmds.textScrollList(
+        "CastNotetrackList", query=True, selectItem=True)
+
+    if not selected:
+        return
+
+    for select in selected:
+        name = select[select.find(" ") + 1:]
+        frame = int(select[:select.find(" ")].replace(
+            "[", "").replace("]", "").replace("\t", ""))
+
+        if name not in existing:
+            continue
+        if frame not in existing[name]:
+            continue
+
+        existing[name].remove(frame)
+
+    cmds.textScrollList("CastNotetrackList", edit=True, removeItem=selected)
+
+    cmds.setAttr("CastNotetracks.Notetracks",
+                 json.dumps(existing), type="string")
+
+
+def utilityEditNotetracks():
+    if cmds.control("CastNotetrackEditor", exists=True):
+        cmds.deleteUI("CastNotetrackEditor")
+
+    window = cmds.window("CastNotetrackEditor",
+                         title="Cast - Edit Notifications")
+    windowLayout = cmds.formLayout("CastNotetrackEditor_Form")
+
+    notetrackControl = cmds.text(
+        label="Frame:                   Notification:", annotation="Current scene notifications")
+
+    notifications = []
+    notetracks = utilityGetNotetracks()
+
+    for note in notetracks:
+        for frame in notetracks[note]:
+            notifications.append((frame, note))
+
+    sortedNotifications = []
+
+    for notification in sorted(notifications, key=lambda note: note[0]):
+        sortedNotifications.append("[%d\t] %s" %
+                                   (notification[0], notification[1]))
+
+    notetrackListControl = cmds.textScrollList(
+        "CastNotetrackList", append=sortedNotifications, allowMultiSelection=True)
+
+    addNotificationControl = cmds.button(label="Add Notification",
+                                         command=lambda x: utilityCreateNotetrack(),
+                                         annotation="Add a notification at the current scene time")
+    removeNotificationControl = cmds.button(label="Remove Selected",
+                                            annotation="Removes the selected notifications",
+                                            command=lambda x: utilityRemoveSelectedNotetracks())
+    clearAllNotificationsControl = cmds.button(
+        label="Clear All", annotation="Removes all notifications", command=lambda x: utilityClearNotetracks())
+
+    cmds.formLayout(windowLayout, edit=True,
+                    attachForm=[
+                        (notetrackControl, "top", 10),
+                        (notetrackControl, "left", 10),
+                        (notetrackListControl, "left", 10),
+                        (notetrackListControl, "right", 10),
+                        (addNotificationControl, "left", 10),
+                        (addNotificationControl, "bottom", 10),
+                        (removeNotificationControl, "bottom", 10),
+                        (clearAllNotificationsControl, "bottom", 10)
+                    ],
+                    attachControl=[
+                        (notetrackListControl, "top", 5, notetrackControl),
+                        (notetrackListControl, "bottom", 5, addNotificationControl),
+                        (removeNotificationControl, "left",
+                         5, addNotificationControl),
+                        (clearAllNotificationsControl,
+                         "left", 5, removeNotificationControl)
+                    ])
+
+    cmds.showWindow(window)
 
 
 def utilityRemoveNamespaces():
@@ -189,6 +345,16 @@ def utilityCreateMenu():
     cmds.menuItem("importReset", label="Import Resets Scene", annotation="Importing animations clears all existing animations in the scene",
                   checkBox=utilityQueryToggleItem("importReset"), command=lambda x: utilitySetToggleItem("importReset"))
 
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("exportAnim", label="Export Animations", annotation="Include animations when exporting",
+                  checkBox=utilityQueryToggleItem("exportAnim"), command=lambda x: utilitySetToggleItem("exportAnim"))
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("editNotetracks", label="Edit Notifications",
+                  annotation="Edit the animations notifications", command=lambda x: utilityEditNotetracks())
+
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
 
@@ -199,6 +365,11 @@ def utilityCreateMenu():
 
     cmds.menuItem("importIK", label="Import IK Handles", annotation="Imports and configures ik handles for the models skeleton",
                   checkBox=utilityQueryToggleItem("importIK"), command=lambda x: utilitySetToggleItem("importIK"))
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("exportModel", label="Export Models", annotation="Include models when exporting",
+                  checkBox=utilityQueryToggleItem("exportModel"), command=lambda x: utilitySetToggleItem("exportModel"))
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
@@ -1124,6 +1295,26 @@ def importCurveNode(node, path, timeUnit, startFrame):
     return (smallestFrame, largestFrame)
 
 
+def importNotificationTrackNode(node, timeUnit, frameStart):
+    smallestFrame = OpenMaya.MTime()
+    largestFrame = OpenMaya.MTime()
+
+    frameBuffer = node.KeyFrameBuffer()
+
+    for frame in frameBuffer:
+        time = OpenMaya.MTime(frame, timeUnit) + frameStart
+
+        if time < smallestFrame:
+            smallestFrame = time
+        if time > largestFrame:
+            largestFrame = time
+
+        utilityAddNotetrack(node.Name(), int(time.value()))
+
+    # Return the frame sizes [s, l] so we can adjust the scene times
+    return (smallestFrame, largestFrame)
+
+
 def importAnimationNode(node, path):
     # We need to be sure to disable auto keyframe, because it breaks import of animations
     # do this now so we don't forget...
@@ -1184,6 +1375,14 @@ def importAnimationNode(node, path):
         utilityStepProgress(progress)
 
     utilityEndProgress(progress)
+
+    for x in node.Notifications():
+        (smallestFrame, largestFrame) = importNotificationTrackNode(
+            x, wantedFps, startFrame)
+        if smallestFrame < wantedSmallestFrame:
+            wantedSmallestFrame = smallestFrame
+        if largestFrame > wantedLargestFrame:
+            wantedLargestFrame = largestFrame
 
     # Set the animation segment
     sceneAnimationController.setAnimationStartEndTime(
