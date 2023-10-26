@@ -93,8 +93,9 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
 
     bone = poseBones[name]
 
-    return fcurves.new(data_path="pose.bones[\"%s\"].%s" %
-                       (bone.name, curve[0]), index=curve[1], action_group=bone.name)
+    return fcurves.find(data_path="pose.bones[\"%s\"].%s" %
+                        (bone.name, curve[0])) or fcurves.new(data_path="pose.bones[\"%s\"].%s" %
+                                                              (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
 def utilityImportQuatTrackData(tracks, poseBones, name, property, frameStart, frameBuffer, valueBuffer, mode):
@@ -546,7 +547,12 @@ def importAnimationNode(self, node, path):
 
     bpy.ops.object.mode_set(mode='POSE')
 
-    action = bpy.data.actions.new(animName)
+    if self.import_reset:
+        action = bpy.data.actions.new(animName)
+    else:
+        action = selectedObject.animation_data.action or bpy.data.actions.new(
+            animName)
+
     selectedObject.animation_data.action = action
     selectedObject.animation_data.action.use_fake_user = True
 
