@@ -382,7 +382,7 @@ def importModelNode(self, model, path):
         if meshMaterial is not None:
             newMesh.materials.append(materialArray[meshMaterial.Name()])
 
-        if skeletonObj is not None:
+        if skeletonObj is not None and self.import_skin:
             boneGroups = []
             for bone in model.Skeleton().Bones():
                 boneGroups.append(meshObj.vertex_groups.new(name=bone.Name()))
