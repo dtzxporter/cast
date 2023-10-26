@@ -504,13 +504,15 @@ def importCurveNode(node, fcurves, poseBones, path, startFrame):
     return trackSwitcher[propertyName](tracks, poseBones, nodeName, propertyName, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode())
 
 
-def importNotificationTrackNode(node, action):
+def importNotificationTrackNode(node, action, frameStart):
     smallestFrame = 0
     largestFrame = 0
 
     frameBuffer = node.KeyFrameBuffer()
 
     for frame in frameBuffer:
+        frame = frame + frameStart
+
         notetrack = action.pose_markers.new(node.Name())
         notetrack.frame = frame
 
@@ -522,7 +524,7 @@ def importNotificationTrackNode(node, action):
     return (smallestFrame, largestFrame)
 
 
-def importAnimationNode(node, path):
+def importAnimationNode(self, node, path):
     # The object which the animation node should be applied to.
     selectedObject = bpy.context.object
     # Check that the selected object is an 'ARMATURE'.
@@ -557,6 +559,11 @@ def importAnimationNode(node, path):
     wantedSmallestFrame = 0
     wantedLargestFrame = 1
 
+    if self.import_time:
+        startFrame = scene.frame_current
+    else:
+        startFrame = 0
+
     curves = node.Curves()
 
     # Create a list of pose bones that match the curves..
@@ -569,23 +576,24 @@ def importAnimationNode(node, path):
 
     for x in curves:
         (smallestFrame, largestFrame) = importCurveNode(
-            x, action.fcurves, poseBones, path, 0)
+            x, action.fcurves, poseBones, path, startFrame)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame
         if largestFrame > wantedLargestFrame:
             wantedLargestFrame = largestFrame
 
     for x in node.Notifications():
-        (smallestFrame, largestFrame) = importNotificationTrackNode(x, action)
+        (smallestFrame, largestFrame) = importNotificationTrackNode(
+            x, action, startFrame)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame
         if largestFrame > wantedLargestFrame:
             wantedLargestFrame = largestFrame
 
     # Set the animation segment
-    scene.frame_current = 0
     scene.frame_start = wantedSmallestFrame
     scene.frame_end = wantedLargestFrame
+    scene.frame_current = wantedSmallestFrame
 
     bpy.context.evaluated_depsgraph_get().update()
     bpy.ops.object.mode_set(mode='POSE')
@@ -595,7 +603,7 @@ def importRootNode(self, node, path):
     for child in node.ChildrenOfType(Model):
         importModelNode(self, child, path)
     for child in node.ChildrenOfType(Animation):
-        importAnimationNode(child, path)
+        importAnimationNode(self, child, path)
 
 
 def importCast(self, path):

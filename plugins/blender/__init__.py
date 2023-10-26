@@ -31,6 +31,24 @@ class ImportCast(bpy.types.Operator, ImportHelper):
 
     files: CollectionProperty(type=bpy.types.PropertyGroup)
 
+    import_time: BoolProperty(
+        name="Import At Scene Time", description="Import animations starting at the current scene time", default=False)
+
+    import_reset: BoolProperty(
+        name="Import Resets Scene", description="Importing animations clears all existing animations in the scene", default=False)
+
+    import_skin: BoolProperty(
+        name="Import Bind Skin", description="Imports and binds a model to it's smooth skin", default=True)
+
+    import_ik: BoolProperty(
+        name="Import IK Handles", description="Imports and configures ik handles for the models skeleton", default=True)
+
+    def draw(self, context):
+        self.layout.prop(self, "import_time")
+        self.layout.prop(self, "import_reset")
+        self.layout.prop(self, "import_skin")
+        self.layout.prop(self, "import_ik")
+
     def execute(self, context):
         from . import import_cast
         try:
