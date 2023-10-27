@@ -621,13 +621,15 @@ def utilityGetOrCreateCurve(name, property, curveType):
     if not cmds.objExists("%s.%s" % (name, property)):
         return None
 
-    selectList = OpenMaya.MSelectionList()
-    selectList.add(name)
-
     try:
+        selectList = OpenMaya.MSelectionList()
+        selectList.add(name)
+
         nodePath = OpenMaya.MDagPath()
         selectList.getDagPath(0, nodePath)
     except RuntimeError:
+        cmds.warning("Unable to animate %s[%s] due to a name conflict in the scene" % (
+            name, property))
         return None
 
     restTransform = utilitySaveNodeData(nodePath)
@@ -1273,11 +1275,17 @@ def importCurveNode(node, path, timeUnit, startFrame):
     nodeName = node.NodeName()
     propertyName = node.KeyPropertyName()
 
+    smallestFrame = OpenMaya.MTime()
+    largestFrame = OpenMaya.MTime()
+
     if not propertyName in propertySwitcher:
-        return
+        return (smallestFrame, largestFrame)
 
     tracks = [utilityGetOrCreateCurve(
         nodeName, x, typeSwitcher[propertyName]) for x in propertySwitcher[propertyName]]
+
+    if tracks is None:
+        return (smallestFrame, largestFrame)
 
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
