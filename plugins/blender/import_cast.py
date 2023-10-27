@@ -94,8 +94,8 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
     bone = poseBones[name]
 
     return fcurves.find(data_path="pose.bones[\"%s\"].%s" %
-                        (bone.name, curve[0])) or fcurves.new(data_path="pose.bones[\"%s\"].%s" %
-                                                              (bone.name, curve[0]), index=curve[1], action_group=bone.name)
+                        (bone.name, curve[0]), index=curve[1]) or fcurves.new(data_path="pose.bones[\"%s\"].%s" %
+                                                                              (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
 def utilityImportQuatTrackData(tracks, poseBones, name, property, frameStart, frameBuffer, valueBuffer, mode):
@@ -234,9 +234,13 @@ def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, 
     return (smallestFrame, largestFrame)
 
 
+def importSkeletonIKNode(skeleton, skeletonObj, handles, indexes):
+    print("IK NODE")
+
+
 def importSkeletonNode(name, skeleton, collection):
-    if skeleton is None or len(skeleton.Bones()) == 0:
-        return None
+    if skeleton is None:
+        return (None, None, None)
 
     armature = bpy.data.armatures.new("Joints")
     armature.display_type = "STICK"
@@ -250,6 +254,7 @@ def importSkeletonNode(name, skeleton, collection):
 
     bones = skeleton.Bones()
     handles = [None] * len(bones)
+    indexes = {}
     matrices = {}
 
     for i, bone in enumerate(bones):
@@ -270,6 +275,7 @@ def importSkeletonNode(name, skeleton, collection):
         matrices[bone.Name()] = Matrix.LocRotScale(
             translation, rotation, scale)
         handles[i] = newBone
+        indexes[bone.Hash()] = i
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
@@ -283,7 +289,7 @@ def importSkeletonNode(name, skeleton, collection):
         bone.matrix = matrices[bone.name]
 
     bpy.ops.pose.armature_apply()
-    return skeletonObj
+    return (skeletonObj, handles, indexes)
 
 
 def importMaterialNode(path, material):
@@ -311,7 +317,8 @@ def importModelNode(self, model, path):
     bpy.context.scene.collection.children.link(collection)
 
     # Import skeleton for binds, materials for meshes
-    skeletonObj = importSkeletonNode(modelName, model.Skeleton(), collection)
+    (skeletonObj, handles, indexes) = importSkeletonNode(
+        modelName, model.Skeleton(), collection)
     materialArray = {key: value for (key, value) in (
         importMaterialNode(path, x) for x in model.Materials())}
 
