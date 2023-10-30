@@ -10,7 +10,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 0, 7),
+    "version": (1, 1, 0),
     "blender": (2, 90, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -52,8 +52,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         from . import import_cast
         try:
-            import_cast.load(
-                self, context, **self.as_keywords(ignore=("filter_glob", "files")))
+            import_cast.load(self, context, self.filepath)
 
             self.report({'INFO'}, 'Cast has been loaded')
             return {'FINISHED'}

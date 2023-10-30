@@ -234,13 +234,69 @@ def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, 
     return (smallestFrame, largestFrame)
 
 
-def importSkeletonIKNode(skeleton, skeletonObj, handles, indexes):
-    print("IK NODE")
+def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
+    if skeleton is None:
+        return
+
+    bones = skeleton.Bones()
+
+    for handle in skeleton.IKHandles():
+        startBone = poses[handle.EndBone().Name()]
+        endBone = poses[handle.StartBone().Name()]
+
+        ik = startBone.constraints.new("IK")
+
+        if handle.Name() is not None:
+            ik.name = handle.Name()
+
+        # We need to create the ik constraint for the start bone, and set the chain length
+        # so that it makes it to end end bone (Walk the parent tree and count.)
+        ik.chain_count = 0
+        ik.use_tail = True
+
+        bone = startBone
+
+        while True:
+            ik.chain_count += 1
+            bone = bone.parent
+
+            if bone is None:
+                break
+            elif bone.name == endBone.name:
+                ik.chain_count += 1
+                break
+
+        targetBone = handle.TargetBone()
+
+        if targetBone is not None:
+            target = poses[targetBone.Name()]
+
+            ik.target = target.id_data
+            ik.subtarget = target.name
+            ik.use_location = True
+
+            if handle.UseTargetRotation():
+                ik.use_rotation = True
+
+        poleVectorBone = handle.PoleVectorBone()
+
+        if poleVectorBone is not None:
+            poleVector = poses[poleVectorBone.Name()]
+
+            ik.pole_target = target.id_data
+            ik.pole_subtarget = poleVector.name
+
+        poleBone = handle.PoleBone()
+
+        if poleBone is not None:
+            # Warn until we figure out how to emulate this effectively.
+            self.report(
+                {"WARNING"}, "Unable to setup %s fully due to blender not supporting pole (twist) bones." % ik.name)
 
 
 def importSkeletonNode(name, skeleton, collection):
     if skeleton is None:
-        return (None, None, None)
+        return (None, None)
 
     armature = bpy.data.armatures.new("Joints")
     armature.display_type = "STICK"
@@ -254,12 +310,12 @@ def importSkeletonNode(name, skeleton, collection):
 
     bones = skeleton.Bones()
     handles = [None] * len(bones)
-    indexes = {}
+    poses = {}
     matrices = {}
 
     for i, bone in enumerate(bones):
         newBone = armature.edit_bones.new(bone.Name())
-        newBone.tail = 0, 0.05, 0  # I am sorry but blender sucks
+        newBone.tail = 0, 0.0025, 0  # I am sorry but blender sucks
 
         tempQuat = bone.LocalRotation()  # Also sucks, WXYZ? => XYZW master race
         rotation = Quaternion(
@@ -275,7 +331,6 @@ def importSkeletonNode(name, skeleton, collection):
         matrices[bone.Name()] = Matrix.LocRotScale(
             translation, rotation, scale)
         handles[i] = newBone
-        indexes[bone.Hash()] = i
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
@@ -287,9 +342,10 @@ def importSkeletonNode(name, skeleton, collection):
     for bone in skeletonObj.pose.bones:
         bone.matrix_basis.identity()
         bone.matrix = matrices[bone.name]
+        poses[bone.name] = bone
 
     bpy.ops.pose.armature_apply()
-    return (skeletonObj, handles, indexes)
+    return (skeletonObj, poses)
 
 
 def importMaterialNode(path, material):
@@ -317,7 +373,7 @@ def importModelNode(self, model, path):
     bpy.context.scene.collection.children.link(collection)
 
     # Import skeleton for binds, materials for meshes
-    (skeletonObj, handles, indexes) = importSkeletonNode(
+    (skeletonObj, poses) = importSkeletonNode(
         modelName, model.Skeleton(), collection)
     materialArray = {key: value for (key, value) in (
         importMaterialNode(path, x) for x in model.Materials())}
@@ -465,6 +521,10 @@ def importModelNode(self, model, path):
                 newShape.data[v].co = value.co
 
             shape[0].hide_viewport = True
+
+    # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
+    if self.import_ik:
+        importSkeletonIKNode(self, model.Skeleton(), skeletonObj, poses)
 
     # Relink the collection after the mesh is built
     bpy.context.view_layer.active_layer_collection.collection.children.link(
