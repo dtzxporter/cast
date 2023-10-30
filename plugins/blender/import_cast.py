@@ -93,8 +93,9 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
 
     bone = poseBones[name]
 
-    return fcurves.new(data_path="pose.bones[\"%s\"].%s" %
-                       (bone.name, curve[0]), index=curve[1], action_group=bone.name)
+    return fcurves.find(data_path="pose.bones[\"%s\"].%s" %
+                        (bone.name, curve[0]), index=curve[1]) or fcurves.new(data_path="pose.bones[\"%s\"].%s" %
+                                                                              (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
 def utilityImportQuatTrackData(tracks, poseBones, name, property, frameStart, frameBuffer, valueBuffer, mode):
@@ -233,9 +234,69 @@ def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, 
     return (smallestFrame, largestFrame)
 
 
+def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
+    if skeleton is None:
+        return
+
+    bones = skeleton.Bones()
+
+    for handle in skeleton.IKHandles():
+        startBone = poses[handle.EndBone().Name()]
+        endBone = poses[handle.StartBone().Name()]
+
+        ik = startBone.constraints.new("IK")
+
+        if handle.Name() is not None:
+            ik.name = handle.Name()
+
+        # We need to create the ik constraint for the start bone, and set the chain length
+        # so that it makes it to end end bone (Walk the parent tree and count.)
+        ik.chain_count = 0
+        ik.use_tail = True
+
+        bone = startBone
+
+        while True:
+            ik.chain_count += 1
+            bone = bone.parent
+
+            if bone is None:
+                break
+            elif bone.name == endBone.name:
+                ik.chain_count += 1
+                break
+
+        targetBone = handle.TargetBone()
+
+        if targetBone is not None:
+            target = poses[targetBone.Name()]
+
+            ik.target = target.id_data
+            ik.subtarget = target.name
+            ik.use_location = True
+
+            if handle.UseTargetRotation():
+                ik.use_rotation = True
+
+        poleVectorBone = handle.PoleVectorBone()
+
+        if poleVectorBone is not None:
+            poleVector = poses[poleVectorBone.Name()]
+
+            ik.pole_target = target.id_data
+            ik.pole_subtarget = poleVector.name
+
+        poleBone = handle.PoleBone()
+
+        if poleBone is not None:
+            # Warn until we figure out how to emulate this effectively.
+            self.report(
+                {"WARNING"}, "Unable to setup %s fully due to blender not supporting pole (twist) bones." % ik.name)
+
+
 def importSkeletonNode(name, skeleton, collection):
-    if skeleton is None or len(skeleton.Bones()) == 0:
-        return None
+    if skeleton is None:
+        return (None, None)
 
     armature = bpy.data.armatures.new("Joints")
     armature.display_type = "STICK"
@@ -249,11 +310,12 @@ def importSkeletonNode(name, skeleton, collection):
 
     bones = skeleton.Bones()
     handles = [None] * len(bones)
+    poses = {}
     matrices = {}
 
     for i, bone in enumerate(bones):
         newBone = armature.edit_bones.new(bone.Name())
-        newBone.tail = 0, 0.05, 0  # I am sorry but blender sucks
+        newBone.tail = 0, 0.0025, 0  # I am sorry but blender sucks
 
         tempQuat = bone.LocalRotation()  # Also sucks, WXYZ? => XYZW master race
         rotation = Quaternion(
@@ -280,9 +342,10 @@ def importSkeletonNode(name, skeleton, collection):
     for bone in skeletonObj.pose.bones:
         bone.matrix_basis.identity()
         bone.matrix = matrices[bone.name]
+        poses[bone.name] = bone
 
     bpy.ops.pose.armature_apply()
-    return skeletonObj
+    return (skeletonObj, poses)
 
 
 def importMaterialNode(path, material):
@@ -310,7 +373,8 @@ def importModelNode(self, model, path):
     bpy.context.scene.collection.children.link(collection)
 
     # Import skeleton for binds, materials for meshes
-    skeletonObj = importSkeletonNode(modelName, model.Skeleton(), collection)
+    (skeletonObj, poses) = importSkeletonNode(
+        modelName, model.Skeleton(), collection)
     materialArray = {key: value for (key, value) in (
         importMaterialNode(path, x) for x in model.Materials())}
 
@@ -381,7 +445,7 @@ def importModelNode(self, model, path):
         if meshMaterial is not None:
             newMesh.materials.append(materialArray[meshMaterial.Name()])
 
-        if skeletonObj is not None:
+        if skeletonObj is not None and self.import_skin:
             boneGroups = []
             for bone in model.Skeleton().Bones():
                 boneGroups.append(meshObj.vertex_groups.new(name=bone.Name()))
@@ -458,6 +522,10 @@ def importModelNode(self, model, path):
 
             shape[0].hide_viewport = True
 
+    # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
+    if self.import_ik:
+        importSkeletonIKNode(self, model.Skeleton(), skeletonObj, poses)
+
     # Relink the collection after the mesh is built
     bpy.context.view_layer.active_layer_collection.collection.children.link(
         collection)
@@ -504,13 +572,15 @@ def importCurveNode(node, fcurves, poseBones, path, startFrame):
     return trackSwitcher[propertyName](tracks, poseBones, nodeName, propertyName, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode())
 
 
-def importNotificationTrackNode(node, action):
+def importNotificationTrackNode(node, action, frameStart):
     smallestFrame = 0
     largestFrame = 0
 
     frameBuffer = node.KeyFrameBuffer()
 
     for frame in frameBuffer:
+        frame = frame + frameStart
+
         notetrack = action.pose_markers.new(node.Name())
         notetrack.frame = frame
 
@@ -522,7 +592,7 @@ def importNotificationTrackNode(node, action):
     return (smallestFrame, largestFrame)
 
 
-def importAnimationNode(node, path):
+def importAnimationNode(self, node, path):
     # The object which the animation node should be applied to.
     selectedObject = bpy.context.object
     # Check that the selected object is an 'ARMATURE'.
@@ -544,7 +614,12 @@ def importAnimationNode(node, path):
 
     bpy.ops.object.mode_set(mode='POSE')
 
-    action = bpy.data.actions.new(animName)
+    if self.import_reset:
+        action = bpy.data.actions.new(animName)
+    else:
+        action = selectedObject.animation_data.action or bpy.data.actions.new(
+            animName)
+
     selectedObject.animation_data.action = action
     selectedObject.animation_data.action.use_fake_user = True
 
@@ -556,6 +631,11 @@ def importAnimationNode(node, path):
     # fetching once here, then passing to the curve importer.
     wantedSmallestFrame = 0
     wantedLargestFrame = 1
+
+    if self.import_time:
+        startFrame = scene.frame_current
+    else:
+        startFrame = 0
 
     curves = node.Curves()
 
@@ -569,23 +649,24 @@ def importAnimationNode(node, path):
 
     for x in curves:
         (smallestFrame, largestFrame) = importCurveNode(
-            x, action.fcurves, poseBones, path, 0)
+            x, action.fcurves, poseBones, path, startFrame)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame
         if largestFrame > wantedLargestFrame:
             wantedLargestFrame = largestFrame
 
     for x in node.Notifications():
-        (smallestFrame, largestFrame) = importNotificationTrackNode(x, action)
+        (smallestFrame, largestFrame) = importNotificationTrackNode(
+            x, action, startFrame)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame
         if largestFrame > wantedLargestFrame:
             wantedLargestFrame = largestFrame
 
     # Set the animation segment
-    scene.frame_current = 0
     scene.frame_start = wantedSmallestFrame
     scene.frame_end = wantedLargestFrame
+    scene.frame_current = wantedSmallestFrame
 
     bpy.context.evaluated_depsgraph_get().update()
     bpy.ops.object.mode_set(mode='POSE')
@@ -595,7 +676,7 @@ def importRootNode(self, node, path):
     for child in node.ChildrenOfType(Model):
         importModelNode(self, child, path)
     for child in node.ChildrenOfType(Animation):
-        importAnimationNode(child, path)
+        importAnimationNode(self, child, path)
 
 
 def importCast(self, path):

@@ -919,7 +919,7 @@ def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
 
 def importSkeletonNode(skeleton):
     if skeleton is None:
-        return (None, None)
+        return (None, None, None, None)
 
     bones = skeleton.Bones()
     handles = [None] * len(bones)
