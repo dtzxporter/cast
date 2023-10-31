@@ -1,7 +1,9 @@
 import bpy
 import bpy_types
-from bpy_extras.wm_utils.progress_report import ProgressReport
+import bmesh
 import math
+
+from bpy_extras.wm_utils.progress_report import ProgressReport
 from mathutils import *
 from .cast import Cast
 
@@ -38,8 +40,109 @@ def utilityGetQuatKeyValue(object):
         return object.matrix.to_quaternion()
 
 
+def exportModel(self, context, root, armatureOrMesh):
+    model = root.CreateModel()
+    model.SetName(armatureOrMesh.name)
+
+    # Build skeleton and collect meshes.
+    if armatureOrMesh.type == 'ARMATURE':
+        meshes = [x for x in bpy.data.objects if x.type == 'MESH' and armatureOrMesh in [
+            m.object for m in x.modifiers if m.type == 'ARMATURE']]
+    else:
+        meshes = [armatureOrMesh]
+
+    materialToHash = {}
+
+    # Collect, aggregate and build materials.
+    for mesh in meshes:
+        for material in mesh.data.materials:
+            if material.name in materialToHash:
+                continue
+
+            # TODO: Parse, inject, and set material hashes.
+            materialToHash[material.name] = True
+
+    # Build meshes, blend shapes.
+    with ProgressReport(context.window_manager) as progress:
+        progress.enter_substeps(len(meshes))
+
+        for mesh in meshes:
+            meshNode = model.CreateMesh()
+
+            if not mesh.name.startswith("CastMesh"):
+                meshNode.SetName(mesh.name)
+
+            blendMesh = bmesh.new(use_operators=False)
+            blendMesh.from_mesh(
+                mesh.data, face_normals=False, vertex_normals=True, use_shape_key=False, shape_key_index=0)
+
+            vertexPositions = [None] * len(blendMesh.verts)
+            vertexNormals = [None] * len(blendMesh.verts)
+            faceBuffer = [None] * (len(blendMesh.faces) * 3)
+
+            for i, vert in enumerate(blendMesh.verts):
+                vertexPositions[i] = (
+                    vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
+                vertexNormals[i] = (
+                    vert.normal.x, vert.normal.y, vert.normal.z)
+
+            for i, face in enumerate(blendMesh.faces):
+                faceBuffer[(i * 3)] = face.loops[2].vert.index
+                faceBuffer[(i * 3) +
+                           1] = face.loops[0].vert.index
+                faceBuffer[(i * 3) +
+                           2] = face.loops[1].vert.index
+
+            meshNode.SetVertexPositionBuffer(vertexPositions)
+            meshNode.SetVertexNormalBuffer(vertexNormals)
+            meshNode.SetFaceBuffer(faceBuffer)
+
+            blendMesh.free()
+
+            if mesh.data.shape_keys is not None:
+                shapeNode = model.CreateBlendShape()
+                shapeNode.SetName(mesh.data.shape_keys.name)
+                shapeNode.SetBaseShape(meshNode.Hash())
+
+                targetWeights = []
+
+                progress.enter_substeps(
+                    len(mesh.data.shape_keys.key_blocks) - 1)
+
+                for i, target in [(i, x) for i, x in enumerate(mesh.data.shape_keys.key_blocks) if x != mesh.data.shape_keys.reference_key]:
+                    meshNode = model.CreateMesh()
+                    meshNode.SetName(target.name)
+
+                    blendMesh = bmesh.new(use_operators=False)
+                    blendMesh.from_mesh(
+                        mesh.data, face_normals=False, vertex_normals=True, use_shape_key=True, shape_key_index=i)
+
+                    # Just set the new positions, which is the only supported blender operation at the moment.
+                    for i, vert in enumerate(blendMesh.verts):
+                        vertexPositions[i] = (
+                            vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
+
+                    meshNode.SetVertexPositionBuffer(vertexPositions)
+                    meshNode.SetVertexNormalBuffer(vertexNormals)
+                    meshNode.SetFaceBuffer(faceBuffer)
+
+                    blendMesh.free()
+                    targetWeights.append(target.slider_max)
+
+                    progress.step()
+
+                shapeNode.SetTargetWeightScales(targetWeights)
+
+                progress.leave_substeps()
+
+            progress.step()
+
+        progress.leave_substeps()
+
+
 def exportAction(self, context, root, objects, action):
     animation = root.CreateAnimation()
+    animation.SetName(action.name)
     animation.SetFramerate(30.0)
     animation.SetLooping(self.is_looped)
 
@@ -183,7 +286,7 @@ def save(self, context, filepath=""):
 
     if self.incl_animation:
         # Check that the selected object is an 'ARMATURE' if we're exporting selected animations.
-        if self.export_selected and (selectedObject is None or selectedObject.type != 'ARMATURE'):
+        if self.export_selected and (selectedObject is not None and selectedObject.type != 'ARMATURE'):
             raise Exception(
                 "You must select an armature to export animation data for.")
 
@@ -195,5 +298,25 @@ def save(self, context, filepath=""):
             for action in bpy.data.actions:
                 exportAction(self, context, root, list(
                     bpy.data.objects), action)
+
+    if self.incl_model:
+        # Check that selected object is an 'ARMATURE' or mesh if we're exporting selected models.
+        if self.export_selected and (selectedObject is None or (selectedObject.type != 'ARMATURE' and selectedObject.type != 'MESH')):
+            raise Exception(
+                "You must select an armature or mesh to export model data for.")
+
+        # Export either the armature and it's meshes, the mesh, or all of the armature's / meshes in the scene.
+        if self.export_selected:
+            exportModel(self, context, root, selectedObject)
+        else:
+            # Handle armature and it's mesh references.
+            for obj in bpy.data.objects:
+                if obj.type == 'ARMATURE':
+                    exportModel(self, context, root, obj)
+            # Handle free standing meshes.
+            for obj in bpy.data.objects:
+                if obj.type == 'MESH':
+                    if obj.find_armature() is None:
+                        exportModel(self, context, root, obj)
 
     cast.save(filepath)
