@@ -947,6 +947,20 @@ namespace Cast
         }
 
         /// <summary>
+        /// The name of the animation.
+        /// </summary>
+        /// <returns></returns>
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// The skeleton embedded in this animation.
         /// </summary>
         /// <returns></returns>
@@ -1191,6 +1205,20 @@ namespace Cast
         public Model()
             : base(0x6C646F6D)
         {
+        }
+
+        /// <summary>
+        /// The name of the model.
+        /// </summary>
+        /// <returns></returns>
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
         }
 
         /// <summary>
