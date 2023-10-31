@@ -135,6 +135,20 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<td>True</td>
  	</tr>
 </table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
 
 ### Mesh:
 <table>
@@ -613,7 +627,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
@@ -649,12 +663,18 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
 		<th>Required</th>
  	</tr>
+	<tr>
+		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+	</tr>
 	 <tr>
   		<td>Framerate (fr)</td>
    		<td>Float (f)</td>

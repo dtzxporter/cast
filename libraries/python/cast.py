@@ -226,6 +226,17 @@ class Model(CastNode):
     def __init__(self):
         super(Model, self).__init__(0x6C646F6D)
 
+    def Name(self):
+        """The name of this model."""
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
+    
+    def SetName(self, name):
+        """Sets the name of this model."""
+        self.CreateProperty("n", "s").values = [name]
+
     def Skeleton(self):
         """The skeleton embedded in this model."""
         find = self.ChildrenOfType(Skeleton)
@@ -267,6 +278,17 @@ class Animation(CastNode):
 
     def __init__(self):
         super(Animation, self).__init__(0x6D696E61)
+
+    def Name(self):
+        """The name of this animation."""
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
+    
+    def SetName(self, name):
+        """Sets the name of this animation."""
+        self.CreateProperty("n", "s").values = [name]
 
     def Skeleton(self):
         """The skeleton embedded in this animation."""
@@ -454,13 +476,13 @@ class Mesh(CastNode):
         """Gets the number of vertices in this mesh."""
         vp = self.properties.get("vp")
         if vp is not None:
-            return len(vp.values) / 3
+            return int(len(vp.values) / 3)
 
     def FaceCount(self):
         """Gets the number of faces in this mesh."""
         f = self.properties.get("f")
         if f is not None:
-            return len(f.values) / 3
+            return int(len(f.values) / 3)
 
     def UVLayerCount(self):
         """Gets the number of uv layers in this mesh."""
