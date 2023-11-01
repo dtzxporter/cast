@@ -118,6 +118,7 @@ class CastProperty(object):
 
             string.save(file)
         else:
+            print("%s %d" % (self.type.fmt, len(self.values)))
             file.write(struct.pack(self.type.fmt *
                                    int(len(self.values) / self.type.array), *self.values))
 
@@ -232,7 +233,7 @@ class Model(CastNode):
         if n is not None:
             return n.values[0]
         return None
-    
+
     def SetName(self, name):
         """Sets the name of this model."""
         self.CreateProperty("n", "s").values = [name]
@@ -285,7 +286,7 @@ class Animation(CastNode):
         if n is not None:
             return n.values[0]
         return None
-    
+
     def SetName(self, name):
         """Sets the name of this animation."""
         self.CreateProperty("n", "s").values = [name]
@@ -723,7 +724,10 @@ class Bone(CastNode):
 
     def SetParentIndex(self, index):
         """Sets the index of the parent bone in the skeleton. -1 is a root bone."""
-        self.CreateProperty("p", "i").values = [index]
+        if index < 0:
+            self.CreateProperty("p", "i").values = [index + 2**32]
+        else:
+            self.CreateProperty("p", "i").values = [index]
 
     def SegmentScaleCompensate(self):
         """Whether or not children bones are effected by the scale of this bone."""
