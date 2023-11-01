@@ -118,7 +118,6 @@ class CastProperty(object):
 
             string.save(file)
         else:
-            print("%s %d" % (self.type.fmt, len(self.values)))
             file.write(struct.pack(self.type.fmt *
                                    int(len(self.values) / self.type.array), *self.values))
 
