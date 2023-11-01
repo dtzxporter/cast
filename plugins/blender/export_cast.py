@@ -146,6 +146,7 @@ def exportModel(self, context, root, armatureOrMesh):
                 shapeNode.SetBaseShape(meshNode.Hash())
 
                 targetWeights = []
+                targetShapes = []
 
                 progress.enter_substeps(
                     len(mesh.data.shape_keys.key_blocks) - 1)
@@ -169,10 +170,13 @@ def exportModel(self, context, root, armatureOrMesh):
 
                     blendMesh.free()
                     targetWeights.append(target.slider_max)
+                    targetShapes.append(meshNode.Hash())
 
                     progress.step()
 
-                shapeNode.SetTargetWeightScales(targetWeights)
+                if len(targetWeights) > 0:
+                    shapeNode.SetTargetWeightScales(targetWeights)
+                    shapeNode.SetTargetShapes(targetShapes)
 
                 progress.leave_substeps()
 
