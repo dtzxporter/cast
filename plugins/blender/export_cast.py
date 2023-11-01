@@ -46,6 +46,47 @@ def exportModel(self, context, root, armatureOrMesh):
 
     # Build skeleton and collect meshes.
     if armatureOrMesh.type == 'ARMATURE':
+        skeleton = model.CreateSkeleton()
+
+        bpy.context.view_layer.objects.active = armatureOrMesh
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        boneToIndex = {}
+
+        for i, bone in enumerate(armatureOrMesh.data.edit_bones):
+            boneToIndex[bone.name] = i
+
+        for bone in armatureOrMesh.data.edit_bones:
+            boneNode = skeleton.CreateBone()
+            boneNode.SetName(bone.name)
+
+            if bone.parent is not None:
+                mat = (bone.parent.matrix.inverted() @ bone.matrix)
+            else:
+                mat = bone.matrix
+
+            (position, rotation, scale) = mat.decompose()
+
+            if bone.parent is not None:
+                boneNode.SetParentIndex(boneToIndex[bone.parent.name])
+            else:
+                boneNode.SetParentIndex(-1)
+
+            boneNode.SetLocalPosition(
+                (position.x * self.scale, position.y * self.scale, position.z * self.scale))
+            boneNode.SetLocalRotation(
+                (rotation.x, rotation.y, rotation.z, rotation.w))
+            boneNode.SetScale((scale.x, scale.y, scale.z))
+
+            (position, rotation, _) = bone.matrix.decompose()
+
+            boneNode.SetWorldPosition(
+                (position.x * self.scale, position.y * self.scale, position.z * self.scale))
+            boneNode.SetWorldRotation(
+                (rotation.x, rotation.y, rotation.z, rotation.w))
+
+        bpy.ops.object.mode_set(mode='POSE')
+
         meshes = [x for x in bpy.data.objects if x.type == 'MESH' and armatureOrMesh in [
             m.object for m in x.modifiers if m.type == 'ARMATURE']]
     else:
