@@ -52,6 +52,7 @@ def exportModel(self, context, root, armatureOrMesh):
         bpy.ops.object.mode_set(mode='EDIT')
 
         boneToIndex = {}
+        boneToHash = {}
 
         for i, bone in enumerate(armatureOrMesh.data.edit_bones):
             boneToIndex[bone.name] = i
@@ -59,6 +60,7 @@ def exportModel(self, context, root, armatureOrMesh):
         for bone in armatureOrMesh.data.edit_bones:
             boneNode = skeleton.CreateBone()
             boneNode.SetName(bone.name)
+            boneToHash[bone.name] = boneNode.Hash()
 
             if bone.parent is not None:
                 mat = (bone.parent.matrix.inverted() @ bone.matrix)
@@ -121,11 +123,58 @@ def exportModel(self, context, root, armatureOrMesh):
             vertexNormals = [None] * len(blendMesh.verts)
             faceBuffer = [None] * (len(blendMesh.faces) * 3)
 
+            uvLayers = []
+            colors = []
+
+            # Collect the uv layers for this mesh, making the active the first.
+            if blendMesh.loops.layers.uv is not None and blendMesh.loops.layers.uv.active is not None:
+                uvLayers.append(blendMesh.loops.layers.uv.active)
+
+                # Add the other layers after the active one.
+                for layer in blendMesh.loops.layers.uv.values():
+                    if layer != uvLayers[0]:
+                        uvLayers.append(layer)
+
+            vertexUVLayers = [[None] * len(blendMesh.verts) for _ in uvLayers]
+
+            # Collect the color layer for this mesh, we only support one, the active one.
+            if blendMesh.loops.layers.float_color is not None and blendMesh.loops.layers.float_color.active is not None:
+                colors.append(blendMesh.loops.layers.float_color.active)
+
+            vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
+
             for i, vert in enumerate(blendMesh.verts):
                 vertexPositions[i] = (
                     vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
                 vertexNormals[i] = (
                     vert.normal.x, vert.normal.y, vert.normal.z)
+
+                vertexLoopCount = len(vert.link_loops)
+
+                # Calculate the average uv coords for each face that shares this vertex.
+                for uvLayer, uvLayerLoop in enumerate(uvLayers):
+                    uv = Vector((0.0, 0.0))
+
+                    for loop in vert.link_loops:
+                        uv += loop[uvLayerLoop].uv / vertexLoopCount
+
+                    vertexUVLayers[uvLayer][i] = (uv.x, 1.0 - uv.y)
+
+                # Calculate the average color for each face that shares this vertex.
+                for colorLayer, colorLayerLoop in enumerate(colors):
+                    color = Vector((0.0, 0.0, 0.0, 0.0))
+
+                    for loop in vert.link_loops:
+                        color += loop[colorLayerLoop].float_color / \
+                            vertexLoopCount
+
+                    r = int(max(min(color.x * 255, 255), 0))
+                    g = int(max(min(color.y * 255, 255), 0))
+                    b = int(max(min(color.z * 255, 255), 0))
+                    a = int(max(min(color.w * 255, 255), 0))
+
+                    vertexColorLayers[colorLayer][i] = (
+                        a << 24) | (b << 16) | (g << 8) | r
 
             for i, face in enumerate(blendMesh.faces):
                 faceBuffer[(i * 3)] = face.loops[2].vert.index
@@ -136,6 +185,15 @@ def exportModel(self, context, root, armatureOrMesh):
 
             meshNode.SetVertexPositionBuffer(vertexPositions)
             meshNode.SetVertexNormalBuffer(vertexNormals)
+
+            for uvLayer, vertexUVs in enumerate(vertexUVLayers):
+                meshNode.SetVertexUVLayerBuffer(uvLayer, vertexUVs)
+
+            meshNode.SetUVLayerCount(len(vertexUVLayers))
+
+            if len(vertexColorLayers) > 0:
+                meshNode.SetVertexColorBuffer(vertexColorLayers[0])
+
             meshNode.SetFaceBuffer(faceBuffer)
 
             blendMesh.free()
