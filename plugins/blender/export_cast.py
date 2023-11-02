@@ -138,8 +138,8 @@ def exportModel(self, context, root, armatureOrMesh):
             vertexUVLayers = [[None] * len(blendMesh.verts) for _ in uvLayers]
 
             # Collect the color layer for this mesh, we only support one, the active one.
-            if blendMesh.loops.layers.float_color is not None and blendMesh.loops.layers.float_color.active is not None:
-                colors.append(blendMesh.loops.layers.float_color.active)
+            if blendMesh.verts.layers.float_color is not None and blendMesh.verts.layers.float_color.active is not None:
+                colors.append(blendMesh.verts.layers.float_color.active)
 
             vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
 
@@ -162,16 +162,12 @@ def exportModel(self, context, root, armatureOrMesh):
 
                 # Calculate the average color for each face that shares this vertex.
                 for colorLayer, colorLayerLoop in enumerate(colors):
-                    color = Vector((0.0, 0.0, 0.0, 0.0))
+                    color = vert[colorLayerLoop] * 255
 
-                    for loop in vert.link_loops:
-                        color += loop[colorLayerLoop].float_color / \
-                            vertexLoopCount
-
-                    r = int(max(min(color.x * 255, 255), 0))
-                    g = int(max(min(color.y * 255, 255), 0))
-                    b = int(max(min(color.z * 255, 255), 0))
-                    a = int(max(min(color.w * 255, 255), 0))
+                    r = int(max(min(color.x, 255), 0))
+                    g = int(max(min(color.y, 255), 0))
+                    b = int(max(min(color.z, 255), 0))
+                    a = int(max(min(color.w, 255), 0))
 
                     vertexColorLayers[colorLayer][i] = (
                         a << 24) | (b << 16) | (g << 8) | r
