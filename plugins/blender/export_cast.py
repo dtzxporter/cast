@@ -127,7 +127,7 @@ def exportModel(self, context, root, armatureOrMesh):
             colors = []
 
             # Collect the uv layers for this mesh, making the active the first.
-            if blendMesh.loops.layers.uv is not None and blendMesh.loops.layers.uv.active is not None:
+            if blendMesh.loops.layers.uv.active is not None:
                 uvLayers.append(blendMesh.loops.layers.uv.active)
 
                 # Add the other layers after the active one.
@@ -138,8 +138,10 @@ def exportModel(self, context, root, armatureOrMesh):
             vertexUVLayers = [[None] * len(blendMesh.verts) for _ in uvLayers]
 
             # Collect the color layer for this mesh, we only support one, the active one.
-            if blendMesh.verts.layers.float_color is not None and blendMesh.verts.layers.float_color.active is not None:
+            if blendMesh.verts.layers.float_color.active is not None:
                 colors.append(blendMesh.verts.layers.float_color.active)
+            elif blendMesh.verts.layers.color.active is not None:
+                colors.append(blendMesh.verts.layers.color.active)
 
             vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
 
@@ -161,10 +163,11 @@ def exportModel(self, context, root, armatureOrMesh):
                     vertexUVLayers[uvLayer][i] = (uv.x, 1.0 - uv.y)
 
                 # Calculate the average color for each face that shares this vertex.
-                for colorLayer, colorLayerLoop in enumerate(colors):
-                    color = vert[colorLayerLoop]
+                if blendMesh.verts.layers.float_color.active is not None \
+                        or blendMesh.verts.layers.color.active is not None:
+                    color = vert[colors[0]]
 
-                    vertexColorLayers[colorLayer][i] = CastColor.toInteger(
+                    vertexColorLayers[0][i] = CastColor.toInteger(
                         (color.x, color.y, color.z, color.w))
 
             for i, face in enumerate(blendMesh.faces):
