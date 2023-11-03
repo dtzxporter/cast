@@ -142,6 +142,10 @@ def exportModel(self, context, root, armatureOrMesh):
                 colors.append(blendMesh.verts.layers.float_color.active)
             elif blendMesh.verts.layers.color.active is not None:
                 colors.append(blendMesh.verts.layers.color.active)
+            elif blendMesh.loops.layers.float_color.active is not None:
+                colors.append(blendMesh.loops.layers.float_color.active)
+            elif blendMesh.loops.layers.color.active is not None:
+                colors.append(blendMesh.loops.layers.color.active)
 
             vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
 
@@ -162,10 +166,19 @@ def exportModel(self, context, root, armatureOrMesh):
 
                     vertexUVLayers[uvLayer][i] = (uv.x, 1.0 - uv.y)
 
-                # Calculate the average color for each face that shares this vertex.
+                # Calculate per-vert/per-face vertex colors.
                 if blendMesh.verts.layers.float_color.active is not None \
                         or blendMesh.verts.layers.color.active is not None:
                     color = vert[colors[0]]
+
+                    vertexColorLayers[0][i] = CastColor.toInteger(
+                        (color.x, color.y, color.z, color.w))
+                elif blendMesh.loops.layers.float_color.active is not None \
+                        or blendMesh.loops.layers.color.active is not None:
+                    color = Vector((0.0, 0.0, 0.0, 0.0))
+
+                    for loop in vert.link_loops:
+                        color += loop[colors[0]] / vertexLoopCount
 
                     vertexColorLayers[0][i] = CastColor.toInteger(
                         (color.x, color.y, color.z, color.w))
