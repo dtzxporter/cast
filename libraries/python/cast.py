@@ -75,6 +75,27 @@ class CastProperty_t(object):
         self.identifier = identifier
 
 
+class CastColor:
+    """Utility methods for working with colors."""
+
+    @staticmethod
+    def fromInteger(color):
+        """Unpacks a color value to a tuple of rgba (float)."""
+        bytes = list(struct.pack("<I", color))
+
+        return (bytes[0] / 255.0, bytes[1] / 255.0, bytes[2] / 255.0, bytes[3] / 255.0)
+
+    @staticmethod
+    def toInteger(color):
+        """Packs a tuple of rgba (float) to a color value."""
+        r = int(max(min(color[0] * 255.0, 255.0), 0.0))
+        g = int(max(min(color[1] * 255.0, 255.0), 0.0))
+        b = int(max(min(color[2] * 255.0, 255.0), 0.0))
+        a = int(max(min(color[3] * 255.0, 255.0), 0.0))
+
+        return struct.unpack("<I", bytes([r, g, b, a]))[0]
+
+
 class CastProperty(object):
     """A single property for a cast node."""
 
