@@ -93,7 +93,7 @@ class CastColor:
         b = int(max(min(color[2] * 255.0, 255.0), 0.0))
         a = int(max(min(color[3] * 255.0, 255.0), 0.0))
 
-        return struct.unpack("<I", bytes([r, g, b, a]))[0]
+        return struct.unpack("<I", bytearray([r, g, b, a]))[0]
 
 
 class CastProperty(object):
