@@ -5,7 +5,7 @@ import math
 
 from bpy_extras.wm_utils.progress_report import ProgressReport
 from mathutils import *
-from .cast import Cast
+from .cast import Cast, CastColor
 
 
 def utilityResolveObjectTarget(objects, path):
@@ -162,15 +162,10 @@ def exportModel(self, context, root, armatureOrMesh):
 
                 # Calculate the average color for each face that shares this vertex.
                 for colorLayer, colorLayerLoop in enumerate(colors):
-                    color = vert[colorLayerLoop] * 255
+                    color = vert[colorLayerLoop]
 
-                    r = int(max(min(color.x, 255), 0))
-                    g = int(max(min(color.y, 255), 0))
-                    b = int(max(min(color.z, 255), 0))
-                    a = int(max(min(color.w, 255), 0))
-
-                    vertexColorLayers[colorLayer][i] = (
-                        a << 24) | (b << 16) | (g << 8) | r
+                    vertexColorLayers[colorLayer][i] = CastColor.toInteger(
+                        (color.x, color.y, color.z, color.w))
 
             for i, face in enumerate(blendMesh.faces):
                 faceBuffer[(i * 3)] = face.loops[2].vert.index

@@ -4,7 +4,7 @@ import array
 import math
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
-from .cast import Cast, Model, Animation, File
+from .cast import Cast, CastColor, Model, Animation, File
 
 PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
 SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
@@ -423,8 +423,8 @@ def importModelNode(self, model, path):
         vertexColors = mesh.VertexColorBuffer()
         if vertexColors is not None:
             newMesh.vertex_colors.new(do_init=False)
-            newMesh.vertex_colors[0].data.foreach_set("color", unpack_list([((vertexColors[x] >> 0 & 0xff) / 255.0, (vertexColors[x]
-                                                                                                                     >> 8 & 0xff) / 255.0, (vertexColors[x] >> 16 & 0xff) / 255.0, (vertexColors[x] >> 24 & 0xff) / 255.0) for x in faces]))
+            newMesh.vertex_colors[0].data.foreach_set(
+                "color", unpack_list([CastColor.fromInteger(vertexColors[x]) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
         if vertexNormals is not None:
