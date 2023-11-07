@@ -7,6 +7,9 @@ from bpy_extras.wm_utils.progress_report import ProgressReport
 from mathutils import *
 from .cast import Cast, CastColor
 
+# Minimum weight value to be considered.
+WEIGHT_THRESHOLD = 0.000001
+
 
 def utilityResolveObjectTarget(objects, path):
     for object in objects:
@@ -44,15 +47,15 @@ def exportModel(self, context, root, armatureOrMesh):
     model = root.CreateModel()
     model.SetName(armatureOrMesh.name)
 
+    boneToIndex = {}
+    boneToHash = {}
+
     # Build skeleton and collect meshes.
     if armatureOrMesh.type == 'ARMATURE':
         skeleton = model.CreateSkeleton()
 
         bpy.context.view_layer.objects.active = armatureOrMesh
         bpy.ops.object.mode_set(mode='EDIT')
-
-        boneToIndex = {}
-        boneToHash = {}
 
         for i, bone in enumerate(armatureOrMesh.data.edit_bones):
             boneToIndex[bone.name] = i
@@ -115,6 +118,11 @@ def exportModel(self, context, root, armatureOrMesh):
             if not mesh.name.startswith("CastMesh"):
                 meshNode.SetName(mesh.name)
 
+            deformers = [x for x in mesh.modifiers if x.type == 'ARMATURE']
+
+            if len(deformers) > 0 and deformers[0].use_deform_preserve_volume:
+                meshNode.SetSkinningMethod("quaternion")
+
             blendMesh = bmesh.new(use_operators=False)
             blendMesh.from_mesh(
                 mesh.data, face_normals=False, vertex_normals=True, use_shape_key=False, shape_key_index=0)
@@ -149,6 +157,8 @@ def exportModel(self, context, root, armatureOrMesh):
 
             vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
 
+            vertexMaxInfluence = 0
+
             for i, vert in enumerate(blendMesh.verts):
                 vertexPositions[i] = (
                     vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
@@ -156,6 +166,16 @@ def exportModel(self, context, root, armatureOrMesh):
                     vert.normal.x, vert.normal.y, vert.normal.z)
 
                 vertexLoopCount = len(vert.link_loops)
+
+                # Calculate the maximum influence for this vertex.
+                maximumInfluence = 0
+
+                if blendMesh.verts.layers.deform.active is not None:
+                    for weight in vert[blendMesh.verts.layers.deform.active].values():
+                        if weight > WEIGHT_THRESHOLD:
+                            maximumInfluence += 1
+
+                vertexMaxInfluence = max(vertexMaxInfluence, maximumInfluence)
 
                 # Calculate the average uv coords for each face that shares this vertex.
                 for uvLayer, uvLayerLoop in enumerate(uvLayers):
@@ -182,6 +202,32 @@ def exportModel(self, context, root, armatureOrMesh):
 
                     vertexColorLayers[0][i] = CastColor.toInteger(
                         (color.x, color.y, color.z, color.w))
+
+            if blendMesh.verts.layers.deform.active is not None:
+                meshNode.SetMaximumWeightInfluence(vertexMaxInfluence)
+
+                vertexGroups = [x.name for x in mesh.vertex_groups]
+
+                vertexWeightValueBuffer = [
+                    0.0] * (len(blendMesh.verts) * vertexMaxInfluence)
+                vertexWeightBoneBuffer = [
+                    0] * (len(blendMesh.verts) * vertexMaxInfluence)
+
+                for i, vert in enumerate(blendMesh.verts):
+                    weights = vert[blendMesh.verts.layers.deform.active]
+                    slot = 0
+
+                    for vgroup, weight in weights.items():
+                        if weight > WEIGHT_THRESHOLD:
+                            vertexWeightValueBuffer[(
+                                i * vertexMaxInfluence) + slot] = weight
+                            vertexWeightBoneBuffer[(
+                                i * vertexMaxInfluence) + slot] = boneToIndex[vertexGroups[vgroup]]
+
+                            slot += 1
+
+                meshNode.SetVertexWeightValueBuffer(vertexWeightValueBuffer)
+                meshNode.SetVertexWeightBoneBuffer(vertexWeightBoneBuffer)
 
             for i, face in enumerate(blendMesh.faces):
                 faceBuffer[(i * 3)] = face.loops[2].vert.index
