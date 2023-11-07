@@ -81,7 +81,7 @@ class CastColor:
     @staticmethod
     def fromInteger(color):
         """Unpacks a color value to a tuple of rgba (float)."""
-        bytes = list(struct.pack("<I", color))
+        bytes = bytearray(struct.pack("<I", color))
 
         return (bytes[0] / 255.0, bytes[1] / 255.0, bytes[2] / 255.0, bytes[3] / 255.0)
 

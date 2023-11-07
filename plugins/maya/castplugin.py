@@ -9,7 +9,7 @@ import maya.OpenMaya as OpenMaya
 import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
 
-from cast import Cast, Model, Animation, File
+from cast import Cast, CastColor, Model, Animation, File
 
 # Support Python 3.0+
 try:
@@ -1009,7 +1009,8 @@ def importModelNode(model, path):
     # Import the meshes
     meshTransform = OpenMaya.MFnTransform()
     meshNode = meshTransform.create()
-    meshTransform.setName(model.Name() or os.path.splitext(os.path.basename(path))[0])
+    meshTransform.setName(
+        model.Name() or os.path.splitext(os.path.basename(path))[0])
 
     meshes = model.Meshes()
     progress = utilityCreateProgress("Importing meshes...", len(meshes))
@@ -1096,8 +1097,8 @@ def importModelNode(model, path):
         vertexColors = mesh.VertexColorBuffer()
         if vertexColors is not None:
             scriptUtil = OpenMaya.MScriptUtil()
-            scriptUtil.createFromList([x for xs in [[(x >> i & 0xff) / 255.0 for i in (
-                0, 8, 16, 24)] for x in vertexColors] for x in xs], len(vertexColors) * 4)
+            scriptUtil.createFromList(
+                [x for xs in [CastColor.fromInteger(x) for x in vertexColors] for x in xs], len(vertexColors) * 4)
 
             vertexColorBuffer = OpenMaya.MColorArray(
                 scriptUtil.asFloat4Ptr(), len(vertexColors))
