@@ -2,12 +2,14 @@ import os
 import os.path
 import json
 import math
-from cast import Cast, Model, Animation, File
+
 import maya.mel as mel
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
 import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
+
+from cast import Cast, Model, Animation, File
 
 # Support Python 3.0+
 try:
@@ -30,7 +32,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.20"
+version = "1.21"
 
 
 def utilityAbout():
@@ -1007,7 +1009,7 @@ def importModelNode(model, path):
     # Import the meshes
     meshTransform = OpenMaya.MFnTransform()
     meshNode = meshTransform.create()
-    meshTransform.setName(os.path.splitext(os.path.basename(path))[0])
+    meshTransform.setName(model.Name() or os.path.splitext(os.path.basename(path))[0])
 
     meshes = model.Meshes()
     progress = utilityCreateProgress("Importing meshes...", len(meshes))

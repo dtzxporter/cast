@@ -1,9 +1,14 @@
 import bpy
 import bpy_types
-from bpy_extras.wm_utils.progress_report import ProgressReport
+import bmesh
 import math
+
+from bpy_extras.wm_utils.progress_report import ProgressReport
 from mathutils import *
-from .cast import Cast
+from .cast import Cast, CastColor
+
+# Minimum weight value to be considered.
+WEIGHT_THRESHOLD = 0.000001
 
 
 def utilityResolveObjectTarget(objects, path):
@@ -38,8 +43,297 @@ def utilityGetQuatKeyValue(object):
         return object.matrix.to_quaternion()
 
 
+def utilityAssignMaterialSlots(material, matNode):
+    slots = {
+        "Base Color": "albedo",
+        "Specular": "specular",
+        "Emissive Color": "emissive",
+        "Emission": "emissive",
+        "Ambient Occlusion": "ao",
+        "Metallic": "metal",
+    }
+
+    if not material.use_nodes:
+        return
+
+    for node in material.node_tree.nodes:
+        if node.type == 'TEX_IMAGE':
+
+            file = matNode.CreateFile()
+            file.SetPath(node.image.filepath)
+
+            for output in node.outputs:
+                if output.is_linked:
+                    connection = output.links[0].to_socket.name
+
+                    if connection in slots:
+                        matNode.SetSlot(slots[connection], file.Hash())
+
+
+def exportModel(self, context, root, armatureOrMesh):
+    model = root.CreateModel()
+    model.SetName(armatureOrMesh.name)
+
+    boneToIndex = {}
+    boneToHash = {}
+
+    # Build skeleton and collect meshes.
+    if armatureOrMesh.type == 'ARMATURE':
+        skeleton = model.CreateSkeleton()
+
+        bpy.context.view_layer.objects.active = armatureOrMesh
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        for i, bone in enumerate(armatureOrMesh.data.edit_bones):
+            boneToIndex[bone.name] = i
+
+        for bone in armatureOrMesh.data.edit_bones:
+            boneNode = skeleton.CreateBone()
+            boneNode.SetName(bone.name)
+            boneToHash[bone.name] = boneNode.Hash()
+
+            if bone.parent is not None:
+                mat = (bone.parent.matrix.inverted() @ bone.matrix)
+            else:
+                mat = bone.matrix
+
+            (position, rotation, scale) = mat.decompose()
+
+            if bone.parent is not None:
+                boneNode.SetParentIndex(boneToIndex[bone.parent.name])
+            else:
+                boneNode.SetParentIndex(-1)
+
+            boneNode.SetLocalPosition(
+                (position.x * self.scale, position.y * self.scale, position.z * self.scale))
+            boneNode.SetLocalRotation(
+                (rotation.x, rotation.y, rotation.z, rotation.w))
+            boneNode.SetScale((scale.x, scale.y, scale.z))
+
+            (position, rotation, _) = bone.matrix.decompose()
+
+            boneNode.SetWorldPosition(
+                (position.x * self.scale, position.y * self.scale, position.z * self.scale))
+            boneNode.SetWorldRotation(
+                (rotation.x, rotation.y, rotation.z, rotation.w))
+
+        bpy.ops.object.mode_set(mode='POSE')
+
+        meshes = [x for x in bpy.data.objects if x.type == 'MESH' and armatureOrMesh in [
+            m.object for m in x.modifiers if m.type == 'ARMATURE']]
+    else:
+        meshes = [armatureOrMesh]
+
+    materialToHash = {}
+
+    # Collect, aggregate and build materials.
+    for mesh in meshes:
+        for material in mesh.data.materials:
+            if material.name in materialToHash:
+                continue
+
+            matNode = model.CreateMaterial()
+            matNode.SetName(material.name)
+            matNode.SetType("pbr")
+
+            utilityAssignMaterialSlots(material, matNode)
+
+            materialToHash[material.name] = matNode.Hash()
+
+    # Build meshes, blend shapes.
+    with ProgressReport(context.window_manager) as progress:
+        progress.enter_substeps(len(meshes))
+
+        for mesh in meshes:
+            meshNode = model.CreateMesh()
+
+            if not mesh.name.startswith("CastMesh"):
+                meshNode.SetName(mesh.name)
+
+            if mesh.active_material is not None:
+                meshNode.SetMaterial(materialToHash[mesh.active_material.name])
+
+            deformers = [x for x in mesh.modifiers if x.type == 'ARMATURE']
+
+            if len(deformers) > 0 and deformers[0].use_deform_preserve_volume:
+                meshNode.SetSkinningMethod("quaternion")
+
+            blendMesh = bmesh.new(use_operators=False)
+            blendMesh.from_mesh(
+                mesh.data, face_normals=False, vertex_normals=True, use_shape_key=False, shape_key_index=0)
+
+            vertexPositions = [None] * len(blendMesh.verts)
+            vertexNormals = [None] * len(blendMesh.verts)
+            faceBuffer = [None] * (len(blendMesh.faces) * 3)
+
+            uvLayers = []
+            colors = []
+
+            # Collect the uv layers for this mesh, making the active the first.
+            if blendMesh.loops.layers.uv.active is not None:
+                uvLayers.append(blendMesh.loops.layers.uv.active)
+
+                # Add the other layers after the active one.
+                for layer in blendMesh.loops.layers.uv.values():
+                    if layer != uvLayers[0]:
+                        uvLayers.append(layer)
+
+            vertexUVLayers = [[None] * len(blendMesh.verts) for _ in uvLayers]
+
+            # Collect the color layer for this mesh, we only support one, the active one.
+            if blendMesh.verts.layers.float_color.active is not None:
+                colors.append(blendMesh.verts.layers.float_color.active)
+            elif blendMesh.verts.layers.color.active is not None:
+                colors.append(blendMesh.verts.layers.color.active)
+            elif blendMesh.loops.layers.float_color.active is not None:
+                colors.append(blendMesh.loops.layers.float_color.active)
+            elif blendMesh.loops.layers.color.active is not None:
+                colors.append(blendMesh.loops.layers.color.active)
+
+            vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
+
+            vertexMaxInfluence = 0
+
+            for i, vert in enumerate(blendMesh.verts):
+                vertexPositions[i] = (
+                    vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
+                vertexNormals[i] = (
+                    vert.normal.x, vert.normal.y, vert.normal.z)
+
+                vertexLoopCount = len(vert.link_loops)
+
+                # Calculate the maximum influence for this vertex.
+                maximumInfluence = 0
+
+                if blendMesh.verts.layers.deform.active is not None:
+                    for weight in vert[blendMesh.verts.layers.deform.active].values():
+                        if weight > WEIGHT_THRESHOLD:
+                            maximumInfluence += 1
+
+                vertexMaxInfluence = max(vertexMaxInfluence, maximumInfluence)
+
+                # Calculate the average uv coords for each face that shares this vertex.
+                for uvLayer, uvLayerLoop in enumerate(uvLayers):
+                    uv = Vector((0.0, 0.0))
+
+                    for loop in vert.link_loops:
+                        uv += loop[uvLayerLoop].uv / vertexLoopCount
+
+                    vertexUVLayers[uvLayer][i] = (uv.x, 1.0 - uv.y)
+
+                # Calculate per-vert/per-face vertex colors.
+                if blendMesh.verts.layers.float_color.active is not None \
+                        or blendMesh.verts.layers.color.active is not None:
+                    color = vert[colors[0]]
+
+                    vertexColorLayers[0][i] = CastColor.toInteger(
+                        (color.x, color.y, color.z, color.w))
+                elif blendMesh.loops.layers.float_color.active is not None \
+                        or blendMesh.loops.layers.color.active is not None:
+                    color = Vector((0.0, 0.0, 0.0, 0.0))
+
+                    for loop in vert.link_loops:
+                        color += loop[colors[0]] / vertexLoopCount
+
+                    vertexColorLayers[0][i] = CastColor.toInteger(
+                        (color.x, color.y, color.z, color.w))
+
+            if blendMesh.verts.layers.deform.active is not None:
+                meshNode.SetMaximumWeightInfluence(vertexMaxInfluence)
+
+                vertexGroups = [x.name for x in mesh.vertex_groups]
+
+                vertexWeightValueBuffer = [
+                    0.0] * (len(blendMesh.verts) * vertexMaxInfluence)
+                vertexWeightBoneBuffer = [
+                    0] * (len(blendMesh.verts) * vertexMaxInfluence)
+
+                for i, vert in enumerate(blendMesh.verts):
+                    weights = vert[blendMesh.verts.layers.deform.active]
+                    slot = 0
+
+                    for vgroup, weight in weights.items():
+                        if weight > WEIGHT_THRESHOLD:
+                            vertexWeightValueBuffer[(
+                                i * vertexMaxInfluence) + slot] = weight
+                            vertexWeightBoneBuffer[(
+                                i * vertexMaxInfluence) + slot] = boneToIndex[vertexGroups[vgroup]]
+
+                            slot += 1
+
+                meshNode.SetVertexWeightValueBuffer(vertexWeightValueBuffer)
+                meshNode.SetVertexWeightBoneBuffer(vertexWeightBoneBuffer)
+
+            for i, face in enumerate(blendMesh.faces):
+                faceBuffer[(i * 3)] = face.loops[2].vert.index
+                faceBuffer[(i * 3) +
+                           1] = face.loops[0].vert.index
+                faceBuffer[(i * 3) +
+                           2] = face.loops[1].vert.index
+
+            meshNode.SetVertexPositionBuffer(vertexPositions)
+            meshNode.SetVertexNormalBuffer(vertexNormals)
+
+            for uvLayer, vertexUVs in enumerate(vertexUVLayers):
+                meshNode.SetVertexUVLayerBuffer(uvLayer, vertexUVs)
+
+            meshNode.SetUVLayerCount(len(vertexUVLayers))
+
+            if len(vertexColorLayers) > 0:
+                meshNode.SetVertexColorBuffer(vertexColorLayers[0])
+
+            meshNode.SetFaceBuffer(faceBuffer)
+
+            blendMesh.free()
+
+            if mesh.data.shape_keys is not None:
+                shapeNode = model.CreateBlendShape()
+                shapeNode.SetName(mesh.data.shape_keys.name)
+                shapeNode.SetBaseShape(meshNode.Hash())
+
+                targetWeights = []
+                targetShapes = []
+
+                progress.enter_substeps(
+                    len(mesh.data.shape_keys.key_blocks) - 1)
+
+                for i, target in [(i, x) for i, x in enumerate(mesh.data.shape_keys.key_blocks) if x != mesh.data.shape_keys.reference_key]:
+                    meshNode = model.CreateMesh()
+                    meshNode.SetName(target.name)
+
+                    blendMesh = bmesh.new(use_operators=False)
+                    blendMesh.from_mesh(
+                        mesh.data, face_normals=False, vertex_normals=True, use_shape_key=True, shape_key_index=i)
+
+                    # Just set the new positions, which is the only supported blender operation at the moment.
+                    for i, vert in enumerate(blendMesh.verts):
+                        vertexPositions[i] = (
+                            vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
+
+                    meshNode.SetVertexPositionBuffer(vertexPositions)
+                    meshNode.SetVertexNormalBuffer(vertexNormals)
+                    meshNode.SetFaceBuffer(faceBuffer)
+
+                    blendMesh.free()
+                    targetWeights.append(target.slider_max)
+                    targetShapes.append(meshNode.Hash())
+
+                    progress.step()
+
+                if len(targetWeights) > 0:
+                    shapeNode.SetTargetWeightScales(targetWeights)
+                    shapeNode.SetTargetShapes(targetShapes)
+
+                progress.leave_substeps()
+
+            progress.step()
+
+        progress.leave_substeps()
+
+
 def exportAction(self, context, root, objects, action):
     animation = root.CreateAnimation()
+    animation.SetName(action.name)
     animation.SetFramerate(30.0)
     animation.SetLooping(self.is_looped)
 
@@ -183,7 +477,7 @@ def save(self, context, filepath=""):
 
     if self.incl_animation:
         # Check that the selected object is an 'ARMATURE' if we're exporting selected animations.
-        if self.export_selected and (selectedObject is None or selectedObject.type != 'ARMATURE'):
+        if self.export_selected and (selectedObject is not None and selectedObject.type != 'ARMATURE'):
             raise Exception(
                 "You must select an armature to export animation data for.")
 
@@ -195,5 +489,25 @@ def save(self, context, filepath=""):
             for action in bpy.data.actions:
                 exportAction(self, context, root, list(
                     bpy.data.objects), action)
+
+    if self.incl_model:
+        # Check that selected object is an 'ARMATURE' or mesh if we're exporting selected models.
+        if self.export_selected and (selectedObject is None or (selectedObject.type != 'ARMATURE' and selectedObject.type != 'MESH')):
+            raise Exception(
+                "You must select an armature or mesh to export model data for.")
+
+        # Export either the armature and it's meshes, the mesh, or all of the armature's / meshes in the scene.
+        if self.export_selected:
+            exportModel(self, context, root, selectedObject)
+        else:
+            # Handle armature and it's mesh references.
+            for obj in bpy.data.objects:
+                if obj.type == 'ARMATURE':
+                    exportModel(self, context, root, obj)
+            # Handle free standing meshes.
+            for obj in bpy.data.objects:
+                if obj.type == 'MESH':
+                    if obj.find_armature() is None:
+                        exportModel(self, context, root, obj)
 
     cast.save(filepath)

@@ -75,6 +75,27 @@ class CastProperty_t(object):
         self.identifier = identifier
 
 
+class CastColor:
+    """Utility methods for working with colors."""
+
+    @staticmethod
+    def fromInteger(color):
+        """Unpacks a color value to a tuple of rgba (float)."""
+        bytes = list(struct.pack("<I", color))
+
+        return (bytes[0] / 255.0, bytes[1] / 255.0, bytes[2] / 255.0, bytes[3] / 255.0)
+
+    @staticmethod
+    def toInteger(color):
+        """Packs a tuple of rgba (float) to a color value."""
+        r = int(max(min(color[0] * 255.0, 255.0), 0.0))
+        g = int(max(min(color[1] * 255.0, 255.0), 0.0))
+        b = int(max(min(color[2] * 255.0, 255.0), 0.0))
+        a = int(max(min(color[3] * 255.0, 255.0), 0.0))
+
+        return struct.unpack("<I", bytearray([r, g, b, a]))[0]
+
+
 class CastProperty(object):
     """A single property for a cast node."""
 
@@ -226,6 +247,17 @@ class Model(CastNode):
     def __init__(self):
         super(Model, self).__init__(0x6C646F6D)
 
+    def Name(self):
+        """The name of this model."""
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
+
+    def SetName(self, name):
+        """Sets the name of this model."""
+        self.CreateProperty("n", "s").values = [name]
+
     def Skeleton(self):
         """The skeleton embedded in this model."""
         find = self.ChildrenOfType(Skeleton)
@@ -267,6 +299,17 @@ class Animation(CastNode):
 
     def __init__(self):
         super(Animation, self).__init__(0x6D696E61)
+
+    def Name(self):
+        """The name of this animation."""
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
+
+    def SetName(self, name):
+        """Sets the name of this animation."""
+        self.CreateProperty("n", "s").values = [name]
 
     def Skeleton(self):
         """The skeleton embedded in this animation."""
@@ -454,13 +497,13 @@ class Mesh(CastNode):
         """Gets the number of vertices in this mesh."""
         vp = self.properties.get("vp")
         if vp is not None:
-            return len(vp.values) / 3
+            return int(len(vp.values) / 3)
 
     def FaceCount(self):
         """Gets the number of faces in this mesh."""
         f = self.properties.get("f")
         if f is not None:
-            return len(f.values) / 3
+            return int(len(f.values) / 3)
 
     def UVLayerCount(self):
         """Gets the number of uv layers in this mesh."""
@@ -701,7 +744,10 @@ class Bone(CastNode):
 
     def SetParentIndex(self, index):
         """Sets the index of the parent bone in the skeleton. -1 is a root bone."""
-        self.CreateProperty("p", "i").values = [index]
+        if index < 0:
+            self.CreateProperty("p", "i").values = [index + 2**32]
+        else:
+            self.CreateProperty("p", "i").values = [index]
 
     def SegmentScaleCompensate(self):
         """Whether or not children bones are effected by the scale of this bone."""

@@ -4,7 +4,7 @@ import array
 import math
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
-from .cast import Cast, Model, Animation, File
+from .cast import Cast, CastColor, Model, Animation, File
 
 PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
 SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
@@ -366,7 +366,7 @@ def importMaterialNode(path, material):
 
 def importModelNode(self, model, path):
     # Extract the name of this model from the path
-    modelName = os.path.splitext(os.path.basename(path))[0]
+    modelName = model.Name() or os.path.splitext(os.path.basename(path))[0]
 
     # Create a collection for our objects
     collection = bpy.data.collections.new(modelName)
@@ -423,23 +423,26 @@ def importModelNode(self, model, path):
         vertexColors = mesh.VertexColorBuffer()
         if vertexColors is not None:
             newMesh.vertex_colors.new(do_init=False)
-            newMesh.vertex_colors[0].data.foreach_set("color", unpack_list([((vertexColors[x] >> 0 & 0xff) / 255.0, (vertexColors[x]
-                                                                                                                     >> 8 & 0xff) / 255.0, (vertexColors[x] >> 16 & 0xff) / 255.0, (vertexColors[x] >> 24 & 0xff) / 255.0) for x in faces]))
+            newMesh.vertex_colors[0].data.foreach_set(
+                "color", unpack_list([CastColor.fromInteger(vertexColors[x]) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
-        newMesh.create_normals_split()
-        newMesh.loops.foreach_set("normal", unpack_list(
-            [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
+        if vertexNormals is not None:
+            newMesh.create_normals_split()
+            newMesh.loops.foreach_set("normal", unpack_list(
+                [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
 
-        newMesh.validate(clean_customdata=False)
-        clnors = array.array('f', [0.0] * (len(newMesh.loops) * 3))
-        newMesh.loops.foreach_get("normal", clnors)
+            newMesh.validate(clean_customdata=False)
+            clnors = array.array('f', [0.0] * (len(newMesh.loops) * 3))
+            newMesh.loops.foreach_get("normal", clnors)
 
-        newMesh.polygons.foreach_set(
-            "use_smooth", [True] * len(newMesh.polygons))
+            newMesh.polygons.foreach_set(
+                "use_smooth", [True] * len(newMesh.polygons))
 
-        newMesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
-        newMesh.use_auto_smooth = True
+            newMesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
+            newMesh.use_auto_smooth = True
+        else:
+            newMesh.validate(clean_customdata=False)
 
         meshMaterial = mesh.Material()
         if meshMaterial is not None:
@@ -600,8 +603,8 @@ def importAnimationNode(self, node, path):
         raise Exception(
             "You must select an armature to apply the animation to.")
 
-    # Extract the name of this anim from the path
-    animName = os.path.splitext(os.path.basename(path))[0]
+    # Extract the name of this anim from the path.
+    animName = node.Name() or os.path.splitext(os.path.basename(path))[0]
 
     try:
         selectedObject.animation_data.action

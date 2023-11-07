@@ -8,7 +8,7 @@ The goal of cast is to create an engine agnostic format that can be parsed and w
 
 ## 3D Engine Plugins:
 - Autodesk Maya (2012+): [Releases](https://github.com/dtzxporter/cast/releases)
-- Blender (2.8+): [Releases](https://github.com/dtzxporter/cast/releases)
+- Blender (3.0+): [Releases](https://github.com/dtzxporter/cast/releases)
 - 3DS Max: (Help wanted)
 
 # Programming libraries:
@@ -133,6 +133,20 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
    		<td>Root</td>
 		<td>False</td>
 		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
  	</tr>
 </table>
 
@@ -613,7 +627,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
@@ -649,12 +663,18 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
 		<th>Required</th>
  	</tr>
+	<tr>
+		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+	</tr>
 	 <tr>
   		<td>Framerate (fr)</td>
    		<td>Float (f)</td>
