@@ -43,6 +43,33 @@ def utilityGetQuatKeyValue(object):
         return object.matrix.to_quaternion()
 
 
+def utilityAssignMaterialSlots(material, matNode):
+    slots = {
+        "Base Color": "albedo",
+        "Specular": "specular",
+        "Emissive Color": "emissive",
+        "Emission": "emissive",
+        "Ambient Occlusion": "ao",
+        "Metallic": "metal",
+    }
+
+    if not material.use_nodes:
+        return
+
+    for node in material.node_tree.nodes:
+        if node.type == 'TEX_IMAGE':
+
+            file = matNode.CreateFile()
+            file.SetPath(node.image.filepath)
+
+            for output in node.outputs:
+                if output.is_linked:
+                    connection = output.links[0].to_socket.name
+
+                    if connection in slots:
+                        matNode.SetSlot(slots[connection], file.Hash())
+
+
 def exportModel(self, context, root, armatureOrMesh):
     model = root.CreateModel()
     model.SetName(armatureOrMesh.name)
@@ -105,8 +132,13 @@ def exportModel(self, context, root, armatureOrMesh):
             if material.name in materialToHash:
                 continue
 
-            # TODO: Parse, inject, and set material hashes.
-            materialToHash[material.name] = True
+            matNode = model.CreateMaterial()
+            matNode.SetName(material.name)
+            matNode.SetType("pbr")
+
+            utilityAssignMaterialSlots(material, matNode)
+
+            materialToHash[material.name] = matNode.Hash()
 
     # Build meshes, blend shapes.
     with ProgressReport(context.window_manager) as progress:
@@ -117,6 +149,9 @@ def exportModel(self, context, root, armatureOrMesh):
 
             if not mesh.name.startswith("CastMesh"):
                 meshNode.SetName(mesh.name)
+
+            if mesh.active_material is not None:
+                meshNode.SetMaterial(materialToHash[mesh.active_material.name])
 
             deformers = [x for x in mesh.modifiers if x.type == 'ARMATURE']
 
