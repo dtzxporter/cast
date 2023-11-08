@@ -2,6 +2,7 @@ import bpy
 import bpy_types
 import bmesh
 import math
+import os
 
 from bpy_extras.wm_utils.progress_report import ProgressReport
 from mathutils import *
@@ -43,7 +44,7 @@ def utilityGetQuatKeyValue(object):
         return object.matrix.to_quaternion()
 
 
-def utilityAssignMaterialSlots(material, matNode):
+def utilityAssignMaterialSlots(material, matNode, filepath):
     slots = {
         "Base Color": "albedo",
         "Specular": "specular",
@@ -60,7 +61,14 @@ def utilityAssignMaterialSlots(material, matNode):
         if node.type == 'TEX_IMAGE':
 
             file = matNode.CreateFile()
-            file.SetPath(node.image.filepath)
+
+            try:
+                # Attempt to build a relative path to the image based on where the cast is being saved.
+                file.SetPath(os.path.relpath(
+                    node.image.filepath, os.path.dirname(filepath)))
+            except:
+                # Fallback to the absolute path of the image.
+                file.SetPath(node.image.filepath)
 
             for output in node.outputs:
                 if output.is_linked:
@@ -70,7 +78,7 @@ def utilityAssignMaterialSlots(material, matNode):
                         matNode.SetSlot(slots[connection], file.Hash())
 
 
-def exportModel(self, context, root, armatureOrMesh):
+def exportModel(self, context, root, armatureOrMesh, filepath):
     model = root.CreateModel()
     model.SetName(armatureOrMesh.name)
 
@@ -136,7 +144,7 @@ def exportModel(self, context, root, armatureOrMesh):
             matNode.SetName(material.name)
             matNode.SetType("pbr")
 
-            utilityAssignMaterialSlots(material, matNode)
+            utilityAssignMaterialSlots(material, matNode, filepath)
 
             materialToHash[material.name] = matNode.Hash()
 
@@ -498,16 +506,16 @@ def save(self, context, filepath=""):
 
         # Export either the armature and it's meshes, the mesh, or all of the armature's / meshes in the scene.
         if self.export_selected:
-            exportModel(self, context, root, selectedObject)
+            exportModel(self, context, root, selectedObject, filepath)
         else:
             # Handle armature and it's mesh references.
             for obj in bpy.data.objects:
                 if obj.type == 'ARMATURE':
-                    exportModel(self, context, root, obj)
+                    exportModel(self, context, root, obj, filepath)
             # Handle free standing meshes.
             for obj in bpy.data.objects:
                 if obj.type == 'MESH':
                     if obj.find_armature() is None:
-                        exportModel(self, context, root, obj)
+                        exportModel(self, context, root, obj, filepath)
 
     cast.save(filepath)
