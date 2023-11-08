@@ -50,8 +50,10 @@ def utilityAssignMaterialSlots(material, matNode, filepath):
         "Specular": "specular",
         "Emissive Color": "emissive",
         "Emission": "emissive",
+        "Roughness": "roughness",
         "Ambient Occlusion": "ao",
         "Metallic": "metal",
+        "Normal": "normal"
     }
 
     if not material.use_nodes:
