@@ -1491,12 +1491,21 @@ def exportAnimation(root, objects):
 
             keyframes.append(frame)
 
+            # We need to sample the joint orientation into the quaternion curve
+            # because cast models will combine the rotation and orientation.
             if export[1] == "rotate":
                 euler = cmds.getAttr("%s.rotate" % export[0], time=frame)[0]
-                quat = OpenMaya.MEulerRotation(
-                    math.radians(euler[0]), math.radians(euler[1]), math.radians(euler[2])).asQuaternion()
+                eulerJo = cmds.getAttr("%s.jointOrient" %
+                                       export[0], time=frame)[0]
 
-                keyvalues.append((quat.x, quat.y, quat.z, quat.w))
+                quat = OpenMaya.MEulerRotation(math.radians(euler[0]), math.radians(
+                    euler[1]), math.radians(euler[2])).asQuaternion()
+                quatJo = OpenMaya.MEulerRotation(math.radians(eulerJo[0]), math.radians(
+                    eulerJo[1]), math.radians(eulerJo[2])).asQuaternion()
+
+                value = quat * quatJo
+
+                keyvalues.append((value.x, value.y, value.z, value.w))
             else:
                 keyvalues.append(cmds.getAttr("%s.%s" %
                                  (export[0], export[1]), time=frame))
