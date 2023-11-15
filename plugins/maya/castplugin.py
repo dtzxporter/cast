@@ -1500,7 +1500,7 @@ def exportAnimation(root, objects):
             else:
                 keyvalues.append(cmds.getAttr("%s.%s" %
                                  (export[0], export[1]), time=frame))
-                
+
         # Make sure we had at least one usable keyframe before creating the curve.
         if len(keyframes) > 0:
             curveNode = animation.CreateCurve()
