@@ -32,7 +32,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.21"
+version = "1.22"
 
 
 def utilityAbout():
@@ -1417,12 +1417,150 @@ def importCast(path):
         importRootNode(root, path)
 
 
+def exportAnimation(root, objects):
+    animation = root.CreateAnimation()
+    animation.SetFramerate(cmds.playbackOptions(query=True, fps=True))
+    animation.SetLooping(cmds.playbackOptions(
+        query=True, loop=True) == "continuous")
+
+    # Configure the scene to use degrees.
+    currentAngle = cmds.currentUnit(query=True, angle=True)
+
+    cmds.currentUnit(angle="deg")
+
+    # Grab the smallest and largest keyframe we want to support.
+    startFrame = int(cmds.playbackOptions(query=True, ast=True))
+    endFrame = int(cmds.playbackOptions(query=True, aet=True))
+
+    simpleProperties = [
+        ["translateX", "tx"],
+        ["translateY", "ty"],
+        ["translateZ", "tz"],
+        ["scaleX", "sx"],
+        ["scaleY", "sy"],
+        ["scaleZ", "sz"]
+    ]
+
+    exportable = []
+
+    # For each object, we want to query animatable properties, and which keyframes appear where.
+    for object in objects:
+        # Check simple properties
+        for property in simpleProperties:
+            keyframes = cmds.keyframe(
+                object, at=property[0], query=True, timeChange=True)
+
+            if keyframes:
+                exportable.append(
+                    [object, property[0], property[1], list(set([int(x) for x in keyframes]))])
+
+        # Check rotation properties, and switch between quaternion and euler mode.
+        rotateX = cmds.keyframe(object, at="rotateX",
+                                query=True, timeChange=True)
+        rotateY = cmds.keyframe(object, at="rotateY",
+                                query=True, timeChange=True)
+        rotateZ = cmds.keyframe(object, at="rotateZ",
+                                query=True, timeChange=True)
+
+        keyframes = set()
+
+        if rotateX:
+            keyframes.update([int(x) for x in rotateX])
+        if rotateY:
+            keyframes.update([int(x) for x in rotateY])
+        if rotateZ:
+            keyframes.update([int(x) for x in rotateZ])
+
+        if len(keyframes) > 0:
+            exportable.append([object, "rotate", "rq", list(keyframes)])
+
+    progress = utilityCreateProgress("Exporting animation...", len(exportable))
+
+    for export in exportable:
+        # Always ensure a control keyframe is present based on the start range.
+        if not startFrame in export[3]:
+            export[3].append(startFrame)
+
+        keyframes = []
+        keyvalues = []
+
+        # Export the keyed and possibly control keyframes within the range.
+        for frame in export[3]:
+            if frame < startFrame or frame > endFrame:
+                continue
+
+            keyframes.append(frame)
+
+            # We need to sample the joint orientation into the quaternion curve
+            # because cast models will combine the rotation and orientation.
+            if export[1] == "rotate":
+                euler = cmds.getAttr("%s.rotate" % export[0], time=frame)[0]
+                eulerJo = cmds.getAttr("%s.jointOrient" %
+                                       export[0], time=frame)[0]
+
+                quat = OpenMaya.MEulerRotation(math.radians(euler[0]), math.radians(
+                    euler[1]), math.radians(euler[2])).asQuaternion()
+                quatJo = OpenMaya.MEulerRotation(math.radians(eulerJo[0]), math.radians(
+                    eulerJo[1]), math.radians(eulerJo[2])).asQuaternion()
+
+                value = quat * quatJo
+
+                keyvalues.append((value.x, value.y, value.z, value.w))
+            else:
+                keyvalues.append(cmds.getAttr("%s.%s" %
+                                 (export[0], export[1]), time=frame))
+
+        # Make sure we had at least one usable keyframe before creating the curve.
+        if len(keyframes) > 0:
+            curveNode = animation.CreateCurve()
+            curveNode.SetNodeName(export[0])
+            curveNode.SetKeyPropertyName(export[2])
+            curveNode.SetMode("absolute")
+
+            curveNode.SetKeyFrameBuffer(keyframes)
+
+            if export[1] == "rotate":
+                curveNode.SetVec4KeyValueBuffer(keyvalues)
+            else:
+                curveNode.SetFloatKeyValueBuffer(keyvalues)
+
+        utilityStepProgress(progress)
+    utilityEndProgress(progress)
+
+    # Collect and create notification tracks.
+    notifications = utilityGetNotetracks()
+
+    for note in notifications:
+        notetrack = animation.CreateNotification()
+        notetrack.SetName(note)
+        notetrack.SetKeyFrameBuffer([int(x) for x in notifications[note]])
+
+    # Reset scene units back to user setting.
+    cmds.currentUnit(angle=currentAngle)
+
+
+def exportCast(path, exportSelected):
+    cast = Cast()
+    root = cast.CreateRoot()
+
+    if sceneSettings["exportAnim"]:
+        if exportSelected:
+            exportAnimation(root, cmds.ls(type="joint", selection=True))
+        else:
+            exportAnimation(root, cmds.ls(type="joint"))
+
+    if sceneSettings["exportModel"]:
+        print("")
+
+    cast.save(path)
+
+
 class CastFileTranslator(OpenMayaMPx.MPxFileTranslator):
     def __init__(self):
         OpenMayaMPx.MPxFileTranslator.__init__(self)
 
     def haveWriteMethod(self):
-        return False
+        return True
 
     def haveReadMethod(self):
         return True
@@ -1439,7 +1577,8 @@ class CastFileTranslator(OpenMayaMPx.MPxFileTranslator):
         return "cast"
 
     def writer(self, fileObject, optionString, accessMode):
-        print("TODO: Implement")
+        exportCast(fileObject.fullName(), exportSelected=accessMode ==
+                   OpenMayaMPx.MPxFileTranslator.kExportActiveAccessMode)
 
     def reader(self, fileObject, optionString, accessMode):
         importCast(fileObject.fullName())
