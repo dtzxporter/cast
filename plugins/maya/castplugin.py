@@ -1527,6 +1527,15 @@ def exportAnimation(root, objects):
         utilityStepProgress(progress)
     utilityEndProgress(progress)
 
+    # Collect and create notification tracks.
+    notifications = utilityGetNotetracks()
+
+    for note in notifications:
+        notetrack = animation.CreateNotification()
+        notetrack.SetName(note)
+        notetrack.SetKeyFrameBuffer([int(x) for x in notifications[note]])
+
+    # Reset scene units back to user setting.
     cmds.currentUnit(angle=currentAngle)
 
 
