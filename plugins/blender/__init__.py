@@ -1,5 +1,6 @@
 import bpy
 import bpy_extras.io_utils
+import os
 
 from bpy.types import Operator, AddonPreferences
 from bpy.props import *
@@ -10,7 +11,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 2, 3),
+    "version": (1, 2, 4),
     "blender": (3, 0, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -52,7 +53,14 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         from . import import_cast
         try:
-            import_cast.load(self, context, self.filepath)
+            if self.import_reset:
+                for file in self.files:
+                    base = os.path.dirname(self.filepath)
+                    file = os.path.join(base, file.name)
+                    
+                    import_cast.load(self, context, file)
+            else:
+                import_cast.load(self, context, self.filepath)
 
             self.report({'INFO'}, 'Cast has been loaded')
             return {'FINISHED'}
