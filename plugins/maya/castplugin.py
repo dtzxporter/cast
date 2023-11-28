@@ -768,10 +768,6 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     timeBuffer = OpenMaya.MTimeArray()
     scriptUtil = OpenMaya.MScriptUtil()
 
-    # Cast rx, ry, rz is in degrees, maya needs radians
-    if property in ["rx", "ry", "rz"]:
-        valueBuffer = [math.radians(x) for x in valueBuffer]
-
     # We must have one track here
     if tracks[0] is None:
         return (smallestFrame, largestFrame)
@@ -812,9 +808,6 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
         restSwitcher = {
-            "rx": lambda: utilityGetRestData(restTransform, "rotation")[0],
-            "ry": lambda: utilityGetRestData(restTransform, "rotation")[1],
-            "rz": lambda: utilityGetRestData(restTransform, "rotation")[2],
             "tx": lambda: utilityGetRestData(restTransform, "translation")[0],
             "ty": lambda: utilityGetRestData(restTransform, "translation")[1],
             "tz": lambda: utilityGetRestData(restTransform, "translation")[2],
@@ -1237,9 +1230,6 @@ def importModelNode(model, path):
 def importCurveNode(node, path, timeUnit, startFrame):
     propertySwitcher = {
         "rq": ["rx", "ry", "rz"],
-        "rx": ["rx"],
-        "ry": ["ry"],
-        "rz": ["rz"],
         "tx": ["tx"],
         "ty": ["ty"],
         "tz": ["tz"],
@@ -1250,9 +1240,6 @@ def importCurveNode(node, path, timeUnit, startFrame):
     }
     typeSwitcher = {
         "rq": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
-        "rx": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
-        "ry": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
-        "rz": OpenMayaAnim.MFnAnimCurve.kAnimCurveTA,
         "tx": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
         "ty": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
         "tz": OpenMayaAnim.MFnAnimCurve.kAnimCurveTL,
@@ -1263,9 +1250,6 @@ def importCurveNode(node, path, timeUnit, startFrame):
     }
     trackSwitcher = {
         "rq": utilityImportQuatTrackData,
-        "rx": utilityImportSingleTrackData,
-        "ry": utilityImportSingleTrackData,
-        "rz": utilityImportSingleTrackData,
         "tx": utilityImportSingleTrackData,
         "ty": utilityImportSingleTrackData,
         "tz": utilityImportSingleTrackData,
@@ -1454,7 +1438,7 @@ def exportAnimation(root, objects):
                 exportable.append(
                     [object, property[0], property[1], list(set([int(x) for x in keyframes]))])
 
-        # Check rotation properties, and switch between quaternion and euler mode.
+        # Check rotation properties
         rotateX = cmds.keyframe(object, at="rotateX",
                                 query=True, timeChange=True)
         rotateY = cmds.keyframe(object, at="rotateY",

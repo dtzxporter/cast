@@ -28,10 +28,6 @@ def utilityGetSimpleKeyValue(object, property):
             return object.parent.matrix.inverted() @ object.matrix.translation
         else:
             return object.matrix_basis.translation
-    if property == "rotation_euler":
-        quat = utilityGetQuatKeyValue(object)
-        euler = quat.to_euler("XYZ")
-        return (math.degrees(euler[0]), math.degrees(euler[1]), math.degrees(euler[2]))
     elif property == "scale":
         return object.scale
     return None
@@ -373,15 +369,10 @@ def exportAction(self, context, root, objects, action):
                 result.append(
                     (curve, "location", curve.array_index))
                 curves[poseBone] = result
-            elif target == poseBone.rotation_quaternion.owner:
+            elif target == poseBone.rotation_quaternion.owner or target == poseBone.rotation_euler.owner:
                 result = curves.get(poseBone, [])
                 result.append(
                     (curve, "rotation_quaternion", curve.array_index))
-                curves[poseBone] = result
-            elif target == poseBone.rotation_euler.owner:
-                result = curves.get(poseBone, [])
-                result.append(
-                    (curve, "rotation_euler", curve.array_index))
                 curves[poseBone] = result
             elif target == poseBone.scale.owner:
                 result = curves.get(poseBone, [])
@@ -427,7 +418,6 @@ def exportAction(self, context, root, objects, action):
             for (curve, property, index) in curves:
                 switcherProperty = {
                     "location": ["tx", "ty", "tz"],
-                    "rotation_euler": ["rx", "ry", "rz"],
                     "scale": ["sx", "sy", "sz"]
                 }
 

@@ -169,10 +169,6 @@ def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, 
 
     bone = poseBones[name]
 
-    # Rotate rx, ry, rz is in degrees, blender needs radians.
-    if property in ["rx", "ry", "rz"]:
-        valueBuffer = [math.radians(x) for x in valueBuffer]
-
     # Scale isn't based on the scene value, it's per-bone and defaults to 1.0.
     if property in ["sx", "sy", "sz"]:
         for i, x in enumerate(frameBuffer):
@@ -497,18 +493,12 @@ def importModelNode(self, model, path):
 def importBasicCurveNode(node, fcurves, poseBones, path, startFrame):
     propertySwitcher = {
         "rq": [("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3), ("rotation_quaternion", 0)],
-        "rx": [("rotation_euler", 0)],
-        "ry": [("rotation_euler", 1)],
-        "rz": [("rotation_euler", 2)],
         "sx": [("scale", 0)],
         "sy": [("scale", 1)],
         "sz": [("scale", 2)],
     }
     trackSwitcher = {
         "rq": utilityImportQuatTrackData,
-        "rx": utilityImportSingleTrackData,
-        "ry": utilityImportSingleTrackData,
-        "rz": utilityImportSingleTrackData,
         "sx": utilityImportSingleTrackData,
         "sy": utilityImportSingleTrackData,
         "sz": utilityImportSingleTrackData,
