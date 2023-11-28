@@ -152,8 +152,7 @@ def utilityImportQuatTrackData(tracks, poseBones, name, property, frameStart, fr
     bone.matrix_basis.identity()
 
     for track in tracks:
-        if track is not None:
-            track.update()
+        track.update()
 
     return (smallestFrame, largestFrame)
 
@@ -170,49 +169,12 @@ def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, 
 
     bone = poseBones[name]
 
-    # Cast rx, ry, rz is in degrees, blender needs radians
+    # Rotate rx, ry, rz is in degrees, blender needs radians.
     if property in ["rx", "ry", "rz"]:
         valueBuffer = [math.radians(x) for x in valueBuffer]
 
-    # Translation properties are based on the scene value, so we have to compute the delta and key that
-    # instead of the keyframe value. It also requires us to have the other components, hence splat.
-    if property in ["tx", "ty", "tz"]:
-        reset = bone.matrix.to_translation()
-
-        if bone.parent is None:
-            splat = Vector((0, 0, 0))
-        else:
-            splat = (bone.parent.matrix.inverted() @ bone.matrix).translation
-        splatIndex = tracks[0].array_index
-
-        for i, x in enumerate(frameBuffer):
-            frame = x + frameStart
-
-            bone.matrix_basis.identity()
-            bone.matrix.translation = reset
-
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-
-            splat[splatIndex] = valueBuffer[i]
-
-            if mode == "absolute" or mode is None:
-                if bone.parent is None:
-                    bone.matrix_basis.translation = splat
-                else:
-                    bone.matrix.translation = bone.parent.matrix @ splat
-            elif mode == "relative":
-                bone.matrix_basis.translation = bone.bone.matrix @ splat
-            else:
-                raise Exception(
-                    "Additive animations are currently not supported in blender.")
-
-            tracks[0].keyframe_points.insert(
-                frame, value=bone.location[splatIndex], options={'FAST'})
     # Scale isn't based on the scene value, it's per-bone and defaults to 1.0.
-    elif property in ["sx", "sy", "sz"]:
+    if property in ["sx", "sy", "sz"]:
         for i, x in enumerate(frameBuffer):
             frame = x + frameStart
 
@@ -237,8 +199,6 @@ def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, 
 def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
     if skeleton is None:
         return
-
-    bones = skeleton.Bones()
 
     for handle in skeleton.IKHandles():
         startBone = poses[handle.EndBone().Name()]
@@ -534,15 +494,12 @@ def importModelNode(self, model, path):
         collection)
 
 
-def importCurveNode(node, fcurves, poseBones, path, startFrame):
+def importBasicCurveNode(node, fcurves, poseBones, path, startFrame):
     propertySwitcher = {
         "rq": [("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3), ("rotation_quaternion", 0)],
         "rx": [("rotation_euler", 0)],
         "ry": [("rotation_euler", 1)],
         "rz": [("rotation_euler", 2)],
-        "tx": [("location", 0)],
-        "ty": [("location", 1)],
-        "tz": [("location", 2)],
         "sx": [("scale", 0)],
         "sy": [("scale", 1)],
         "sz": [("scale", 2)],
@@ -552,9 +509,6 @@ def importCurveNode(node, fcurves, poseBones, path, startFrame):
         "rx": utilityImportSingleTrackData,
         "ry": utilityImportSingleTrackData,
         "rz": utilityImportSingleTrackData,
-        "tx": utilityImportSingleTrackData,
-        "ty": utilityImportSingleTrackData,
-        "tz": utilityImportSingleTrackData,
         "sx": utilityImportSingleTrackData,
         "sy": utilityImportSingleTrackData,
         "sz": utilityImportSingleTrackData,
@@ -573,6 +527,90 @@ def importCurveNode(node, fcurves, poseBones, path, startFrame):
         fcurves, poseBones, nodeName, x) for x in propertySwitcher[propertyName]]
 
     return trackSwitcher[propertyName](tracks, poseBones, nodeName, propertyName, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode())
+
+
+def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
+    smallestFrame = 0
+    largestFrame = 0
+
+    if not nodeName in poseBones:
+        return (smallestFrame, largestFrame)
+
+    mode = None
+
+    for node in nodes:
+        if node is not None:
+            mode = node.Mode()
+
+    bone = poseBones[nodeName]
+    tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
+        ("location", 0), ("location", 1), ("location", 2)]]
+
+    lastFrame = 0
+
+    for axis, node in enumerate(nodes):
+        if node is None:
+            if bone.parent is None:
+                tracks[axis].keyframe_points.insert(
+                    0, value=bone.matrix.translation[axis], options={'FAST'})
+            else:
+                tracks[axis].keyframe_points.insert(
+                    0, value=(bone.parent.matrix.inverted() @ bone.matrix).translation[axis], options={'FAST'})
+        else:
+            keyFrameBuffer = node.KeyFrameBuffer()
+            keyValueBuffer = node.KeyValueBuffer()
+
+            for i, frame in enumerate(keyFrameBuffer):
+                tracks[axis].keyframe_points.insert(
+                    frame, value=keyValueBuffer[i], options={'FAST'})
+                lastFrame = max(lastFrame, frame)
+
+    keyFrameBuffer = []
+    keyValueBuffer = []
+
+    # Now, we need to bake the curves into sampled keyframes that collectively animate the transform.
+    for frame in range(0, lastFrame + 1):
+        keyFrameBuffer.append(frame)
+        keyValueBuffer.append((tracks[0].evaluate(
+            frame), tracks[1].evaluate(frame), tracks[2].evaluate(frame)))
+
+    # Now, we need to actually generate keyframes for each of the tracks based on the mode.
+    for track in tracks:
+        track.keyframe_points.clear()
+
+    for i, frame in enumerate(keyFrameBuffer):
+        offset = Vector(keyValueBuffer[i])
+
+        frame = frame + startFrame
+
+        if frame < smallestFrame:
+            smallestFrame = frame
+        if frame > largestFrame:
+            largestFrame = frame
+
+        if mode == "absolute" or mode is None:
+            if bone.parent is not None:
+                bone.matrix.translation = bone.parent.matrix @ offset
+            else:
+                bone.matrix_basis.translation = offset
+        elif mode == "relative":
+            bone.matrix_basis.translation = bone.bone.matrix.inverted() @ offset
+        else:
+            # I need to get some samples of these before attempting this again.
+            raise Exception(
+                "Additive animations are currently not supported in blender.")
+
+        for axis, track in enumerate(tracks):
+            track.keyframe_points.insert(
+                frame, value=bone.location[axis], options={'FAST'})
+
+    # Reset temporary matrices used to calculate the keyframe locations.
+    bone.matrix_basis.identity()
+
+    for track in tracks:
+        track.update()
+
+    return (smallestFrame, largestFrame)
 
 
 def importNotificationTrackNode(node, action, frameStart):
@@ -650,9 +688,40 @@ def importAnimationNode(self, node, path):
             if x.NodeName().lower() == bone.name.lower():
                 poseBones[x.NodeName()] = bone
 
+    # Create a list of the separate location curves..
+    locCurves = {}
+
     for x in curves:
-        (smallestFrame, largestFrame) = importCurveNode(
+        nodeName = x.NodeName()
+        property = x.KeyPropertyName()
+
+        if property == "tx":
+            if nodeName in locCurves:
+                locCurves[nodeName][0] = x
+            else:
+                locCurves[nodeName] = [x, None, None]
+        if property == "ty":
+            if nodeName in locCurves:
+                locCurves[nodeName][1] = x
+            else:
+                locCurves[nodeName] = [None, x, None]
+        if property == "tz":
+            if nodeName in locCurves:
+                locCurves[nodeName][2] = x
+            else:
+                locCurves[nodeName] = [None, None, x]
+
+    for x in curves:
+        (smallestFrame, largestFrame) = importBasicCurveNode(
             x, action.fcurves, poseBones, path, startFrame)
+        if smallestFrame < wantedSmallestFrame:
+            wantedSmallestFrame = smallestFrame
+        if largestFrame > wantedLargestFrame:
+            wantedLargestFrame = largestFrame
+
+    for nodeName, x in locCurves.items():
+        (smallestFrame, largestFrame) = importLocCurveNodes(
+            x, nodeName, action.fcurves, poseBones, path, startFrame)
         if smallestFrame < wantedSmallestFrame:
             wantedSmallestFrame = smallestFrame
         if largestFrame > wantedLargestFrame:
