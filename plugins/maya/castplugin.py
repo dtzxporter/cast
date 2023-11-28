@@ -1,7 +1,7 @@
 import os
-import os.path
 import json
 import math
+import sys
 
 import maya.mel as mel
 import maya.cmds as cmds
@@ -32,7 +32,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.24"
+version = "1.25"
 
 
 def utilityAbout():
@@ -668,8 +668,9 @@ def utilityGetOrCreateCurve(name, property, curveType):
 
 def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
     timeBuffer = OpenMaya.MTimeArray()
-    smallestFrame = OpenMaya.MTime()
-    largestFrame = OpenMaya.MTime()
+
+    smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
+    largestFrame = OpenMaya.MTime(0, timeUnit)
 
     tempBufferX = OpenMaya.MScriptUtil()
     tempBufferY = OpenMaya.MScriptUtil()
@@ -682,10 +683,8 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     for frame in frameBuffer:
         time = OpenMaya.MTime(frame, timeUnit) + frameStart
 
-        if time < smallestFrame:
-            smallestFrame = time
-        if time > largestFrame:
-            largestFrame = time
+        smallestFrame = min(time, smallestFrame)
+        largestFrame = max(time, largestFrame)
 
         timeBuffer.append(time)
 
@@ -763,9 +762,11 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
 
 
 def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBuffer, valueBuffer, mode, blendWeight):
-    smallestFrame = OpenMaya.MTime()
-    largestFrame = OpenMaya.MTime()
     timeBuffer = OpenMaya.MTimeArray()
+
+    smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
+    largestFrame = OpenMaya.MTime(0, timeUnit)
+
     scriptUtil = OpenMaya.MScriptUtil()
 
     # We must have one track here
@@ -778,10 +779,8 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     for frame in frameBuffer:
         time = OpenMaya.MTime(frame, timeUnit) + frameStart
 
-        if time < smallestFrame:
-            smallestFrame = time
-        if time > largestFrame:
-            largestFrame = time
+        smallestFrame = min(time, smallestFrame)
+        largestFrame = max(time, largestFrame)
 
         timeBuffer.append(time)
 
@@ -1262,8 +1261,8 @@ def importCurveNode(node, path, timeUnit, startFrame):
     nodeName = node.NodeName()
     propertyName = node.KeyPropertyName()
 
-    smallestFrame = OpenMaya.MTime()
-    largestFrame = OpenMaya.MTime()
+    smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
+    largestFrame = OpenMaya.MTime(0, timeUnit)
 
     if not propertyName in propertySwitcher:
         return (smallestFrame, largestFrame)
@@ -1291,18 +1290,16 @@ def importCurveNode(node, path, timeUnit, startFrame):
 
 
 def importNotificationTrackNode(node, timeUnit, frameStart):
-    smallestFrame = OpenMaya.MTime()
-    largestFrame = OpenMaya.MTime()
+    smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
+    largestFrame = OpenMaya.MTime(0, timeUnit)
 
     frameBuffer = node.KeyFrameBuffer()
 
     for frame in frameBuffer:
         time = OpenMaya.MTime(frame, timeUnit) + frameStart
 
-        if time < smallestFrame:
-            smallestFrame = time
-        if time > largestFrame:
-            largestFrame = time
+        smallestFrame = min(time, smallestFrame)
+        largestFrame = max(time, largestFrame)
 
         utilityAddNotetrack(node.Name(), int(time.value()))
 
@@ -1354,7 +1351,7 @@ def importAnimationNode(node, path):
     # We need to determine the proper time to import the curves, for example
     # the user may want to import at the current scene time, and that would require
     # fetching once here, then passing to the curve importer.
-    wantedSmallestFrame = OpenMaya.MTime(0, wantedFps)
+    wantedSmallestFrame = OpenMaya.MTime(sys.maxsize, wantedFps)
     wantedLargestFrame = OpenMaya.MTime(1, wantedFps)
 
     curves = node.Curves()
@@ -1363,10 +1360,8 @@ def importAnimationNode(node, path):
     for x in curves:
         (smallestFrame, largestFrame) = importCurveNode(
             x, path, wantedFps, startFrame)
-        if smallestFrame < wantedSmallestFrame:
-            wantedSmallestFrame = smallestFrame
-        if largestFrame > wantedLargestFrame:
-            wantedLargestFrame = largestFrame
+        wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+        wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         utilityStepProgress(progress)
 
     utilityEndProgress(progress)
@@ -1374,12 +1369,13 @@ def importAnimationNode(node, path):
     for x in node.Notifications():
         (smallestFrame, largestFrame) = importNotificationTrackNode(
             x, wantedFps, startFrame)
-        if smallestFrame < wantedSmallestFrame:
-            wantedSmallestFrame = smallestFrame
-        if largestFrame > wantedLargestFrame:
-            wantedLargestFrame = largestFrame
+        wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+        wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     # Set the animation segment
+    if wantedSmallestFrame == OpenMaya.MTime(sys.maxsize, wantedFps):
+        wantedSmallestFrame = OpenMaya.MTime(0, wantedFps)
+
     sceneAnimationController.setAnimationStartEndTime(
         wantedSmallestFrame, wantedLargestFrame)
     sceneAnimationController.setMinMaxTime(

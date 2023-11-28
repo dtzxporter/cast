@@ -702,13 +702,11 @@ def importAnimationNode(self, node, path):
 
     # Set the animation segment
     if wantedSmallestFrame == sys.maxsize:
-        scene.frame_start = 0
-        scene.frame_end = wantedLargestFrame
-        scene.frame_current = 0
-    else:
-        scene.frame_start = wantedSmallestFrame
-        scene.frame_end = wantedLargestFrame
-        scene.frame_current = wantedSmallestFrame
+        wantedSmallestFrame = 0
+
+    scene.frame_start = wantedSmallestFrame
+    scene.frame_end = wantedLargestFrame
+    scene.frame_current = wantedSmallestFrame
 
     bpy.context.evaluated_depsgraph_get().update()
     bpy.ops.object.mode_set(mode='POSE')
