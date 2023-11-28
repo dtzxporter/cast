@@ -1,7 +1,8 @@
 import bpy
 import os
 import array
-import math
+import sys
+
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
 from .cast import Cast, CastColor, Model, Animation, File
@@ -16,6 +17,15 @@ def utilityBuildPath(root, asset):
 
     root = os.path.dirname(root)
     return os.path.join(root, asset)
+
+
+def utilityStashCurveComponent(component, curve, name, index):
+    if name in component:
+        component[name][index] = curve
+    else:
+        value = [None] * 3
+        value[index] = curve
+        component[name] = value
 
 
 def utilityAssignBSDFMaterialSlots(material, slots, path):
@@ -96,100 +106,6 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
     return fcurves.find(data_path="pose.bones[\"%s\"].%s" %
                         (bone.name, curve[0]), index=curve[1]) or fcurves.new(data_path="pose.bones[\"%s\"].%s" %
                                                                               (bone.name, curve[0]), index=curve[1], action_group=bone.name)
-
-
-def utilityImportQuatTrackData(tracks, poseBones, name, property, frameStart, frameBuffer, valueBuffer, mode):
-    smallestFrame = 0
-    largestFrame = 0
-
-    if not name in poseBones:
-        return (smallestFrame, largestFrame)
-
-    bone = poseBones[name]
-
-    if mode == "absolute" or mode == "relative" or mode is None:
-        for i in range(0, len(valueBuffer), 4):
-            frame = frameBuffer[int(i / 4)] + frameStart
-
-            bone.matrix_basis.identity()
-
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-
-            # We have to convert the keyframe value to the delta of the rest position,
-            # blender keyframes apply over the rest position in the scene.
-            frameRotationMatrix = Quaternion(
-                (valueBuffer[i + 3], valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2])).to_matrix().to_3x3()
-
-            if bone.parent is None:
-                mat = frameRotationMatrix.to_4x4()
-            else:
-                mat = (bone.parent.matrix.to_3x3() @
-                       frameRotationMatrix).to_4x4()
-
-            bone.matrix = mat
-
-            if tracks[0] is not None:
-                tracks[0].keyframe_points.insert(frame,
-                                                 value=bone.rotation_quaternion.x, options={'FAST'})
-            if tracks[1] is not None:
-                tracks[1].keyframe_points.insert(frame,
-                                                 value=bone.rotation_quaternion.y, options={'FAST'})
-            if tracks[2] is not None:
-                tracks[2].keyframe_points.insert(frame,
-                                                 value=bone.rotation_quaternion.z, options={'FAST'})
-            if tracks[3] is not None:
-                tracks[3].keyframe_points.insert(frame,
-                                                 value=bone.rotation_quaternion.w, options={'FAST'})
-    else:
-        # I need to get some samples of these before attempting this again.
-        raise Exception(
-            "Additive animations are currently not supported in blender.")
-
-    # Reset temporary matrices used to calculate the keyframe rotations.
-    bone.matrix_basis.identity()
-
-    for track in tracks:
-        track.update()
-
-    return (smallestFrame, largestFrame)
-
-
-def utilityImportSingleTrackData(tracks, poseBones, name, property, frameStart, frameBuffer, valueBuffer, mode):
-    smallestFrame = 0
-    largestFrame = 0
-
-    if tracks[0] is None:
-        return (smallestFrame, largestFrame)
-
-    if not name in poseBones:
-        return (smallestFrame, largestFrame)
-
-    bone = poseBones[name]
-
-    # Scale isn't based on the scene value, it's per-bone and defaults to 1.0.
-    if property in ["sx", "sy", "sz"]:
-        for i, x in enumerate(frameBuffer):
-            frame = x + frameStart
-
-            if frame < smallestFrame:
-                smallestFrame = frame
-            if frame > largestFrame:
-                largestFrame = frame
-
-            tracks[0].keyframe_points.insert(
-                frame, value=valueBuffer[i], options={'FAST'})
-    else:
-        raise Exception("Unsupported curve property: %s" % (property))
-
-    # Reset temporary matrices used to calculate the keyframes.
-    bone.matrix_basis.identity()
-
-    tracks[0].update()
-
-    return (smallestFrame, largestFrame)
 
 
 def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
@@ -490,54 +406,120 @@ def importModelNode(self, model, path):
         collection)
 
 
-def importBasicCurveNode(node, fcurves, poseBones, path, startFrame):
-    propertySwitcher = {
-        "rq": [("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3), ("rotation_quaternion", 0)],
-        "sx": [("scale", 0)],
-        "sy": [("scale", 1)],
-        "sz": [("scale", 2)],
-    }
-    trackSwitcher = {
-        "rq": utilityImportQuatTrackData,
-        "sx": utilityImportSingleTrackData,
-        "sy": utilityImportSingleTrackData,
-        "sz": utilityImportSingleTrackData,
-    }
-
-    nodeName = node.NodeName()
-    propertyName = node.KeyPropertyName()
-
-    if not propertyName in propertySwitcher:
-        return (0, 0)
-
-    keyFrameBuffer = node.KeyFrameBuffer()
-    keyValueBuffer = node.KeyValueBuffer()
-
-    tracks = [utilityGetOrCreateCurve(
-        fcurves, poseBones, nodeName, x) for x in propertySwitcher[propertyName]]
-
-    return trackSwitcher[propertyName](tracks, poseBones, nodeName, propertyName, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode())
-
-
-def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
-    smallestFrame = 0
+def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
+    smallestFrame = sys.maxsize
     largestFrame = 0
 
     if not nodeName in poseBones:
         return (smallestFrame, largestFrame)
 
+    bone = poseBones[nodeName]
+    mode = node.Mode()
+
+    tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
+        ("rotation_quaternion", 0), ("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3)]]
+
+    keyFrameBuffer = node.KeyFrameBuffer()
+    keyValueBuffer = node.KeyValueBuffer()
+
+    # Rotation keyframes in blender are independent from other data.
+    for i in range(0, len(keyValueBuffer), 4):
+        rotation = Quaternion(
+            (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2])).to_matrix().to_3x3()
+
+        frame = keyFrameBuffer[int(i / 4)] + startFrame
+
+        smallestFrame = min(frame, smallestFrame)
+        largestFrame = max(frame, largestFrame)
+
+        if mode == "absolute" or bone.parent is not None:
+            bone.matrix_basis.identity()
+            bone.matrix = (bone.parent.matrix.to_3x3() @ rotation).to_4x4()
+
+            for axis, track in enumerate(tracks):
+                track.keyframe_points.insert(
+                    frame, value=bone.rotation_quaternion[axis], options={'FAST'})
+        elif mode == "relative" or bone.parent is None:
+            for axis, track in enumerate(tracks):
+                track.keyframe_points.insert(
+                    frame, value=rotation[axis], options={'FAST'})
+        else:
+            # I need to get some samples of these before attempting this again.
+            raise Exception(
+                "Additive animations are currently not supported in blender.")
+
+    # Reset temporary matrices used to calculate the keyframe locations.
+    bone.matrix_basis.identity()
+
+    for track in tracks:
+        track.update()
+
+    return (smallestFrame, largestFrame)
+
+
+def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
+    smallestFrame = sys.maxsize
+    largestFrame = 0
+
+    if not nodeName in poseBones:
+        return (smallestFrame, largestFrame)
+
+    bone = poseBones[nodeName]
+
+    tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
+        ("scale", 0), ("scale", 1), ("scale", 2)]]
+
+    # Scale keyframes are independant from other data.
+    for axis, node in enumerate(nodes):
+        if node is None:
+            continue
+
+        keyFrameBuffer = node.KeyFrameBuffer()
+        keyValueBuffer = node.KeyValueBuffer()
+
+        mode = node.Mode()
+
+        for i, frame in enumerate(keyFrameBuffer):
+            if mode == "absolute" or mode is None:
+                tracks[axis].keyframe_points.insert(
+                    frame, value=keyValueBuffer[i], options={'FAST'})
+            elif mode == "relative":
+                tracks[axis].keyframe_points.insert(
+                    frame, value=bone.scale[axis] + keyValueBuffer[i], options={'FAST'})
+            else:
+                # I need to get some samples of these before attempting this again.
+                raise Exception(
+                    "Additive animations are currently not supported in blender.")
+
+    # Reset temporary matrices used to calculate the keyframe locations.
+    bone.matrix_basis.identity()
+
+    for track in tracks:
+        track.update()
+
+    return (smallestFrame, largestFrame)
+
+
+def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
+    smallestFrame = sys.maxsize
+    largestFrame = 0
+
+    if not nodeName in poseBones:
+        return (smallestFrame, largestFrame)
+
+    bone = poseBones[nodeName]
     mode = None
 
     for node in nodes:
         if node is not None:
             mode = node.Mode()
 
-    bone = poseBones[nodeName]
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("location", 0), ("location", 1), ("location", 2)]]
 
     lastFrame = 0
 
+    # Location keyframes in blender are post-rotation, and as such, require all components in order to animate properly.
     for axis, node in enumerate(nodes):
         if node is None:
             if bone.parent is None:
@@ -573,10 +555,8 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
 
         frame = frame + startFrame
 
-        if frame < smallestFrame:
-            smallestFrame = frame
-        if frame > largestFrame:
-            largestFrame = frame
+        smallestFrame = min(frame, smallestFrame)
+        largestFrame = max(frame, largestFrame)
 
         if mode == "absolute" or mode is None:
             if bone.parent is not None:
@@ -604,7 +584,7 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
 
 
 def importNotificationTrackNode(node, action, frameStart):
-    smallestFrame = 0
+    smallestFrame = sys.maxsize
     largestFrame = 0
 
     frameBuffer = node.KeyFrameBuffer()
@@ -615,10 +595,8 @@ def importNotificationTrackNode(node, action, frameStart):
         notetrack = action.pose_markers.new(node.Name())
         notetrack.frame = frame
 
-        if frame < smallestFrame:
-            smallestFrame = frame
-        if frame > largestFrame:
-            largestFrame = frame
+        smallestFrame = min(frame, smallestFrame)
+        largestFrame = max(frame, largestFrame)
 
     return (smallestFrame, largestFrame)
 
@@ -660,7 +638,7 @@ def importAnimationNode(self, node, path):
     # We need to determine the proper time to import the curves, for example
     # the user may want to import at the current scene time, and that would require
     # fetching once here, then passing to the curve importer.
-    wantedSmallestFrame = 0
+    wantedSmallestFrame = sys.maxsize
     wantedLargestFrame = 1
 
     if self.import_time:
@@ -678,57 +656,59 @@ def importAnimationNode(self, node, path):
             if x.NodeName().lower() == bone.name.lower():
                 poseBones[x.NodeName()] = bone
 
-    # Create a list of the separate location curves..
+    # Create a list of the separate location and scale curves because their curves are separate.
     locCurves = {}
+    scaleCurves = {}
 
     for x in curves:
         nodeName = x.NodeName()
         property = x.KeyPropertyName()
 
-        if property == "tx":
-            if nodeName in locCurves:
-                locCurves[nodeName][0] = x
-            else:
-                locCurves[nodeName] = [x, None, None]
-        if property == "ty":
-            if nodeName in locCurves:
-                locCurves[nodeName][1] = x
-            else:
-                locCurves[nodeName] = [None, x, None]
-        if property == "tz":
-            if nodeName in locCurves:
-                locCurves[nodeName][2] = x
-            else:
-                locCurves[nodeName] = [None, None, x]
-
-    for x in curves:
-        (smallestFrame, largestFrame) = importBasicCurveNode(
-            x, action.fcurves, poseBones, path, startFrame)
-        if smallestFrame < wantedSmallestFrame:
-            wantedSmallestFrame = smallestFrame
-        if largestFrame > wantedLargestFrame:
-            wantedLargestFrame = largestFrame
+        if property == "rq":
+            (smallestFrame, largestFrame) = importRotCurveNode(
+                x, nodeName, action.fcurves, poseBones, path, startFrame)
+            wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+            wantedLargestFrame = max(largestFrame, wantedLargestFrame)
+        elif property == "tx":
+            utilityStashCurveComponent(locCurves, x, nodeName, 0)
+        elif property == "ty":
+            utilityStashCurveComponent(locCurves, x, nodeName, 1)
+        elif property == "tz":
+            utilityStashCurveComponent(locCurves, x, nodeName, 2)
+        elif property == "sx":
+            utilityStashCurveComponent(scaleCurves, x, nodeName, 0)
+        elif property == "sy":
+            utilityStashCurveComponent(scaleCurves, x, nodeName, 1)
+        elif property == "sz":
+            utilityStashCurveComponent(scaleCurves, x, nodeName, 2)
 
     for nodeName, x in locCurves.items():
         (smallestFrame, largestFrame) = importLocCurveNodes(
             x, nodeName, action.fcurves, poseBones, path, startFrame)
-        if smallestFrame < wantedSmallestFrame:
-            wantedSmallestFrame = smallestFrame
-        if largestFrame > wantedLargestFrame:
-            wantedLargestFrame = largestFrame
+        wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+        wantedLargestFrame = max(largestFrame, wantedLargestFrame)
+
+    for nodeName, x in scaleCurves.items():
+        (smallestFrame,  largestFrame) = importScaleCurveNodes(
+            x, nodeName, action.fcurves, poseBones, path, startFrame)
+        wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+        wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     for x in node.Notifications():
         (smallestFrame, largestFrame) = importNotificationTrackNode(
             x, action, startFrame)
-        if smallestFrame < wantedSmallestFrame:
-            wantedSmallestFrame = smallestFrame
-        if largestFrame > wantedLargestFrame:
-            wantedLargestFrame = largestFrame
+        wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+        wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     # Set the animation segment
-    scene.frame_start = wantedSmallestFrame
-    scene.frame_end = wantedLargestFrame
-    scene.frame_current = wantedSmallestFrame
+    if wantedSmallestFrame == sys.maxsize:
+        scene.frame_start = 0
+        scene.frame_end = wantedLargestFrame
+        scene.frame_current = 0
+    else:
+        scene.frame_start = wantedSmallestFrame
+        scene.frame_end = wantedLargestFrame
+        scene.frame_current = wantedSmallestFrame
 
     bpy.context.evaluated_depsgraph_get().update()
     bpy.ops.object.mode_set(mode='POSE')
