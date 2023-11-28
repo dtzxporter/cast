@@ -761,6 +761,17 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
   - `additive`: The keyframe is added to the current scene frame value of the nodes property.
   - `absolute`: The keyframe is the exact value for the given frame.
   - `relative`: The keyframe is added to the rest position value of the nodes property.
+- The property values correspond to:
+  - `rq` Rotation Quaternion and expects `v4` values.
+  - `tx` Translation 'X' and expects `f` values.
+  - `ty` Translation 'Y' and expects `f` values.
+  - `tz` Translation 'Z' and expects `f` values.
+  - `sx` Scale 'X' and expects `f` values.
+  - `sy` Scale 'Y' and expects `f` values.
+  - `sz` Scale 'Z' and expects `f` values.
+  - `vb` Visibility and expects `b`, `h`, or `i` values.
+    - `=0` = hidden.
+    - `>=1` = visible.
 
 ### NotificationTrack:
 <table>
