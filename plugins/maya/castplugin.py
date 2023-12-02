@@ -32,7 +32,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.25"
+version = "1.26"
 
 
 def utilityAbout():
@@ -1171,9 +1171,18 @@ def importModelNode(model, path):
                     weightedValueBuffer[0] = 1.0
                 else:
                     clusterAttrPayload = clusterAttrBase % i + clusterAttrArray
+                    weightsConfigured = []
                     for j in xrange(maximumInfluence):
-                        weightedValueBuffer[weightedRemap[weightBoneBuffer[j + (
-                            i * maximumInfluence)]]] = weightValueBuffer[j + (i * maximumInfluence)]
+                        weightIndex = j + (i * maximumInfluence)
+                        weightBone = weightBoneBuffer[weightIndex]
+                        weightValue = weightValueBuffer[weightIndex]
+
+                        if weightBone in weightsConfigured:
+                            continue
+                        elif weightValue > 0.0:
+                            weightedValueBuffer[weightedRemap[weightBone]
+                                                ] = weightValue
+                            weightsConfigured.append(weightBone)
 
                 cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
                 weightedValueBuffer = [0.0] * (weightedBonesCount)
