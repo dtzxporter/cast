@@ -567,7 +567,7 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
 
     loader[mayaShaderType](materialInstance, slots, path)
 
-    return (materialInstance)
+    return materialInstance
 
 
 def utilityGetTrackEndTime(track):
@@ -975,11 +975,11 @@ def importSkeletonNode(skeleton):
 
 def importMaterialNode(path, material):
     # If you already created the material, ignore this
-    if cmds.objExists(material.Name()):
+    if cmds.objExists("%sSG" % material.Name()):
         return material.Name()
 
     # Create the material and assign slots
-    (materialNew) = utilityCreateMaterial(
+    materialNew = utilityCreateMaterial(
         material.Name(), material.Type(), material.Slots(), path)
 
     # Create the shader group that connects to a surface
@@ -990,13 +990,14 @@ def importMaterialNode(path, material):
     cmds.connectAttr(("%s.outColor" % materialNew),
                      ("%s.surfaceShader" % materialGroup), force=True)
 
-    return material.Name()
+    return materialNew
 
 
 def importModelNode(model, path):
     # Import skeleton for binds, materials for meshes
     (handles, paths, indexes, jointTransform) = importSkeletonNode(model.Skeleton())
-    _materials = [importMaterialNode(path, x) for x in model.Materials()]
+    materials = {x.Name(): importMaterialNode(path, x)
+                 for x in model.Materials()}
 
     # Import the meshes
     meshTransform = OpenMaya.MFnTransform()
@@ -1110,7 +1111,7 @@ def importModelNode(model, path):
         try:
             if meshMaterial is not None:
                 cmds.sets(newMesh.fullPathName(), forceElement=(
-                    "%sSG" % meshMaterial.Name()))
+                    "%sSG" % materials[meshMaterial.Name()]))
             else:
                 cmds.sets(newMesh.fullPathName(),
                           forceElement="initialShadingGroup")
