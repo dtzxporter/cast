@@ -1172,18 +1172,14 @@ def importModelNode(model, path):
                     weightedValueBuffer[0] = 1.0
                 else:
                     clusterAttrPayload = clusterAttrBase % i + clusterAttrArray
-                    weightsConfigured = []
+
                     for j in xrange(maximumInfluence):
                         weightIndex = j + (i * maximumInfluence)
                         weightBone = weightBoneBuffer[weightIndex]
                         weightValue = weightValueBuffer[weightIndex]
 
-                        if weightBone in weightsConfigured:
-                            continue
-                        elif weightValue > 0.0:
-                            weightedValueBuffer[weightedRemap[weightBone]
-                                                ] = weightValue
-                            weightsConfigured.append(weightBone)
+                        weightedValueBuffer[weightedRemap[weightBone]
+                                            ] += weightValue
 
                 cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
                 weightedValueBuffer = [0.0] * (weightedBonesCount)
