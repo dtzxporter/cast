@@ -9,7 +9,7 @@ from .cast import Cast, CastColor, Model, Animation, File
 
 PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
 SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
-
+BLENDER_VERSION = bpy.app.version
 
 def utilityBuildPath(root, asset):
     if os.path.isabs(asset):
@@ -36,12 +36,12 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
-            "specular": "Specular",
+            "specular": "Specular IOR Level" if BLENDER_VERSION[0] >= 4 else "Specular",
             "metal": "Metallic",
             "roughness": "Roughness",
             "gloss": "Roughness",
             "normal": "Normal",
-            "emissive": "Emission"
+            "emissive": "Emission Color" if BLENDER_VERSION[0] >= 4 else "Emission",
         }
     else:
         # We need to create the specular node, removing principled first
