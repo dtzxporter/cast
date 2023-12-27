@@ -11,6 +11,7 @@ PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
 SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
 BLENDER_VERSION = bpy.app.version
 
+
 def utilityBuildPath(root, asset):
     if os.path.isabs(asset):
         return asset
@@ -346,11 +347,9 @@ def importModelNode(self, model, path):
                 for x in range(len(newMesh.vertices)):
                     for j in range(maximumInfluence):
                         index = j + (x * maximumInfluence)
-                        value = weightValueBuffer[index]
 
-                        if value > 0.0:
-                            boneGroups[weightBoneBuffer[index]].add(
-                                (x,), value, "REPLACE")
+                        boneGroups[weightBoneBuffer[index]].add(
+                            (x,), weightValueBuffer[index], "ADD")
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(len(newMesh.vertices)):
