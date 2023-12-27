@@ -431,7 +431,7 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
 
-        if mode == "absolute" or bone.parent is not None:
+        if mode == "absolute" and bone.parent is not None:
             bone.matrix_basis.identity()
             bone.matrix = (bone.parent.matrix.to_3x3() @ rotation).to_4x4()
 
@@ -439,6 +439,8 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
                 track.keyframe_points.insert(
                     frame, value=bone.rotation_quaternion[axis], options={'FAST'})
         elif mode == "relative" or bone.parent is None:
+            rotation = rotation.to_quaternion()
+
             for axis, track in enumerate(tracks):
                 track.keyframe_points.insert(
                     frame, value=rotation[axis], options={'FAST'})
