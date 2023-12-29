@@ -66,6 +66,7 @@ enum class CastId : uint32_t
 	Skeleton = 0x6C656B73,
 	Bone = 0x656E6F62,
 	IKHandle = 0x64686B69,
+	Constraint = 0x74736E63,
 	Animation = 0x6D696E61,
 	Curve = 0x76727563,
 	NotificationTrack = 0x6669746E,
@@ -334,7 +335,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>Bone</td>
+   		<td>Bone, IKHandle, Constraint</td>
 		<td>True</td>
 		<td>False</td>
  	</tr>
@@ -456,43 +457,43 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<th>IsArray</th>
 		<th>Required</th>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Name (n)</td>
    		<td>String (s)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Start Bone Hash (sb)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>End Bone Hash (eb)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Target Bone Hash (tb)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Pole Vector Bone Hash (pv)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
-	  <tr>
+	<tr>
   		<td>Pole Bone Hash (pb)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Use Target Rotation (tr)</td>
    		<td>Byte (b) [True, False]</td>
 		<td>False</td>
@@ -503,6 +504,66 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 **Notes**:
 - `Use Target Rotation` should default to `False` when not specified.
 - `Pole Bone` must only effect the twist of the chain, in general you either have a `Pole Bone` or a `Pole Vector Bone`.
+
+### Constraint:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Skeleton</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	<tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Constraint Type (ct)</td>
+   		<td>String (s) [pt, or, sc]</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Constraint Bone Hash (cb)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Target Bone Hash (tb)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+**Notes**:
+- The constraint type values correspond to:
+  - `pt` Point Constraint, which applies to translations.
+  - `or` Orient Constraint, which applies to rotations.
+  - `sc` Scale Constraint, which applies to scales.
 
 ### Material:
 <table>
