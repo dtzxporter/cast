@@ -713,6 +713,14 @@ class Skeleton(CastNode):
         """Creates a new ik handle in this skeleton."""
         return self.CreateChild(IKHandle())
 
+    def Constraints(self):
+        """The collection of constraints in this skeleton."""
+        return self.ChildrenOfType(Constraint)
+
+    def CreateConstraint(self):
+        """Creates a new constraint in this skeleton."""
+        return self.CreateChild(Constraint())
+
 
 class Bone(CastNode):
     """A 3d bone that belongs to a skeleton."""
@@ -906,6 +914,57 @@ class IKHandle(CastNode):
             self.CreateProperty("tr", "b").values = [0]
 
 
+class Constraint(CastNode):
+    """Defines a bone constraint in a skeleton."""
+
+    def __init__(self):
+        super(Constraint, self).__init__(0x74736E63)
+
+    def Name(self):
+        """The name of this constraint."""
+        name = self.properties.get("n")
+        if name is not None:
+            return name.values[0]
+        return None
+
+    def SetName(self, name):
+        """Sets the name for this constraint."""
+        self.CreateProperty("n", "s").values = [name]
+
+    def ConstraintType(self):
+        """The type of constraint to configure."""
+        ct = self.properties.get("ct")
+        if ct is not None:
+            return ct.values[0]
+        return None
+
+    def SetConstraintType(self, type):
+        """Sets the type of constraint to configure."""
+        self.CreateProperty("ct", "s").values = [type]
+
+    def ConstraintBone(self):
+        """The bone that is being constrained."""
+        cb = self.properties.get("cb")
+        if cb is not None:
+            return self.parentNode.ChildByHash(cb.values[0])
+        return None
+
+    def SetConstraintBone(self, hash):
+        """Sets the bone that is being constrained."""
+        self.CreateProperty("cb", "l").values = [hash]
+
+    def TargetBone(self):
+        """The bone that is the target for the constraint."""
+        tb = self.properties.get("tb")
+        if tb is not None:
+            return self.parentNode.ChildByHash(tb.values[0])
+        return None
+
+    def SetTargetBone(self, hash):
+        """Sets the bone that is the target for the constraint."""
+        self.CreateProperty("tb", "l").values = [hash]
+
+
 class Material(CastNode):
     """Material contains a collection of slot:file mappings."""
 
@@ -996,6 +1055,7 @@ typeSwitcher = {
     0x6669746E: NotificationTrack,
     0x656E6F62: Bone,
     0x64686B69: IKHandle,
+    0x74736E63: Constraint,
     0x6C74616D: Material,
     0x656C6966: File,
 }

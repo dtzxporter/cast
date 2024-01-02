@@ -27,12 +27,13 @@ sceneSettings = {
     "importSkin": True,
     "importReset": False,
     "importIK": True,
+    "importConstraints": True,
     "exportAnim": True,
     "exportModel": True,
 }
 
 # Shared version number
-version = "1.30"
+version = "1.31"
 
 
 def utilityAbout():
@@ -367,6 +368,9 @@ def utilityCreateMenu():
 
     cmds.menuItem("importIK", label="Import IK Handles", annotation="Imports and configures ik handles for the models skeleton",
                   checkBox=utilityQueryToggleItem("importIK"), command=lambda x: utilitySetToggleItem("importIK"))
+
+    cmds.menuItem("importConstraints", label="Import Constraints", annotation="Imports and configures constraints for the models skeleton",
+                  checkBox=utilityQueryToggleItem("importConstraints"), command=lambda x: utilitySetToggleItem("importConstraints"))
 
     cmds.menuItem(divider=True)
 
@@ -832,6 +836,24 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     return (smallestFrame, largestFrame)
 
 
+def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransform):
+    if skeleton is None:
+        return
+
+    for constraint in skeleton.Constraints():
+        targetBone = paths[indexes[constraint.TargetBone().Hash()]]
+        constraintBone = paths[indexes[constraint.ConstraintBone().Hash()]]
+
+        type = constraint.ConstraintType()
+
+        if type == "pt":
+            cmds.pointConstraint(targetBone, constraintBone)
+        elif type == "or":
+            cmds.orientConstraint(targetBone, constraintBone)
+        elif type == "sc":
+            cmds.scaleConstraint(targetBone, constraintBone)
+
+
 def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
     if skeleton is None:
         return
@@ -1230,6 +1252,11 @@ def importModelNode(model, path):
     if sceneSettings["importIK"]:
         importSkeletonIKNode(model.Skeleton(), handles,
                              paths, indexes, jointTransform)
+
+    # Import any additional constraints.
+    if sceneSettings["importConstraints"]:
+        importSkeletonConstraintNode(
+            model.Skeleton(), handles, paths, indexes, jointTransform)
 
 
 def importCurveNode(node, path, timeUnit, startFrame):
