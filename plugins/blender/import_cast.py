@@ -109,6 +109,16 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
                                                                               (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
+def utilityGetBindposeScale(poseBone):
+    bindPoseScale = Matrix.LocRotScale(None, None, Vector((1.0, 1.0, 1.0)))
+
+    if poseBone is not None:
+        bindPoseScale = bindPoseScale @ Matrix.LocRotScale(None, None, Vector(
+            getattr(poseBone, "cast_bind_pose_scale", (1.0, 1.0, 1.0))))
+
+    return bindPoseScale
+
+
 def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
     if skeleton is None:
         return
@@ -215,6 +225,7 @@ def importSkeletonNode(name, skeleton, collection):
     handles = [None] * len(bones)
     poses = {}
     matrices = {}
+    scales = {}
 
     for i, bone in enumerate(bones):
         newBone = armature.edit_bones.new(bone.Name())
@@ -226,13 +237,11 @@ def importSkeletonNode(name, skeleton, collection):
 
         translation = Vector(bone.LocalPosition())
 
-        if bone.Scale() is not None:
-            scale = Vector(bone.Scale())
-        else:
-            scale = None
+        scale = Vector(bone.Scale() or (1.0, 1.0, 1.0))
 
         matrices[newBone.name] = Matrix.LocRotScale(
-            translation, rotation, scale)
+            translation, rotation, None)
+        scales[newBone.name] = scale
         handles[i] = newBone
 
     for i, bone in enumerate(bones):
@@ -243,12 +252,10 @@ def importSkeletonNode(name, skeleton, collection):
     bpy.ops.object.mode_set(mode='POSE')
 
     for bone in skeletonObj.pose.bones:
-        matrix = matrices[bone.name]
-
-        bone.cast_bind_pose_scale = matrix.to_scale()
+        bone.cast_bind_pose_scale = scales[bone.name]
 
         bone.matrix_basis.identity()
-        bone.matrix = matrix
+        bone.matrix = matrices[bone.name]
 
         poses[bone.name] = bone
 
@@ -516,9 +523,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
 
     # This works around the issue where EditBone.matrix destroys the scale which means that
     # a model which has an non-1.0 scale when the bind pose is applied will not scale correctly.
-    bindPoseScale = getattr(bone, "cast_bind_pose_scale", (1.0, 1.0, 1.0))
-    bindPoseInvMatrix = Matrix.LocRotScale(
-        None, None, bindPoseScale).inverted()
+    bindPoseInvMatrix = utilityGetBindposeScale(bone).inverted()
 
     # Scale keyframes are independant from other data.
     for axis, node in enumerate(nodes):
