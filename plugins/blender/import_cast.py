@@ -131,19 +131,23 @@ def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
 
         if type == "pt":
             ct = constraintBone.constraints.new("COPY_LOCATION")
+            ct.use_offset = constraint.MaintainOffset()
         elif type == "or":
             ct = constraintBone.constraints.new("COPY_ROTATION")
+            if constraint.MaintainOffset():
+                ct.mix_mode = 'ADD'
         elif type == "sc":
             ct = constraintBone.constraints.new("COPY_SCALE")
+            ct.use_offset = constraint.MaintainOffset()
         else:
             continue
 
         if constraint.Name() is not None:
             ct.name = constraint.Name()
 
-        ct.use_x = True
-        ct.use_y = True
-        ct.use_z = True
+        ct.use_x = not constraint.SkipX()
+        ct.use_y = not constraint.SkipY()
+        ct.use_z = not constraint.SkipZ()
 
         ct.target = targetBone.id_data
         ct.subtarget = targetBone.name

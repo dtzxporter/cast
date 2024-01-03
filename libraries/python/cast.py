@@ -353,7 +353,7 @@ class Animation(CastNode):
         """Whether or not this animation should loop."""
         lo = self.properties.get("lo")
         if lo is not None:
-            return lo.values[0] == 1
+            return lo.values[0] >= 1
         return False
 
     def SetLooping(self, enabled):
@@ -761,7 +761,7 @@ class Bone(CastNode):
         """Whether or not children bones are effected by the scale of this bone."""
         ssc = self.properties.get("ssc")
         if ssc is not None:
-            return ssc.values[0] == 1
+            return ssc.values[0] >= 1
         return None
 
     def SetSegmentScaleCompensate(self, enabled):
@@ -903,7 +903,7 @@ class IKHandle(CastNode):
         """Whether or not the target rotation effects the chain."""
         tr = self.properties.get("tr")
         if tr is not None:
-            return tr.values[0] == 1
+            return tr.values[0] >= 1
         return False
 
     def SetUseTargetRotation(self, enabled):
@@ -963,6 +963,63 @@ class Constraint(CastNode):
     def SetTargetBone(self, hash):
         """Sets the bone that is the target for the constraint."""
         self.CreateProperty("tb", "l").values = [hash]
+
+    def MaintainOffset(self):
+        """Whether or not the original offset is maintained."""
+        mo = self.properties.get("mo")
+        if mo is not None:
+            return mo.values[0] >= 1
+        return False
+
+    def SetMaintainOffset(self, enabled):
+        """Sets whether or not the original offset is maintained."""
+        if enabled:
+            self.CreateProperty("mo", "b").values = [1]
+        else:
+            self.CreateProperty("mo", "b").values = [0]
+
+    def SkipX(self):
+        """Whether or not to skip the x axis when constraining."""
+        sx = self.properties.get("sx")
+        if sx is not None:
+            return sx.values[0] >= 1
+        return False
+    
+    def SetSkipX(self, enabled):
+        """Sets whether or not to skip the x axis when constraining."""
+        if enabled:
+            self.CreateProperty("sx", "b").values = [1]
+        else:
+            self.CreateProperty("sx", "b").values = [0]
+
+    def SkipY(self):
+        """Whether or not to skip the y axis when constraining."""
+        sy = self.properties.get("sy")
+        if sy is not None:
+            return sy.values[0] >= 1
+        return False
+    
+    def SetSkipY(self, enabled):
+        """Sets whether or not to skip the y axis when constraining."""
+        if enabled:
+            self.CreateProperty("sy", "b").values = [1]
+        else:
+            self.CreateProperty("sy", "b").values = [0]
+
+
+    def SkipZ(self):
+        """Whether or not to skip the z axis when constraining."""
+        sz = self.properties.get("sz")
+        if sz is not None:
+            return sz.values[0] >= 1
+        return False
+    
+    def SetSkipZ(self, enabled):
+        """Sets whether or not to skip the z axis when constraining."""
+        if enabled:
+            self.CreateProperty("sz", "b").values = [1]
+        else:
+            self.CreateProperty("sz", "b").values = [0]
 
 
 class Material(CastNode):

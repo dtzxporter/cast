@@ -557,6 +557,30 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<td>False</td>
 		<td>True</td>
  	</tr>
+	<tr>
+  		<td>Maintain Offset (mo)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Skip X (sx)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Skip Y (sy)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Skip Z (sz)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
 </table>
 
 **Notes**:
@@ -564,6 +588,8 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
   - `pt` Point Constraint, which applies to translations.
   - `or` Orient Constraint, which applies to rotations.
   - `sc` Scale Constraint, which applies to scales.
+- Maintain offset should default to `False` when not specified.
+- Skip X, Skip Y, and Skip Z should default to `False` when not specified and refer to ignoring that axis in the constraint.
 
 ### Material:
 <table>
