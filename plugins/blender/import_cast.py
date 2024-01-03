@@ -476,7 +476,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
         ("scale", 0), ("scale", 1), ("scale", 2)]]
 
     # This works around the issue where EditBone.matrix destroys the scale which means that
-    # A model which has an non-1.0 scale when the bind pose is applied.
+    # a model which has an non-1.0 scale when the bind pose is applied will not scale correctly.
     bindPoseScale = getattr(bone, "cast_bind_pose_scale", (1.0, 1.0, 1.0))
     bindPoseInvMatrix = Matrix.LocRotScale(
         None, None, bindPoseScale).inverted()
