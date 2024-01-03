@@ -428,7 +428,7 @@ namespace Cast
         {
             if (Properties.TryGetValue("ssc", out CastProperty Value))
             {
-                return (int)Value.Values[0] == 1;
+                return (uint)Value.Values[0] >= 1;
             }
 
             return true;
@@ -607,7 +607,7 @@ namespace Cast
         {
             if (Properties.TryGetValue("tr", out CastProperty Value))
             {
-                return (uint)Value.Values[0] == 1;
+                return (uint)Value.Values[0] >= 1;
             }
 
             return false;
@@ -1016,7 +1016,7 @@ namespace Cast
         {
             if (Properties.TryGetValue("lo", out CastProperty Value))
             {
-                return (bool)Value.Values[0];
+                return (uint)Value.Values[0] >= 1;
             }
 
             return false;
