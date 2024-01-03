@@ -109,6 +109,36 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
                                                                               (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
+def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
+    if skeleton is None:
+        return
+
+    for constraint in skeleton.Constraints():
+        constraintBone = poses[constraint.ConstraintBone().Name()]
+        targetBone = poses[constraint.TargetBone().Name()]
+
+        type = constraint.ConstraintType()
+
+        if type == "pt":
+            ct = constraintBone.constraints.new("COPY_LOCATION")
+        elif type == "or":
+            ct = constraintBone.constraints.new("COPY_ROTATION")
+        elif type == "sc":
+            ct = constraintBone.constraints.new("COPY_SCALE")
+        else:
+            continue
+
+        if constraint.Name() is not None:
+            ct.name = constraint.Name()
+
+        ct.use_x = True
+        ct.use_y = True
+        ct.use_z = True
+
+        ct.target = targetBone.id_data
+        ct.subtarget = targetBone.name
+
+
 def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
     if skeleton is None:
         return
@@ -404,6 +434,11 @@ def importModelNode(self, model, path):
     # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
     if self.import_ik:
         importSkeletonIKNode(self, model.Skeleton(), skeletonObj, poses)
+
+    # Import any constraints after ik.
+    if self.import_constraints:
+        importSkeletonConstraintNode(
+            self, model.Skeleton(), skeletonObj, poses)
 
     # Relink the collection after the mesh is built
     bpy.context.view_layer.active_layer_collection.collection.children.link(

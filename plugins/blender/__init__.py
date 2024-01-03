@@ -44,11 +44,15 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     import_ik: BoolProperty(
         name="Import IK Handles", description="Imports and configures ik handles for the models skeleton", default=True)
 
+    import_constraints: BoolProperty(
+        name="Import Constraints", description="Imports and configures constraints for the models skeleton", default=True)
+
     def draw(self, context):
         self.layout.prop(self, "import_time")
         self.layout.prop(self, "import_reset")
         self.layout.prop(self, "import_skin")
         self.layout.prop(self, "import_ik")
+        self.layout.prop(self, "import_constraints")
 
     def execute(self, context):
         from . import import_cast
