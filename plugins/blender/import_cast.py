@@ -201,7 +201,7 @@ def importSkeletonNode(name, skeleton, collection):
         else:
             scale = None
 
-        matrices[bone.Name()] = Matrix.LocRotScale(
+        matrices[newBone.name] = Matrix.LocRotScale(
             translation, rotation, scale)
         handles[i] = newBone
 
@@ -213,8 +213,13 @@ def importSkeletonNode(name, skeleton, collection):
     bpy.ops.object.mode_set(mode='POSE')
 
     for bone in skeletonObj.pose.bones:
+        matrix = matrices[bone.name]
+
+        bone.cast_bind_pose_scale = matrix.to_scale()
+
         bone.matrix_basis.identity()
-        bone.matrix = matrices[bone.name]
+        bone.matrix = matrix
+
         poses[bone.name] = bone
 
     bpy.ops.pose.armature_apply()
@@ -470,6 +475,12 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("scale", 0), ("scale", 1), ("scale", 2)]]
 
+    # This works around the issue where EditBone.matrix destroys the scale which means that
+    # A model which has an non-1.0 scale when the bind pose is applied.
+    bindPoseScale = getattr(bone, "cast_bind_pose_scale", (1.0, 1.0, 1.0))
+    bindPoseInvMatrix = Matrix.LocRotScale(
+        None, None, bindPoseScale).inverted()
+
     # Scale keyframes are independant from other data.
     for axis, node in enumerate(nodes):
         if node is None:
@@ -479,14 +490,20 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
         keyValueBuffer = node.KeyValueBuffer()
 
         mode = node.Mode()
+        scale = Vector((1.0, 1.0, 1.0))
 
         for i, frame in enumerate(keyFrameBuffer):
             if mode == "absolute" or mode is None:
+                scale[axis] = keyValueBuffer[i]
+
+                value = (bindPoseInvMatrix @
+                         Matrix.LocRotScale(None, None, scale)).to_scale()
+
                 tracks[axis].keyframe_points.insert(
-                    frame, value=keyValueBuffer[i], options={'FAST'})
+                    frame, value=value[axis], options={'FAST'})
             elif mode == "relative":
                 tracks[axis].keyframe_points.insert(
-                    frame, value=bone.scale[axis] + keyValueBuffer[i], options={'FAST'})
+                    frame, value=keyValueBuffer[i], options={'FAST'})
             else:
                 # I need to get some samples of these before attempting this again.
                 raise Exception(

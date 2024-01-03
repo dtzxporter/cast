@@ -11,7 +11,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 3, 0),
+    "version": (1, 3, 1),
     "blender": (3, 0, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -57,7 +57,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
                 for file in self.files:
                     base = os.path.dirname(self.filepath)
                     file = os.path.join(base, file.name)
-                    
+
                     import_cast.load(self, context, file)
             else:
                 import_cast.load(self, context, self.filepath)
@@ -147,6 +147,9 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_cast_import)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_cast_export)
 
+
+bpy.types.PoseBone.cast_bind_pose_scale = FloatVectorProperty(
+    name="Cast bind pose scale", description="Used to help cast workaround a blender issue where the bind pose scale is destroyed on EditBones.", default=(1.0, 1.0, 1.0))
 
 if __name__ == "__main__":
     register()
