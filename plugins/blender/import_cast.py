@@ -135,12 +135,15 @@ def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
         elif type == "or":
             ct = constraintBone.constraints.new("COPY_ROTATION")
             if constraint.MaintainOffset():
-                ct.mix_mode = 'ADD'
+                ct.mix_mode = 'OFFSET'
         elif type == "sc":
             ct = constraintBone.constraints.new("COPY_SCALE")
             ct.use_offset = constraint.MaintainOffset()
         else:
             continue
+
+        ct.owner_space = 'LOCAL'
+        ct.target_space = 'LOCAL'
 
         if constraint.Name() is not None:
             ct.name = constraint.Name()
@@ -151,6 +154,11 @@ def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
 
         ct.target = targetBone.id_data
         ct.subtarget = targetBone.name
+
+        # We have to configure this after setting a target because the enum
+        # option isn't available unless orient is supportd by the target itself.
+        if type == "or":
+            ct.target_space = 'LOCAL_OWNER_ORIENT'
 
 
 def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
