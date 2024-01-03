@@ -33,7 +33,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.32"
+version = "1.33"
 
 
 def utilityAbout():
@@ -845,16 +845,24 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
         constraintBone = paths[indexes[constraint.ConstraintBone().Hash()]]
 
         type = constraint.ConstraintType()
+        skip = []
+
+        if constraint.SkipX():
+            skip.append("x")
+        if constraint.SkipY():
+            skip.append("y")
+        if constraint.SkipZ():
+            skip.append("z")
 
         if type == "pt":
             cmds.pointConstraint(targetBone, constraintBone,
-                                 name=constraint.Name() or "CastPointConstraint")
+                                 name=constraint.Name() or "CastPointConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
         elif type == "or":
             cmds.orientConstraint(targetBone, constraintBone,
-                                  name=constraint.Name() or "CastOrientConstraint")
+                                  name=constraint.Name() or "CastOrientConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
         elif type == "sc":
             cmds.scaleConstraint(targetBone, constraintBone,
-                                 name=constraint.Name() or "CastScaleConstraint")
+                                 name=constraint.Name() or "CastScaleConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
 
 
 def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
