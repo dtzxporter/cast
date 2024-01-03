@@ -847,11 +847,14 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
         type = constraint.ConstraintType()
 
         if type == "pt":
-            cmds.pointConstraint(targetBone, constraintBone)
+            cmds.pointConstraint(targetBone, constraintBone,
+                                 name=constraint.Name() or "CastPointConstraint")
         elif type == "or":
-            cmds.orientConstraint(targetBone, constraintBone)
+            cmds.orientConstraint(targetBone, constraintBone,
+                                  name=constraint.Name() or "CastOrientConstraint")
         elif type == "sc":
-            cmds.scaleConstraint(targetBone, constraintBone)
+            cmds.scaleConstraint(targetBone, constraintBone,
+                                 name=constraint.Name() or "CastScaleConstraint")
 
 
 def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
