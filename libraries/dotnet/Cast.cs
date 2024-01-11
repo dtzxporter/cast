@@ -29,6 +29,8 @@ namespace Cast
                     return new Bone();
                 case 0x64686B69:
                     return new IKHandle();
+                case 0x74736E63:
+                    return new Constraint();
                 case 0x6873656D:
                     return new Mesh();
                 case 0x6C74616D:
@@ -615,6 +617,129 @@ namespace Cast
     }
 
     /// <summary>
+    /// Defines a bone constraint in a skeleton.
+    /// </summary>
+    public class Constraint : CastNode
+    {
+        public Constraint()
+            : base(0x74736E63)
+        {
+        }
+
+        /// <summary>
+        /// The name of this constraint.
+        /// </summary>
+        /// <returns></returns>
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The type of constraint to configure.
+        /// </summary>
+        /// <returns></returns>
+        public string ConstraintType()
+        {
+            if (Properties.TryGetValue("ct", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The bone that is being constrained.
+        /// </summary>
+        /// <returns></returns>
+        public Bone ConstraintBone()
+        {
+            if (Properties.TryGetValue("cb", out CastProperty Value))
+            {
+                return (Bone)ParentNode.ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The bone that is the target for the constraint.
+        /// </summary>
+        /// <returns></returns>
+        public Bone TargetBone()
+        {
+            if (Properties.TryGetValue("tb", out CastProperty Value))
+            {
+                return (Bone)ParentNode.ChildByHash((ulong)Value.Values[0]);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Whether or not the original offset is maintained.
+        /// </summary>
+        /// <returns></returns>
+        public bool MaintainOffset()
+        {
+            if (Properties.TryGetValue("mo", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether or not to skip the x axis when constraining.
+        /// </summary>
+        /// <returns></returns>
+        public bool SkipX()
+        {
+            if (Properties.TryGetValue("sx", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether or not to skip the y axis when constraining.
+        /// </summary>
+        /// <returns></returns>
+        public bool SkipY()
+        {
+            if (Properties.TryGetValue("sy", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether or not to skip the z axis when constraining.
+        /// </summary>
+        /// <returns></returns>
+        public bool SkipZ()
+        {
+            if (Properties.TryGetValue("sz", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
     /// A collection of bones for a model or animation.
     /// </summary>
     public class Skeleton : CastNode
@@ -640,6 +765,15 @@ namespace Cast
         public List<IKHandle> IKHandles()
         {
             return ChildrenOfType<IKHandle>();
+        }
+
+        /// <summary>
+        /// The collection of constraints in this skeleton.
+        /// </summary>
+        /// <returns></returns>
+        public List<Constraint> Constraints()
+        {
+            return ChildrenOfType<Constraint>();
         }
     }
 
