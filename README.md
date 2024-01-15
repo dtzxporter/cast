@@ -72,6 +72,7 @@ enum class CastId : uint32_t
 	NotificationTrack = 0x6669746E,
 	Material = 0x6C74616D,
 	File = 0x656C6966,
+	Instance = 0x74736E69,
 };
 ```
 
@@ -883,24 +884,84 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
 		<th>Required</th>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Name (n)</td>
    		<td>String (s)</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Key Frame Buffer (kb)</td>
    		<td>Byte (b), Short (h), Integer 32 (i)</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
+</table>
+
+### Instance:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Parent</td>
+   		<td>Root</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	<tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Reference (Hash of CastNode:File) (r)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Position (p)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Rotation (r)</td>
+   		<td>Vector 4 (v4)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+		<td>Scale (s)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>False</td>
+		<td>True</td>
+	</tr>
 </table>
 
 <br>
