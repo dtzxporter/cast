@@ -1105,7 +1105,7 @@ class Instance(CastNode):
         """The referenced file for this instance."""
         reference = self.properties.get("rf")
         if reference is not None:
-            return self.parentNode.ChildByHash(reference.values[0])
+            return self.ChildByHash(reference.values[0])
         return None
 
     def SetReferenceFile(self, hash):
