@@ -21,6 +21,23 @@ bl_info = {
 }
 
 
+class CastProperties(bpy.types.PropertyGroup):
+    import_scenes_path: StringProperty(
+        name="Path", description="Select the root directory where instance scenes are located", default="", subtype="DIR_PATH")
+
+
+class CastImportScenePanel(bpy.types.Panel):
+    bl_idname = "OBJECT_PT_cast_import_scene_panel"
+    bl_label = "Import Scenes Path"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Cast"
+    bl_context = "objectmode"
+
+    def draw(self, context):
+        self.layout.prop(context.scene.cast_properties, "import_scenes_path")
+
+
 class ImportCast(bpy.types.Operator, ImportHelper):
     bl_idname = "import_scene.cast"
     bl_label = "Import Cast"
@@ -141,15 +158,25 @@ def menu_func_cast_export(self, context):
 def register():
     bpy.utils.register_class(ImportCast)
     bpy.utils.register_class(ExportCast)
+    bpy.utils.register_class(CastProperties)
+    bpy.utils.register_class(CastImportScenePanel)
+
     bpy.types.TOPBAR_MT_file_import.append(menu_func_cast_import)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_cast_export)
+
+    bpy.types.Scene.cast_properties = PointerProperty(type=CastProperties)
 
 
 def unregister():
     bpy.utils.unregister_class(ImportCast)
     bpy.utils.unregister_class(ExportCast)
+    bpy.utils.unregister_class(CastImportScenePanel)
+    bpy.utils.unregister_class(CastProperties)
+
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_cast_import)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_cast_export)
+
+    del bpy.types.Scene.cast_properties
 
 
 bpy.types.PoseBone.cast_bind_pose_scale = FloatVectorProperty(

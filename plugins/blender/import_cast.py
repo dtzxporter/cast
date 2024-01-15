@@ -5,7 +5,7 @@ import sys
 
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
-from .cast import Cast, CastColor, Model, Animation, File
+from .cast import Cast, CastColor, Model, Animation, Instance, File
 
 PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
 SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
@@ -786,21 +786,87 @@ def importAnimationNode(self, node, path):
     bpy.ops.object.mode_set(mode='POSE')
 
 
-def importRootNode(self, node, path):
-    for child in node.ChildrenOfType(Model):
-        importModelNode(self, child, path)
-    for child in node.ChildrenOfType(Animation):
-        importAnimationNode(self, child, path)
+def importInstanceNodes(self, nodes, context, path):
+    rootPath = context.scene.cast_properties.import_scenes_path
+
+    if len(rootPath) == 0:
+        raise Exception("Unable to import instances without a root directory!")
+
+    uniqueInstances = {}
+
+    for instance in nodes:
+        refs = os.path.join(rootPath, instance.ReferenceFile().Path())
+
+        if refs in uniqueInstances:
+            uniqueInstances[refs].append(instance)
+        else:
+            uniqueInstances[refs] = [instance]
+
+    name = os.path.splitext(os.path.basename(path))[0]
+
+    # Used to contain the original imported scene, will be set to hidden once completed.
+    baseGroup = bpy.data.collections.new("%s_scenes" % name)
+    # Used to contain every instance.
+    instanceGroup = bpy.data.collections.new("%s_instances" % name)
+
+    for instancePath, instances in uniqueInstances.items():
+        try:
+            bpy.ops.import_scene.cast(filepath=instancePath)
+        except:
+            self.report(
+                {'WARNING'}, "Instance: %s failed to import or not found, skipping..." % instancePath)
+            continue
+
+        base = bpy.context.view_layer.active_layer_collection.collection.children[-1]
+        bpy.context.view_layer.active_layer_collection.collection.children.unlink(
+            base)
+
+        baseGroup.children.link(base)
+
+        for instance in instances:
+            newInstance = bpy.data.objects.new(instance.Name(), None)
+            newInstance.instance_type = 'COLLECTION'
+            newInstance.instance_collection = base
+
+            position = instance.Position()
+            rotation = instance.Rotation()
+            scale = instance.Scale()
+
+            newInstance.location = Vector(position)
+            newInstance.rotation_mode = 'QUATERNION'
+            newInstance.rotation_quaternion = Quaternion(
+                (rotation[3], rotation[0], rotation[1], rotation[2]))
+            newInstance.scale = Vector(scale)
+
+            instanceGroup.objects.link(newInstance)
+
+    baseGroup.hide_viewport = True
+
+    # Link the groups to the scene at the end for performance.
+    bpy.context.view_layer.active_layer_collection.collection.children.link(
+        baseGroup)
+    bpy.context.view_layer.active_layer_collection.collection.children.link(
+        instanceGroup)
 
 
-def importCast(self, path):
+def importCast(self, context, path):
     cast = Cast.load(path)
 
+    instances = []
+
     for root in cast.Roots():
-        importRootNode(self, root, path)
+        for child in root.ChildrenOfType(Model):
+            importModelNode(self, child, path)
+        for child in root.ChildrenOfType(Animation):
+            importAnimationNode(self, child, path)
+        for child in root.ChildrenOfType(Instance):
+            instances.append(child)
+
+    if len(instances) > 0:
+        importInstanceNodes(self, instances, context, path)
 
 
 def load(self, context, filepath=""):
-    importCast(self, filepath)
+    importCast(self, context, filepath)
 
     bpy.context.view_layer.update()
