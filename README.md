@@ -939,7 +939,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 		<td>False</td>
  	</tr>
 	<tr>
-  		<td>Reference (Hash of CastNode:File) (r)</td>
+  		<td>Reference File (Hash of CastNode:File) (rf)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>True</td>
