@@ -984,7 +984,7 @@ class Constraint(CastNode):
         if sx is not None:
             return sx.values[0] >= 1
         return False
-    
+
     def SetSkipX(self, enabled):
         """Sets whether or not to skip the x axis when constraining."""
         if enabled:
@@ -998,7 +998,7 @@ class Constraint(CastNode):
         if sy is not None:
             return sy.values[0] >= 1
         return False
-    
+
     def SetSkipY(self, enabled):
         """Sets whether or not to skip the y axis when constraining."""
         if enabled:
@@ -1006,14 +1006,13 @@ class Constraint(CastNode):
         else:
             self.CreateProperty("sy", "b").values = [0]
 
-
     def SkipZ(self):
         """Whether or not to skip the z axis when constraining."""
         sz = self.properties.get("sz")
         if sz is not None:
             return sz.values[0] >= 1
         return False
-    
+
     def SetSkipZ(self, enabled):
         """Sets whether or not to skip the z axis when constraining."""
         if enabled:
@@ -1085,6 +1084,68 @@ class File(CastNode):
         self.CreateProperty("p", "s").values = [path]
 
 
+class Instance(CastNode):
+    """An instance of a cast scene."""
+
+    def __init__(self):
+        super(Instance, self).__init__(0x74736E69)
+
+    def Name(self):
+        """The name of this instance."""
+        name = self.properties.get("n")
+        if name is not None:
+            return name.values[0]
+        return None
+
+    def SetName(self, name):
+        """Sets the name of this instance."""
+        self.CreateProperty("n", "s").values = [name]
+
+    def ReferenceFile(self):
+        """The referenced file for this instance."""
+        reference = self.properties.get("rf")
+        if reference is not None:
+            return self.parentNode.ChildByHash(reference.values[0])
+        return None
+
+    def SetReferenceFile(self, hash):
+        """Sets the referenced file hash for this instance."""
+        self.CreateProperty("rf", "l").values = [hash]
+
+    def Position(self):
+        """The position of this instance."""
+        position = self.properties.get("p")
+        if position is not None:
+            return position.values
+        return None
+
+    def SetPosition(self, position):
+        """Sets the position of this instance."""
+        self.CreateProperty("p", "3v").values = list(position)
+
+    def Rotation(self):
+        """The rotation of this instance."""
+        rotation = self.properties.get("r")
+        if rotation is not None:
+            return rotation.values
+        return None
+
+    def SetRotation(self, rotation):
+        """Sets the rotation of this instance."""
+        self.CreateProperty("r", "4v").values = list(rotation)
+
+    def Scale(self):
+        """The scale of this instance."""
+        scale = self.properties.get("s")
+        if scale is not None:
+            return scale.values
+        return None
+
+    def SetScale(self, scale):
+        """Sets the scale of this instance."""
+        self.CreateProperty("s", "3v").values = list(scale)
+
+
 class Root(CastNode):
     """A root node."""
 
@@ -1098,6 +1159,10 @@ class Root(CastNode):
     def CreateAnimation(self):
         """Creates a new animation node."""
         return self.CreateChild(Animation())
+
+    def CreateInstance(self):
+        """Creates a new instance node."""
+        return self.CreateChild(Instance())
 
 
 typeSwitcher = {
@@ -1115,6 +1180,7 @@ typeSwitcher = {
     0x74736E63: Constraint,
     0x6C74616D: Material,
     0x656C6966: File,
+    0x74736E69: Instance,
 }
 
 
