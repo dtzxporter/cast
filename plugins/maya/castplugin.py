@@ -9,7 +9,7 @@ import maya.OpenMaya as OpenMaya
 import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
 
-from cast import Cast, CastColor, Model, Animation, File
+from cast import Cast, CastColor, Model, Animation, Instance, File
 
 # Support Python 3.0+
 try:
@@ -33,7 +33,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.33"
+version = "1.34"
 
 
 def utilityAbout():
@@ -976,7 +976,6 @@ def importSkeletonNode(skeleton):
         utilityStepProgress(progress)
 
     for i, bone in enumerate(bones):
-        scaleUtility = OpenMaya.MScriptUtil()
         newBone = handles[i]
         paths[i] = newBone.fullPathName()
 
@@ -997,7 +996,10 @@ def importSkeletonNode(skeleton):
 
         if bone.Scale() is not None:
             scale = bone.Scale()
+
+            scaleUtility = OpenMaya.MScriptUtil()
             scaleUtility.createFromList([scale[0], scale[1], scale[2]], 3)
+
             newBone.setScale(scaleUtility.asDoublePtr())
 
         utilityStepProgress(progress)
@@ -1427,18 +1429,122 @@ def importAnimationNode(node, path):
     sceneAnimationController.setCurrentTime(wantedSmallestFrame)
 
 
-def importRootNode(node, path):
-    for child in node.ChildrenOfType(Model):
-        importModelNode(child, path)
-    for child in node.ChildrenOfType(Animation):
-        importAnimationNode(child, path)
+def importInstanceNodes(nodes, path):
+    rootPath = cmds.fileDialog2(
+        caption="Select the root directory where instance scenes are located", dialogStyle=2, startingDirectory=path, fileMode=3, okCaption="Import")
+
+    if rootPath is None:
+        return cmds.error("Unable to import instances without a root directory!")
+
+    rootPath = rootPath[0]
+
+    uniqueInstances = {}
+
+    # Resolve unique instances by the scene they reference. Eventually we can also support
+    # recursively searching for the referenced file if it doesn't exist exactly where it points to.
+    for instance in nodes:
+        refs = os.path.join(rootPath, instance.ReferenceFile().Path())
+
+        if refs in uniqueInstances:
+            uniqueInstances[refs].append(instance)
+        else:
+            uniqueInstances[refs] = [instance]
+
+    name = os.path.splitext(os.path.basename(path))[0]
+
+    # Used to contain the original imported scene, will be set to hidden once completed.
+    baseGroup = OpenMaya.MFnTransform()
+    baseGroup.create()
+    baseGroup.setName("%s_scenes" % name)
+
+    # Used to contain every instance.
+    instanceGroup = OpenMaya.MFnTransform()
+    instanceGroup.create()
+    instanceGroup.setName("%s_instances" % name)
+
+    for instancePath, instances in uniqueInstances.items():
+        try:
+            imported = cmds.file(instancePath, i=True,
+                                 type="Cast", returnNewNodes=True)
+        except RuntimeError:
+            cmds.warning(
+                "Instance: %s failed to import or not found, skipping..." % instancePath)
+            continue
+
+        cmds.select(imported, replace=True)
+
+        imported = cmds.ls(l=True, selection=True, exactType="transform")
+        importedRoots = [x for x in imported if len(x.split('|')) == 2]
+
+        cmds.select(clear=True)
+
+        roots = len(importedRoots)
+
+        if roots == 0:
+            cmds.warning(
+                "Instance: %s imported nothing so there will be no instancing." % instancePath)
+            continue
+
+        if roots == 1:
+            base = imported[0]
+        else:
+            group = OpenMaya.MFnTransform()
+            group.create()
+            group.setName("%s_scene" % os.path.splitext(
+                os.path.basename(instancePath))[0])
+
+            for root in importedRoots:
+                cmds.parent(root, group.fullPathName())
+
+            base = group.fullPathName()
+
+        for instance in instances:
+            newInstance = cmds.instance(base, name=instance.Name())[0]
+
+            selectList = OpenMaya.MSelectionList()
+            selectList.add(newInstance)
+
+            dagPath = OpenMaya.MDagPath()
+            selectList.getDagPath(0, dagPath)
+
+            transform = OpenMaya.MFnTransform(dagPath)
+
+            position = instance.Position()
+            rotation = instance.Rotation()
+            scale = instance.Scale()
+
+            transform.setTranslation(OpenMaya.MVector(
+                position[0], position[1], position[2]), OpenMaya.MSpace.kWorld)
+            transform.setRotation(OpenMaya.MQuaternion(
+                rotation[0], rotation[1], rotation[2], rotation[3]))
+
+            scaleUtility = OpenMaya.MScriptUtil()
+            scaleUtility.createFromList([scale[0], scale[1], scale[2]], 3)
+
+            transform.setScale(scaleUtility.asDoublePtr())
+
+            cmds.parent(newInstance, instanceGroup.fullPathName())
+
+        cmds.parent(base, baseGroup.fullPathName())
+
+    cmds.setAttr("%s.visibility" % baseGroup.fullPathName(), False)
 
 
 def importCast(path):
     cast = Cast.load(path)
 
+    instances = []
+
     for root in cast.Roots():
-        importRootNode(root, path)
+        for child in root.ChildrenOfType(Model):
+            importModelNode(child, path)
+        for child in root.ChildrenOfType(Animation):
+            importAnimationNode(child, path)
+        for child in root.ChildrenOfType(Instance):
+            instances.append(child)
+
+    if len(instances) > 0:
+        importInstanceNodes(instances, path)
 
 
 def exportAnimation(root, objects):
