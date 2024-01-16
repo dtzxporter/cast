@@ -29,6 +29,17 @@ def utilityStashCurveComponent(component, curve, name, index):
         component[name] = value
 
 
+def utilityClearKeyframePoints(fcurve):
+    # For whatever reason, the clear method was introduced in blender 4.0...
+    clear = getattr(fcurve.keyframe_points, "clear", None)
+
+    if callable(clear):
+        return fcurve.keyframe_points.clear()
+
+    for keyframe in reversed(fcurve.keyframe_points.values()):
+        fcurve.keyframe_points.remove(keyframe)
+
+
 def utilityAssignBSDFMaterialSlots(material, slots, path):
     # We will two shaders, one for metalness and one for specular
     if "metal" in slots:
@@ -622,7 +633,7 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
 
     # Now, we need to actually generate keyframes for each of the tracks based on the mode.
     for track in tracks:
-        track.keyframe_points.clear()
+        utilityClearKeyframePoints(track)
 
     for i, frame in enumerate(keyFrameBuffer):
         offset = Vector(keyValueBuffer[i])
