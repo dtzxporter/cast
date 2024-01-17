@@ -110,7 +110,7 @@ enum class CastPropertyId : uint16_t
 ## Parsing
 To read a cast file, you just need to traverse the root nodes and their children. Properties always come before a nodes children. Each node has the total size of itself, and all children, so if a processor doesn't understand a node id, it can skip the entire node and continue reading.
 
-Cast ids are integers for performance, unlike FBX where nodes are full strings.
+Cast ids are stored as integers to make it faster to serialize and deserialize.
 
 ## Cast processors:
 
@@ -912,7 +912,7 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
+   		<td>File</td>
 		<td>True</td>
 		<td>False</td>
  	</tr>
