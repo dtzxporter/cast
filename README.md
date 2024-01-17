@@ -1,21 +1,19 @@
-# Cast | A new open-source container for models, animations, and more
+# Cast | A open-source container for models, animations, and more
 
-The goal of cast is to create an engine agnostic format that can be parsed and written with ease. In addition, cast should have very similar output on any engine.
+The goal of cast is to create an easy to use format for models, animations, materials, and game worlds. In addition, cast should be able to produce the same scenes in any 3d software.
 
 <p align="center">
-	<img src="images/cast-icon-md.png" alt="SEAnim"/>
+	<img src="images/cast-icon-md.png" alt="Cast"/>
 </p>
 
 ## 3D Engine Plugins:
 - Autodesk Maya (2012+): [Releases](https://github.com/dtzxporter/cast/releases)
 - Blender (3.0+): [Releases](https://github.com/dtzxporter/cast/releases)
-- 3DS Max: (Help wanted)
 
 # Programming libraries:
 - .NET Framework (Reference): [Libraries/DotNet](https://github.com/dtzxporter/cast/tree/master/libraries/dotnet)
 - .NET Framework (by Scobalula): [Cast.NET](https://github.com/Scobalula/Cast.NET)
 - Python: [Libraries/Python](https://github.com/dtzxporter/cast/tree/master/libraries/python)
-- C++: (Help wanted)
 
 # Viewers:
 - CastModelViewer (By echo000): [Github](https://github.com/echo000/CastModelViewer)
@@ -966,5 +964,5 @@ Cast ids are integers for performance, unlike FBX where nodes are full strings.
 
 <br>
 
-- Format designed by DTZxPorter with input from various developers.
+- Format designed by DTZxPorter with input from the community.
 - Icons by Smashicons
