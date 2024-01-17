@@ -1,4 +1,4 @@
-# Cast | A open-source container for models, animations, and more
+# Cast | An open-source container for models, animations, and more
 
 The goal of cast is to create an easy to use format for models, animations, materials, and game worlds. In addition, cast should be able to produce the same scenes in any 3d software.
 
