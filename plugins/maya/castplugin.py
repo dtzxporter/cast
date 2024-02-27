@@ -1049,7 +1049,7 @@ def importModelNode(model, path):
         newMeshNode = newMeshTransform.create(meshNode)
         newMeshTransform.setName(mesh.Name() or "CastMesh")
 
-        faces = mesh.FaceBuffer()
+        faces = list(mesh.FaceBuffer())
         facesRemoved = 0
 
         # Remove any degenerate faces before giving it to the mesh.
@@ -1077,11 +1077,11 @@ def importModelNode(model, path):
                          (facesRemoved, newMeshTransform.name()))
 
         # Triangle count / vertex count
-        faceCount = int(mesh.FaceCount())
+        faceCount = int(mesh.FaceCount()) - facesRemoved
         vertexCount = int(mesh.VertexCount())
 
         scriptUtil = OpenMaya.MScriptUtil()
-        scriptUtil.createFromList([x for x in faces], len(faces))
+        scriptUtil.createFromList(faces, len(faces))
 
         faceBuffer = OpenMaya.MIntArray(scriptUtil.asIntPtr(), len(faces))
         faceCountBuffer = OpenMaya.MIntArray(faceCount, 3)
