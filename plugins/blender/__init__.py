@@ -44,6 +44,8 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     bl_description = "Import one or more Cast files"
     bl_options = {'PRESET'}
 
+    directory: StringProperty()
+
     filename_ext = ".cast"
     filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
 
@@ -74,14 +76,9 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         from . import import_cast
         try:
-            if self.import_reset:
-                for file in self.files:
-                    base = os.path.dirname(self.filepath)
-                    file = os.path.join(base, file.name)
-
-                    import_cast.load(self, context, file)
-            else:
-                import_cast.load(self, context, self.filepath)
+            for file in self.files:
+                file = os.path.join(self.directory, file.name)
+                import_cast.load(self, context, file)
 
             self.report({'INFO'}, 'Cast has been loaded')
             return {'FINISHED'}
