@@ -9,6 +9,7 @@ import maya.OpenMaya as OpenMaya
 import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
 
+
 from cast import Cast, CastColor, Model, Animation, Instance, File
 
 # Support Python 3.0+
@@ -39,6 +40,31 @@ version = "1.37"
 def utilityAbout():
     cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version %s" % version,
                        button=['OK'], defaultButton='OK', title="About Cast")
+
+
+def utilityResetCursor():
+    try:
+        from PySide2 import QtWidgets
+
+        overrideCursor = QtWidgets.QApplication.overrideCursor()
+
+        if overrideCursor is not None:
+            QtWidgets.QApplication.restoreOverrideCursor()
+            return True
+
+        return False
+    except:
+        return False
+
+
+def utilitySetWaitCursor():
+    try:
+        from PySide2 import QtGui, QtWidgets, QtCore
+
+        QtWidgets.QApplication.setOverrideCursor(
+            QtGui.QCursor(QtCore.Qt.WaitCursor))
+    except:
+        pass
 
 
 def utilityGetNotetracks():
@@ -1430,8 +1456,13 @@ def importAnimationNode(node, path):
 
 
 def importInstanceNodes(nodes, path):
+    overrideCursor = utilityResetCursor()
+
     rootPath = cmds.fileDialog2(
         caption="Select the root directory where instance scenes are located", dialogStyle=2, startingDirectory=path, fileMode=3, okCaption="Import")
+
+    if overrideCursor:
+        utilitySetWaitCursor()
 
     if rootPath is None:
         return cmds.error("Unable to import instances without a root directory!")
