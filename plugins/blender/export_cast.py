@@ -244,7 +244,7 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                     vertexColorLayers[0][i] = CastColor.toInteger(
                         (color.x, color.y, color.z, color.w))
 
-            if blendMesh.verts.layers.deform.active is not None:
+            if blendMesh.verts.layers.deform.active is not None and maximumInfluence > 0:
                 meshNode.SetMaximumWeightInfluence(vertexMaxInfluence)
 
                 vertexGroups = [x.name for x in mesh.vertex_groups]
