@@ -40,6 +40,14 @@ def utilityClearKeyframePoints(fcurve):
         fcurve.keyframe_points.remove(keyframe)
 
 
+def utilityIsVersionAtLeast(major, minor):
+    if BLENDER_VERSION[0] > major:
+        return True
+    elif BLENDER_VERSION[0] == major and BLENDER_VERSION[1] >= minor:
+        return True
+    return False
+
+
 def utilityAssignBSDFMaterialSlots(material, slots, path):
     # We will two shaders, one for metalness and one for specular
     if "metal" in slots:
@@ -48,12 +56,12 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
-            "specular": "Specular IOR Level" if BLENDER_VERSION[0] >= 4 else "Specular",
+            "specular": "Specular IOR Level" if utilityIsVersionAtLeast(4, 0) else "Specular",
             "metal": "Metallic",
             "roughness": "Roughness",
             "gloss": "Roughness",
             "normal": "Normal",
-            "emissive": "Emission Color" if BLENDER_VERSION[0] >= 4 else "Emission",
+            "emissive": "Emission Color" if utilityIsVersionAtLeast(4, 0) else "Emission",
         }
     else:
         # We need to create the specular node, removing principled first
@@ -366,19 +374,29 @@ def importModelNode(self, model, path):
 
         vertexNormals = mesh.VertexNormalBuffer()
         if vertexNormals is not None:
-            newMesh.create_normals_split()
-            newMesh.loops.foreach_set("normal", unpack_list(
-                [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
+            if utilityIsVersionAtLeast(4, 1):
+                newMesh.validate(clean_customdata=False)
 
-            newMesh.validate(clean_customdata=False)
-            clnors = array.array('f', [0.0] * (len(newMesh.loops) * 3))
-            newMesh.loops.foreach_get("normal", clnors)
+                clnors = unpack_list(
+                    [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces])
 
-            newMesh.polygons.foreach_set(
-                "use_smooth", [True] * len(newMesh.polygons))
+                newMesh.normals_split_custom_set(
+                    tuple(zip(*(iter(clnors),) * 3)))
+            else:
+                newMesh.create_normals_split()
+                newMesh.loops.foreach_set("normal", unpack_list(
+                    [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
 
-            newMesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
-            newMesh.use_auto_smooth = True
+                newMesh.validate(clean_customdata=False)
+                clnors = array.array('f', [0.0] * (len(newMesh.loops) * 3))
+                newMesh.loops.foreach_get("normal", clnors)
+
+                newMesh.polygons.foreach_set(
+                    "use_smooth", [True] * len(newMesh.polygons))
+
+                newMesh.normals_split_custom_set(
+                    tuple(zip(*(iter(clnors),) * 3)))
+                newMesh.use_auto_smooth = True
         else:
             newMesh.validate(clean_customdata=False)
 
