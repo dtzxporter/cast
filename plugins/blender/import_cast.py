@@ -377,11 +377,8 @@ def importModelNode(self, model, path):
             if utilityIsVersionAtLeast(4, 1):
                 newMesh.validate(clean_customdata=False)
 
-                clnors = unpack_list(
-                    [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces])
-
-                newMesh.normals_split_custom_set(
-                    tuple(zip(*(iter(clnors),) * 3)))
+                newMesh.normals_split_custom_set_from_vertices(
+                    tuple(zip(*(iter(vertexNormals),) * 3)))
             else:
                 newMesh.create_normals_split()
                 newMesh.loops.foreach_set("normal", unpack_list(
