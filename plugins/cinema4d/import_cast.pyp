@@ -5,9 +5,9 @@ import math
 from c4d import plugins, bitmaps, Vector, gui, BaseObject
 import mxutils
 
-resDir = os.path.join(os.path.dirname(__file__), "res")
-mxutils.ImportSymbols(resDir)
-with mxutils.LocalImportPath(resDir):
+RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "res")
+mxutils.ImportSymbols(RESOURCE_DIR)
+with mxutils.LocalImportPath(RESOURCE_DIR):
     from cast import Cast, CastColor, Model, Animation, Instance, File
 
 __pluginname__ = "Cast"
@@ -164,7 +164,7 @@ def importModelNode(doc, node, model, path):
             newMesh.SetPoint(vertexIndex, Vector(x, y, -z)) # Matching the Maya default import
 
         # Faces
-        for i in range(0, len(faces), 3):
+        for i in range(0, faceIndicesCount, 3):
             polyIndex = i // 3
             a, b, c = faces[i:i+3]
             newMesh.SetPolygon(polyIndex, c4d.CPolygon(a, b, c))
@@ -204,7 +204,11 @@ def importModelNode(doc, node, model, path):
             normalListUnpacked = unpack_list([(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces])
             normalList = [Vector(normalListUnpacked[i], normalListUnpacked[i+1], -normalListUnpacked[i+2]) for i in range(0, len(normalListUnpacked), 3)]
 
-            # Even if it's a Tri, you should pass a value.
+            """
+            Raw data normal structure for one polygon is 12 int16 value (4 vectors 
+            for each vertex of a Cpolygon * 3 components for each vector), even if 
+            the Cpolygon is a triangle.
+            """
             for i in range(len(normalList) // 3):
                 normalList.insert((i + 1) * 4 - 1, Vector(0, 0, 0))
 
@@ -219,11 +223,10 @@ def importModelNode(doc, node, model, path):
         if model.Skeleton() is not None and node[CAST_IMPORT_BIND_SKIN]:
             skinObj = BaseObject(c4d.Oskin)
             skinningMethod = mesh.SkinningMethod()
-            skinType = c4d.ID_CA_SKIN_OBJECT_TYPE
             if skinningMethod == "linear":
-                skinObj[skinType] = 0
+                skinObj[c4d.ID_CA_SKIN_OBJECT_TYPE] = c4d.ID_CA_SKIN_OBJECT_TYPE_LINEAR
             elif skinningMethod == "quaternion":
-                skinObj[skinType] = 1
+                skinObj[c4d.ID_CA_SKIN_OBJECT_TYPE] = c4d.ID_CA_SKIN_OBJECT_TYPE_QUAT
             doc.InsertObject(skinObj, parent=newMesh)
 
             weightTag = c4d.modules.character.CAWeightTag()
@@ -247,7 +250,7 @@ def importModelNode(doc, node, model, path):
                             )
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
-                for x in range(len(newMesh.vertices)):
+                for x in range(vertexCount):
                         weightTag.SetWeight(
                             weightBoneBuffer[x],
                             x,
@@ -261,7 +264,7 @@ def importModelNode(doc, node, model, path):
             material = materialArray[meshMaterial.Name()]
             material_tag = newMesh.MakeTag(c4d.Ttexture)
             material_tag[c4d.TEXTURETAG_MATERIAL] = material
-            material_tag[c4d.TEXTURETAG_PROJECTION] = 6
+            material_tag[c4d.TEXTURETAG_PROJECTION] = c4d.TEXTURETAG_PROJECTION_UVW
 
         doc.InsertObject(newMesh, parent=modelNull)
         newMesh.Message(c4d.MSG_UPDATE)
@@ -286,56 +289,56 @@ def importSkeletonConstraintNode(skeleton, boneIndexes):
         # C4D's constraint system is a bit worse than Blender's
         constraintTag = c4d.BaseTag(CONSTRAINT_TAG)
         constraintBone.InsertTag(constraintTag)
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR] = 1
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR] = True
         
         # Disabling all constraints, cause default is enabled
-        constraintTag[CONSTRAIN_POS] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_X] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Y] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Z] = 0
+        constraintTag[CONSTRAIN_POS] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_X] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Y] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Z] = False
 
-        constraintTag[CONSTRAIN_SCALE] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_X] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Y] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Z] = 0
+        constraintTag[CONSTRAIN_SCALE] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_X] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Y] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Z] = False
 
-        constraintTag[CONSTRAIN_ROT] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_X] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Y] = 0
-        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Z] = 0
+        constraintTag[CONSTRAIN_ROT] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_X] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Y] = False
+        constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Z] = False
 
         constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_MAINTAIN] = constraint.MaintainOffset()
 
         if type == "pt":
-            constraintTag[CONSTRAIN_POS] = 1
+            constraintTag[CONSTRAIN_POS] = True
             constraintTag[CONSTRAINT_TARGET] = targetBone
-            constraintTag[c4d.ID_CA_CONSTRAINT_TAG_LOCAL_P] = 1
+            constraintTag[c4d.ID_CA_CONSTRAINT_TAG_LOCAL_P] = True
             if not constraint.SkipX():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_X] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_X] = True
             if not constraint.SkipY():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Y] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Y] = True
             if not constraint.SkipZ():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Z] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_Z] = True
         elif type == "sc":
-            constraintTag[CONSTRAIN_SCALE] = 1
+            constraintTag[CONSTRAIN_SCALE] = True
             constraintTag[CONSTRAINT_TARGET] = targetBone
-            constraintTag[c4d.ID_CA_CONSTRAINT_TAG_LOCAL_S] = 1
+            constraintTag[c4d.ID_CA_CONSTRAINT_TAG_LOCAL_S] = True
             if not constraint.SkipX():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_X] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_X] = True
             if not constraint.SkipY():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Y] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Y] = True
             if not constraint.SkipZ():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Z] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_S_Z] = True
         elif type == "or":
-            constraintTag[CONSTRAIN_ROT] = 1
+            constraintTag[CONSTRAIN_ROT] = True
             constraintTag[CONSTRAINT_TARGET] = targetBone
-            constraintTag[c4d.ID_CA_CONSTRAINT_TAG_LOCAL_R] = 1
+            constraintTag[c4d.ID_CA_CONSTRAINT_TAG_LOCAL_R] = True
             if not constraint.SkipX():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_X] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_X] = True
             if not constraint.SkipY():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Y] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Y] = True
             if not constraint.SkipZ():
-                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Z] = 1
+                constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_R_Z] = True
         else:
             continue
 
@@ -394,7 +397,7 @@ def importSkeletonNode(modelNull, skeleton):
         translation = Vector(tX, tY, -tZ)
 
         rX, rY, rZ = utilityQuaternionToEuler(bone.LocalRotation())
-        newBone.SetRotationOrder(5)
+        newBone.SetRotationOrder(c4d.ROTATIONORDER_XYZGLOBAL)
 
         scale_tuple = bone.Scale() or (1.0, 1.0, 1.0)
         scale = Vector(scale_tuple[0], scale_tuple[1], scale_tuple[2])
@@ -406,6 +409,7 @@ def importSkeletonNode(modelNull, skeleton):
         handles[i] = newBone
         boneIndexes[bone.Hash() or i] = newBone
 
+    for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
             handles[i].InsertUnder(handles[bone.ParentIndex()])
         else:
