@@ -19,9 +19,6 @@ try:
 except NameError:
     xrange = range
 
-# Used for scene reset cache
-sceneResetCache = {}
-
 # Used for various configuration
 sceneSettings = {
     "importAtTime": False,
@@ -34,7 +31,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.40"
+version = "1.41"
 
 
 def utilityAbout():
@@ -419,26 +416,24 @@ def utilityCreateMenu():
 
 
 def utilityClearAnimation():
-    # First we must remove all existing animation curves
-    # this deletes all curve channels
-    global sceneResetCache
-
     cmds.delete(all=True, c=True)
 
-    for transPath in sceneResetCache:
+    for jointPath in cmds.ls(type="joint", long=True):
         try:
             selectList = OpenMaya.MSelectionList()
-            selectList.add(transPath)
+            selectList.add(jointPath)
 
             dagPath = OpenMaya.MDagPath()
             selectList.getDagPath(0, dagPath)
 
+            restPosition = utilityGetSavedNodeData(dagPath)
+
             transform = OpenMaya.MFnTransform(dagPath)
-            transform.resetFromRestPosition()
+            transform.set(restPosition)
         except RuntimeError:
             pass
-
-    sceneResetCache = {}
+        except ValueError:
+            pass
 
 
 def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMethod="linear"):
@@ -628,22 +623,54 @@ def utilityGetRestData(restTransform, component):
         raise Exception("Invalid component was specified!")
 
 
+def utilityGetSavedNodeData(dagPath):
+    # At this point we must have the attribute, as it's always called from the save function.
+    restTransform = cmds.getAttr(
+        "%s.castRestPosition" % dagPath.fullPathName())
+
+    # Convert to matrix, then back to transformation matrix.
+    restTransformMatrix = OpenMaya.MMatrix()
+    restTransformMatrixDoubles = OpenMaya.MScriptUtil()
+    restTransformMatrixDoubles.createMatrixFromList(
+        restTransform, restTransformMatrix)
+
+    # Make the transformation matrix.
+    restTransform = OpenMaya.MTransformationMatrix(restTransformMatrix)
+
+    return restTransform
+
+
 def utilitySaveNodeData(dagPath):
-    global sceneResetCache
+    # Check if we already had the bone saved, if there is a runtime error, we already have it saved.
+    if cmds.objExists("%s.castRestPosition" % dagPath.fullPathName()):
+        return utilityGetSavedNodeData(dagPath)
+
+    # Create the new attribute.
+    cmds.addAttr(dagPath.fullPathName(), longName="castRestPosition",
+                 attributeType="matrix", storable=True, writable=True, readable=True)
 
     # Grab the transform first
     transform = OpenMaya.MFnTransform(dagPath)
+
     restTransform = transform.transformation()
+    restTransformMatrix = restTransform.asMatrix()
 
-    # If we already had the bone saved, just return it's saved rest position.
-    if dagPath.fullPathName() in sceneResetCache:
-        return transform.restPosition()
+    # Convert matrix to double array.
+    restDoubles = [0.0] * 16
 
-    sceneResetCache[dagPath.fullPathName()] = None
+    for x in xrange(4):
+        restDoubles[x *
+                    4] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 0)
+        restDoubles[(
+            x * 4) + 1] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 1)
+        restDoubles[(
+            x * 4) + 2] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 2)
+        restDoubles[(
+            x * 4) + 3] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 3)
 
-    # We are going to save the rest position on the node
-    # so we can reset the scene later
-    transform.setRestPosition(restTransform)
+    # Set the attribute.
+    cmds.setAttr("%s.castRestPosition" %
+                 dagPath.fullPathName(), restDoubles, type="matrix")
 
     # Required to handle relative transforms.
     return restTransform
