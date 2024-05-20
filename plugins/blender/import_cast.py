@@ -29,23 +29,20 @@ def utilityStashCurveComponent(component, curve, name, index):
         component[name] = value
 
 
-def utilityClearKeyframePoints(fcurve):
-    # For whatever reason, the clear method was introduced in blender 4.0...
-    clear = getattr(fcurve.keyframe_points, "clear", None)
-
-    if callable(clear):
-        return fcurve.keyframe_points.clear()
-
-    for keyframe in reversed(fcurve.keyframe_points.values()):
-        fcurve.keyframe_points.remove(keyframe)
-
-
 def utilityIsVersionAtLeast(major, minor):
     if BLENDER_VERSION[0] > major:
         return True
     elif BLENDER_VERSION[0] == major and BLENDER_VERSION[1] >= minor:
         return True
     return False
+
+
+def utilityClearKeyframePoints(fcurve):
+    if utilityIsVersionAtLeast(4, 0):
+        return fcurve.keyframe_points.clear()
+
+    for keyframe in reversed(fcurve.keyframe_points.values()):
+        fcurve.keyframe_points.remove(keyframe)
 
 
 def utilityAssignBSDFMaterialSlots(material, slots, path):
