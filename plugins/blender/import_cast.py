@@ -125,6 +125,16 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
                                                                               (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
+def utilityResolveCurveModeOverride(bone, mode, overrides):
+    if not overrides:
+        return mode
+
+    for parent in bone.parent_recursive:
+        for override in overrides:
+            if parent.name == override.NodeName():
+                return override.Mode()
+
+
 def utilityGetBindposeScale(poseBone):
     bindPoseScale = Matrix.LocRotScale(None, None, Vector((1.0, 1.0, 1.0)))
 
@@ -487,7 +497,7 @@ def importModelNode(self, model, path):
         collection)
 
 
-def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
+def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -495,7 +505,7 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
-    mode = node.Mode()
+    mode = utilityResolveCurveModeOverride(bone, node.Mode(), overrides)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("rotation_quaternion", 0), ("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3)]]
@@ -544,7 +554,7 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
     return (smallestFrame, largestFrame)
 
 
-def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
+def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -552,6 +562,13 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
+    mode = None
+
+    for node in nodes:
+        if node is not None:
+            mode = node.Mode()
+
+    mode = utilityResolveCurveModeOverride(bone, mode, overrides)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("scale", 0), ("scale", 1), ("scale", 2)]]
@@ -568,7 +585,6 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
         keyFrameBuffer = node.KeyFrameBuffer()
         keyValueBuffer = node.KeyValueBuffer()
 
-        mode = node.Mode()
         scale = Vector((1.0, 1.0, 1.0))
 
         for i, frame in enumerate(keyFrameBuffer):
@@ -597,7 +613,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
     return (smallestFrame, largestFrame)
 
 
-def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
+def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -610,6 +626,8 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
     for node in nodes:
         if node is not None:
             mode = node.Mode()
+
+    mode = utilityResolveCurveModeOverride(bone, mode, overrides)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("location", 0), ("location", 1), ("location", 2)]]
@@ -744,6 +762,7 @@ def importAnimationNode(self, node, path):
         startFrame = 0
 
     curves = node.Curves()
+    curveModeOverrides = node.CurveModeOverrides()
 
     # Create a list of pose bones that match the curves..
     poseBones = {}
@@ -763,7 +782,7 @@ def importAnimationNode(self, node, path):
 
         if property == "rq":
             (smallestFrame, largestFrame) = importRotCurveNode(
-                x, nodeName, action.fcurves, poseBones, path, startFrame)
+                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "tx":
@@ -781,13 +800,13 @@ def importAnimationNode(self, node, path):
 
     for nodeName, x in locCurves.items():
         (smallestFrame, largestFrame) = importLocCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame)
+            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     for nodeName, x in scaleCurves.items():
         (smallestFrame,  largestFrame) = importScaleCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame)
+            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
