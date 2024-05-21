@@ -297,6 +297,8 @@ def utilityResolveCurveModeOverride(name, mode, overrides):
                     return override.Mode()
 
         return mode
+    except IndexError:
+        return mode
     except RuntimeError:
         return mode
 
