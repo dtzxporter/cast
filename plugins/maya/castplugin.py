@@ -31,7 +31,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.42"
+version = "1.43"
 
 
 def utilityAbout():
@@ -278,7 +278,7 @@ def utilitySlerp(qa, qb, t):
     return qm
 
 
-def utilityResolveCurveModeOverride(name, mode, overrides):
+def utilityResolveCurveModeOverride(name, mode, overrides, isTranslate=False, isRotate=False, isScale=False):
     if not overrides:
         return mode
 
@@ -293,6 +293,13 @@ def utilityResolveCurveModeOverride(name, mode, overrides):
                 parentName = parentName[parentName.find(":") + 1:]
 
             for override in overrides:
+                if isTranslate and not override.OverrideTranslationCurves():
+                    continue
+                elif isRotate and not override.OverrideRotationCurves():
+                    continue
+                elif isScale and not override.OverrideScaleCurves():
+                    continue
+
                 if parentName == override.NodeName():
                     return override.Mode()
 
@@ -1401,8 +1408,17 @@ def importCurveNode(node, path, timeUnit, startFrame, overrides):
     keyValueBuffer = node.KeyValueBuffer()
 
     # Resolve any override if necessary.
-    nodeMode = utilityResolveCurveModeOverride(
-        nodeName, node.Mode(), overrides)
+    nodeMode = node.Mode()
+
+    if propertyName in ["tx", "ty", "tz"]:
+        nodeMode = utilityResolveCurveModeOverride(
+            nodeName, nodeMode, overrides, isTranslate=True)
+    elif propertyName in ["rq"]:
+        nodeMode = utilityResolveCurveModeOverride(
+            nodeName, nodeMode, overrides, isRotate=True)
+    elif propertyName in ["sx", "sy", "sz"]:
+        nodeMode = utilityResolveCurveModeOverride(
+            nodeName, nodeMode, overrides, isScale=True)
 
     (smallestFrame, largestFrame) = trackSwitcher[propertyName](
         tracks, propertyName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, nodeMode, node.AdditiveBlendWeight())
