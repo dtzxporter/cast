@@ -1303,6 +1303,48 @@ namespace Cast
 
             return null;
         }
+
+        /// <summary>
+        /// Whether or not the override effects translations.
+        /// </summary>
+        /// <returns></returns>
+        public bool OverrideTranslationCurves()
+        {
+            if (Properties.TryGetValue("ot", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether or not the override effects rotations.
+        /// </summary>
+        /// <returns></returns>
+        public bool OverrideRotationCurves()
+        {
+            if (Properties.TryGetValue("or", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether or not the override effects scales.
+        /// </summary>
+        /// <returns></returns>
+        public bool OverrideScaleCurves()
+        {
+            if (Properties.TryGetValue("os", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
     }
 
     /// <summary>

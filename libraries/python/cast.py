@@ -482,6 +482,48 @@ class CurveModeOverride(CastNode):
         """Sets the mode for this override."""
         self.CreateProperty("m", "s").values = [mode]
 
+    def OverrideTranslationCurves(self):
+        """Whether or not the override effects translations."""
+        ot = self.properties.get("ot")
+        if ot is not None:
+            return ot.values[0] >= 1
+        return False
+
+    def SetOverrideTranslationCurves(self, enabled):
+        """Sets whether or not the override effects translations."""
+        if enabled:
+            self.CreateProperty("ot", "b").values = [1]
+        else:
+            self.CreateProperty("ot", "b").values = [0]
+
+    def OverrideRotationCurves(self):
+        """Whether or not the override effects rotations."""
+        orr = self.properties.get("or")
+        if orr is not None:
+            return orr.values[0] >= 1
+        return False
+
+    def SetOverrideRotationCurves(self, enabled):
+        """Sets whether or not the override effects rotations."""
+        if enabled:
+            self.CreateProperty("or", "b").values = [1]
+        else:
+            self.CreateProperty("or", "b").values = [0]
+
+    def OverrideScaleCurves(self):
+        """Whether or not the override effects scales."""
+        os = self.properties.get("os")
+        if os is not None:
+            return os.values[0] >= 1
+        return False
+
+    def SetOverrideScaleCurves(self, enabled):
+        """Sets whether or not the override effects scales."""
+        if enabled:
+            self.CreateProperty("os", "b").values = [1]
+        else:
+            self.CreateProperty("os", "b").values = [0]
+
 
 class NotificationTrack(CastNode):
     """The notification track for an animation."""

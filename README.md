@@ -901,9 +901,31 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
 		<td>True</td>
  	</tr>
+	<tr>
+  		<td>Override Translation Curves (ot)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Override Rotation Curves (or)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Override Scale Curves (os)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
 </table>
 
 **Notes:**
+- See `Curve` notes above for the definition of each `Mode` value.
+- `Override Translation Curves` should default to `False` when not specified.
+- `Override Rotation Curves` should default to `False` when not specified.
+- `Override Scale Curves` should default to `False` when not specified.
 - The override node and all of it's children should override their curves mode to the new mode.
 - The override node must be present at the time of processing in order to determine if a child bone is a descendent.
 
