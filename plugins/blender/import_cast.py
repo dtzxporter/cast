@@ -125,12 +125,19 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
                                                                               (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
-def utilityResolveCurveModeOverride(bone, mode, overrides):
+def utilityResolveCurveModeOverride(bone, mode, overrides, isTranslate=False, isRotate=False, isScale=False):
     if not overrides:
         return mode
 
     for parent in bone.parent_recursive:
         for override in overrides:
+            if isTranslate and not override.OverrideTranslationCurves():
+                continue
+            elif isRotate and not override.OverrideRotationCurves():
+                continue
+            elif isScale and not override.OverrideScaleCurves():
+                continue
+
             if parent.name == override.NodeName():
                 return override.Mode()
 
@@ -505,7 +512,8 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
-    mode = utilityResolveCurveModeOverride(bone, node.Mode(), overrides)
+    mode = utilityResolveCurveModeOverride(
+        bone, node.Mode(), overrides, isRotate=True)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("rotation_quaternion", 0), ("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3)]]
@@ -568,7 +576,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
         if node is not None:
             mode = node.Mode()
 
-    mode = utilityResolveCurveModeOverride(bone, mode, overrides)
+    mode = utilityResolveCurveModeOverride(bone, mode, overrides, isScale=True)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("scale", 0), ("scale", 1), ("scale", 2)]]
@@ -627,7 +635,8 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
         if node is not None:
             mode = node.Mode()
 
-    mode = utilityResolveCurveModeOverride(bone, mode, overrides)
+    mode = utilityResolveCurveModeOverride(
+        bone, mode, overrides, isTranslate=True)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("location", 0), ("location", 1), ("location", 2)]]
