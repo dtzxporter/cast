@@ -41,6 +41,8 @@ namespace Cast
                     return new Animation();
                 case 0x76727563:
                     return new Curve();
+                case 0x564F4D43:
+                    return new CurveModeOverride();
                 case 0x6669746E:
                     return new NotificationTrack();
                 case 0x68736C62:
@@ -1120,6 +1122,15 @@ namespace Cast
         }
 
         /// <summary>
+        /// The collection of curve mode overrides for this animation.
+        /// </summary>
+        /// <returns></returns>
+        public List<CurveModeOverride> CurveModeOverrides()
+        {
+            return ChildrenOfType<CurveModeOverride>();
+        }
+
+        /// <summary>
         /// The collection of notification tracks for this animation.
         /// </summary>
         /// <returns></returns>
@@ -1252,6 +1263,45 @@ namespace Cast
             }
 
             return 1.0f;
+        }
+    }
+
+    /// <summary>
+    /// An override for an animation curves mode.
+    /// </summary>
+    public class CurveModeOverride : CastNode
+    {
+        public CurveModeOverride()
+            : base(0x564F4D43)
+        {
+        }
+
+        /// <summary>
+        /// Sets the name of the node that is the start of this override.
+        /// </summary>
+        /// <returns></returns>
+        public string NodeName()
+        {
+            if (Properties.TryGetValue("nn", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The mode for this override.
+        /// </summary>
+        /// <returns></returns>
+        public string Mode()
+        {
+            if (Properties.TryGetValue("m", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
         }
     }
 

@@ -326,9 +326,17 @@ class Animation(CastNode):
         """The collection of curves for this animation."""
         return self.ChildrenOfType(Curve)
 
+    def CurveModeOverrides(self):
+        """The collection of curve mode overrides for this animation."""
+        return self.ChildrenOfType(CurveModeOverride)
+
     def CreateCurve(self):
         """Creates a new curve in this animation."""
         return self.CreateChild(Curve())
+
+    def CreateCurveModeOverride(self):
+        """Creates a new curve mode override in this animation."""
+        return self.CreateChild(CurveModeOverride())
 
     def Notifications(self):
         """The collection of notification tracks for this animation."""
@@ -444,6 +452,35 @@ class Curve(CastNode):
     def SetAdditiveBlendWeight(self, value):
         """Sets the weight to use when blending this animation."""
         self.CreateProperty("ab", "f").values = [value]
+
+
+class CurveModeOverride(CastNode):
+    """An override for an animation curves mode."""
+
+    def __init__(self):
+        super(CurveModeOverride, self).__init__(0x564F4D43)
+
+    def NodeName(self):
+        """The name of the node that is the start of this override."""
+        nn = self.properties.get("nn")
+        if nn is not None:
+            return nn.values[0]
+        return None
+
+    def SetNodeName(self, name):
+        """Sets the name of the node that is the start of this override."""
+        self.CreateProperty("nn", "s").values = [name]
+
+    def Mode(self):
+        """The mode for this override."""
+        m = self.properties.get("m")
+        if m is not None:
+            return m.values[0]
+        return None
+
+    def SetMode(self, mode):
+        """Sets the mode for this override."""
+        self.CreateProperty("m", "s").values = [mode]
 
 
 class NotificationTrack(CastNode):
@@ -1174,6 +1211,7 @@ typeSwitcher = {
     0x6C656B73: Skeleton,
     0x6D696E61: Animation,
     0x76727563: Curve,
+    0x564F4D43: CurveModeOverride,
     0x6669746E: NotificationTrack,
     0x656E6F62: Bone,
     0x64686B69: IKHandle,
