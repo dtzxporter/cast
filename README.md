@@ -67,6 +67,7 @@ enum class CastId : uint32_t
 	Constraint = 0x74736E63,
 	Animation = 0x6D696E61,
 	Curve = 0x76727563,
+	CurveModeOverride = 0x564F4D43,
 	NotificationTrack = 0x6669746E,
 	Material = 0x6C74616D,
 	File = 0x656C6966,
@@ -738,7 +739,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>Skeleton, Curve, NotificiationTrack</td>
+   		<td>Skeleton, Curve, CurveModeOverride, NotificiationTrack</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
@@ -859,6 +860,52 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   - `vb` Visibility and expects `b`, `h`, or `i` values.
     - `=0` = hidden.
     - `>=1` = visible.
+
+### CurveModeOverride:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Animation</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	<tr>
+  		<td>Node Name (nn)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Mode (m)</td>
+   		<td>String (s) [additive, absolute, relative]</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+**Notes:**
+- The override node and all of it's children should override their curves mode to the new mode.
+- The override node must be present at the time of processing in order to determine if a child bone is a descendent.
 
 ### NotificationTrack:
 <table>
