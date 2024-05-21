@@ -31,7 +31,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.41"
+version = "1.42"
 
 
 def utilityAbout():
@@ -276,6 +276,29 @@ def utilitySlerp(qa, qb, t):
     qm.z = qa.z * ratioA + qb.z * ratioB
 
     return qm
+
+
+def utilityResolveCurveModeOverride(name, mode, overrides):
+    if not overrides:
+        return mode
+
+    try:
+        parentTree = cmds.ls(name, long=True)[0].split('|')[1:-1]
+
+        if not parentTree:
+            return mode
+
+        for parentName in parentTree:
+            if parentName.find(":") >= -1:
+                parentName = parentName[parentName.find(":") + 1:]
+
+            for override in overrides:
+                if parentName == override.NodeName():
+                    return override.Mode()
+
+        return mode
+    except RuntimeError:
+        return mode
 
 
 def utilityQueryToggleItem(name):
@@ -1325,7 +1348,7 @@ def importModelNode(model, path):
             model.Skeleton(), handles, paths, indexes, jointTransform)
 
 
-def importCurveNode(node, path, timeUnit, startFrame):
+def importCurveNode(node, path, timeUnit, startFrame, overrides):
     propertySwitcher = {
         "rq": ["rx", "ry", "rz"],
         "tx": ["tx"],
@@ -1375,8 +1398,12 @@ def importCurveNode(node, path, timeUnit, startFrame):
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
 
+    # Resolve any override if necessary.
+    nodeMode = utilityResolveCurveModeOverride(
+        nodeName, node.Mode(), overrides)
+
     (smallestFrame, largestFrame) = trackSwitcher[propertyName](
-        tracks, propertyName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode(), node.AdditiveBlendWeight())
+        tracks, propertyName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, nodeMode, node.AdditiveBlendWeight())
 
     # Make sure we have at least one quaternion track to set the interpolation mode to
     if propertyName == "rq":
@@ -1454,11 +1481,13 @@ def importAnimationNode(node, path):
     wantedLargestFrame = OpenMaya.MTime(1, wantedFps)
 
     curves = node.Curves()
+    curveModeOverrides = node.CurveModeOverrides()
+
     progress = utilityCreateProgress("Importing animation...", len(curves))
 
     for x in curves:
         (smallestFrame, largestFrame) = importCurveNode(
-            x, path, wantedFps, startFrame)
+            x, path, wantedFps, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         utilityStepProgress(progress)
