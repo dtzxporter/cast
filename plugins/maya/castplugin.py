@@ -1667,6 +1667,16 @@ def exportAnimation(root, objects):
     startFrame = int(cmds.playbackOptions(query=True, ast=True))
     endFrame = int(cmds.playbackOptions(query=True, aet=True))
 
+    # Make sure the frames are positive, for startFrame, force it to be 0 if it's < 0.
+    # If endFrame is < 0, force a fatal error.
+    if startFrame < 0:
+        cmds.warning(
+            "Animation start time was negative [%d], defaulting to 0." % startFrame)
+        startFrame = 0
+    if endFrame < 0:
+        cmds.error("Animation end time must not be negative.")
+        return
+
     simpleProperties = [
         ["translateX", "tx"],
         ["translateY", "ty"],
