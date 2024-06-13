@@ -504,7 +504,7 @@ def importModelNode(self, model, path):
         collection)
 
 
-def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides, rotationFix):
+def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -521,68 +521,53 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
 
-    # If the user specified the rotation fix, we need to interpolate the keyframes that are missing.
-    if rotationFix:
-        rotations = []
-        keyframes = []
+    # https://devtalk.blender.org/t/quaternion-interpolation/15883
+    # Blender interpolates rotations as-if they are separate components.
+    # This logic is of course, broken, so we must interpolate ourselves.
+    rotations = []
+    keyframes = []
 
-        numKeyframes = len(keyValueBuffer)
+    if len(keyFrameBuffer) > 0:
+        minFrame = min(keyFrameBuffer)
+        maxFrame = max(keyFrameBuffer)
 
-        if numKeyframes > 0:
-            minFrame = min(keyFrameBuffer)
-            maxFrame = max(keyFrameBuffer)
-
-            existing = {}
-
-            # Add user specified keyframes.
-            for i in range(0, len(keyValueBuffer), 4):
-                existing[keyFrameBuffer[int(i / 4)]] = Quaternion(
-                    (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2]))
-
-            lastKeyframeValue = None
-            lastKeyframeFrame = None
-
-            nextKeyframeValue = None
-            nextKeyframeFrame = None
-
-            # Step one keyframe at a time, and interpolate the missing ones.
-            for i in range(minFrame, maxFrame + 1):
-                if i in existing:
-                    lastKeyframeValue = existing[i]
-                    lastKeyframeFrame = i
-
-                    rotations.append(existing[i])
-                    keyframes.append(i)
-                    continue
-
-                # Keyframe was not found, we need to find the _last_ keyed frame
-                # And the _next_ keyed frame, then, interpolate between them!
-                if lastKeyframeValue is None:
-                    continue
-
-                # No keyframe available ahead, scan for one.
-                if nextKeyframeFrame is None or nextKeyframeFrame <= i:
-                    for x in range(i + 1, maxFrame + 1):
-                        if x in existing:
-                            nextKeyframeValue = existing[x]
-                            nextKeyframeFrame = x
-                            break
-
-                # We have a next keyframe that will work for us.
-                if nextKeyframeFrame is not None and nextKeyframeFrame > i:
-                    rotations.append(lastKeyframeValue.slerp(
-                        nextKeyframeValue, (i - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
-                    keyframes.append(i)
-                    continue
-    else:
-        # No rotation fix, append the keyframes as they appear in the file (let blender interpolate).
-        rotations = []
-        keyframes = []
+        existing = {}
 
         for i in range(0, len(keyValueBuffer), 4):
-            rotations.append(Quaternion(
-                (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2])))
-            keyframes.append(keyFrameBuffer[int(i / 4)])
+            existing[keyFrameBuffer[int(i / 4)]] = Quaternion(
+                (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2]))
+
+        lastKeyframeValue = None
+        lastKeyframeFrame = None
+        nextKeyframeValue = None
+        nextKeyframeFrame = None
+
+        for frame in range(minFrame, maxFrame + 1):
+            if frame in existing:
+                value = existing[frame]
+
+                lastKeyframeValue = value
+                lastKeyframeFrame = frame
+
+                rotations.append(value)
+                keyframes.append(frame)
+                continue
+
+            if lastKeyframeValue is None or lastKeyframeFrame is None:
+                continue
+
+            if nextKeyframeFrame is None or nextKeyframeFrame <= frame:
+                for nextFrame in range(frame + 1, maxFrame + 1):
+                    if nextFrame in existing:
+                        nextKeyframeValue = existing[nextFrame]
+                        nextKeyframeFrame = nextFrame
+                        break
+
+            if nextKeyframeFrame is not None and nextKeyframeFrame > frame:
+                rotations.append(lastKeyframeValue.slerp(
+                    nextKeyframeValue, (frame - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
+                keyframes.append(frame)
+                continue
 
     # Rotation keyframes in blender are independent from other data.
     for i in range(0, len(keyframes)):
@@ -815,8 +800,6 @@ def importAnimationNode(self, node, path):
         action = selectedObject.animation_data.action or bpy.data.actions.new(
             animName)
 
-    rotationFix = self.import_bake_rotations
-
     selectedObject.animation_data.action = action
     selectedObject.animation_data.action.use_fake_user = True
 
@@ -855,7 +838,7 @@ def importAnimationNode(self, node, path):
 
         if property == "rq":
             (smallestFrame, largestFrame) = importRotCurveNode(
-                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides, rotationFix)
+                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "tx":

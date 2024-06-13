@@ -860,6 +860,8 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   - `vb` Visibility and expects `b`, `h`, or `i` values.
     - `=0` = hidden.
     - `>=1` = visible.
+- The properties `tx`, `ty`, `tz`, `sx`, `sy`, `sz`, `vb` should interpolate linearly.
+- The property `rq` should interpolate with quaternion slerp.
 
 ### CurveModeOverride:
 <table>
