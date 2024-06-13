@@ -564,9 +564,10 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
                         break
 
             if nextKeyframeFrame is not None and nextKeyframeFrame > frame:
-                rotations.append(lastKeyframeValue.slerp(
-                    nextKeyframeValue, (frame - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
-                keyframes.append(frame)
+                if lastKeyframeValue != nextKeyframeValue:
+                    rotations.append(lastKeyframeValue.slerp(
+                        nextKeyframeValue, (frame - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
+                    keyframes.append(frame)
                 continue
 
     # Rotation keyframes in blender are independent from other data.
