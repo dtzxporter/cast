@@ -11,7 +11,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 4, 4),
+    "version": (1, 4, 5),
     "blender": (3, 0, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -66,12 +66,16 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     import_constraints: BoolProperty(
         name="Import Constraints", description="Imports and configures constraints for the models skeleton", default=True)
 
+    import_bake_rotations: BoolProperty(
+        name="Import Rotation Fix", description="Imports baked rotation keyframes, required because blender doesn't interpolate properly", default=True)
+
     def draw(self, context):
         self.layout.prop(self, "import_time")
         self.layout.prop(self, "import_reset")
         self.layout.prop(self, "import_skin")
         self.layout.prop(self, "import_ik")
         self.layout.prop(self, "import_constraints")
+        self.layout.prop(self, "import_bake_rotations")
 
     def execute(self, context):
         from . import import_cast

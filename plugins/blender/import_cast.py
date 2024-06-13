@@ -504,7 +504,7 @@ def importModelNode(self, model, path):
         collection)
 
 
-def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
+def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides, rotationFix):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -521,12 +521,74 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
 
-    # Rotation keyframes in blender are independent from other data.
-    for i in range(0, len(keyValueBuffer), 4):
-        rotation = Quaternion(
-            (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2])).to_matrix().to_3x3()
+    # If the user specified the rotation fix, we need to interpolate the keyframes that are missing.
+    if rotationFix:
+        rotations = []
+        keyframes = []
 
-        frame = keyFrameBuffer[int(i / 4)] + startFrame
+        numKeyframes = len(keyValueBuffer)
+
+        if numKeyframes > 0:
+            minFrame = min(keyFrameBuffer)
+            maxFrame = max(keyFrameBuffer)
+
+            existing = {}
+
+            # Add user specified keyframes.
+            for i in range(0, len(keyValueBuffer), 4):
+                existing[keyFrameBuffer[int(i / 4)]] = Quaternion(
+                    (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2]))
+
+            lastKeyframeValue = None
+            lastKeyframeFrame = None
+
+            nextKeyframeValue = None
+            nextKeyframeFrame = None
+
+            # Step one keyframe at a time, and interpolate the missing ones.
+            for i in range(minFrame, maxFrame + 1):
+                if i in existing:
+                    lastKeyframeValue = existing[i]
+                    lastKeyframeFrame = i
+
+                    rotations.append(existing[i])
+                    keyframes.append(i)
+                    continue
+
+                # Keyframe was not found, we need to find the _last_ keyed frame
+                # And the _next_ keyed frame, then, interpolate between them!
+                if lastKeyframeValue is None:
+                    continue
+
+                # No keyframe available ahead, scan for one.
+                if nextKeyframeFrame is None or nextKeyframeFrame <= i:
+                    for x in range(i + 1, maxFrame + 1):
+                        if x in existing:
+                            nextKeyframeValue = existing[x]
+                            nextKeyframeFrame = x
+                            break
+
+                # We have a next keyframe that will work for us.
+                if nextKeyframeFrame is not None and nextKeyframeFrame > i:
+                    rotations.append(lastKeyframeValue.slerp(
+                        nextKeyframeValue, (i - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
+                    keyframes.append(i)
+                    continue
+    else:
+        # No rotation fix, append the keyframes as they appear in the file (let blender interpolate).
+        rotations = []
+        keyframes = []
+
+        for i in range(0, len(keyValueBuffer), 4):
+            rotations.append(Quaternion(
+                (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2])))
+            keyframes.append(keyFrameBuffer[int(i / 4)])
+
+    # Rotation keyframes in blender are independent from other data.
+    for i in range(0, len(keyframes)):
+        rotation = rotations[i].to_matrix().to_3x3()
+
+        frame = keyframes[i] + startFrame
 
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
@@ -753,6 +815,8 @@ def importAnimationNode(self, node, path):
         action = selectedObject.animation_data.action or bpy.data.actions.new(
             animName)
 
+    rotationFix = self.import_bake_rotations
+
     selectedObject.animation_data.action = action
     selectedObject.animation_data.action.use_fake_user = True
 
@@ -791,7 +855,7 @@ def importAnimationNode(self, node, path):
 
         if property == "rq":
             (smallestFrame, largestFrame) = importRotCurveNode(
-                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides, rotationFix)
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "tx":
