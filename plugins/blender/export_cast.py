@@ -57,6 +57,8 @@ def utilityAssignMaterialSlots(material, matNode, filepath):
 
     for node in material.node_tree.nodes:
         if node.type == 'TEX_IMAGE':
+            if not node.image:
+                continue
 
             file = matNode.CreateFile()
 

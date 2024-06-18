@@ -9,6 +9,7 @@ from .cast import Cast, CastColor, Model, Animation, Instance, File
 
 PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
 SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
+MATERIAL_OUTPUT = bpy.app.translations.pgettext_data("Material Output")
 BLENDER_VERSION = bpy.app.version
 
 
@@ -64,7 +65,7 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
         # We need to create the specular node, removing principled first
         material.node_tree.nodes.remove(
             material.node_tree.nodes[PRINCIPLED_BSDF])
-        material_output = material.node_tree.nodes.get("Material Output")
+        material_output = material.node_tree.nodes.get(MATERIAL_OUTPUT)
         shader = material.node_tree.nodes.new(SPECULAR_BSDF)
         material.node_tree.links.new(
             material_output.inputs[0], shader.outputs[0])
