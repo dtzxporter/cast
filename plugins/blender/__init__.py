@@ -87,7 +87,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
             return {'FINISHED'}
         except Exception as e:
             self.report({'ERROR'}, str(e))
-            return {'CANCELLED'}
+            return {'FINISHED'}
 
     @classmethod
     def poll(self, context):
