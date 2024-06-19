@@ -7,11 +7,6 @@ from mathutils import *
 from bpy_extras.io_utils import unpack_list
 from .cast import Cast, CastColor, Model, Animation, Instance, File
 
-PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
-SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
-MATERIAL_OUTPUT = bpy.app.translations.pgettext_data("Material Output")
-BLENDER_VERSION = bpy.app.version
-
 
 def utilityBuildPath(root, asset):
     if os.path.isabs(asset):
@@ -31,9 +26,9 @@ def utilityStashCurveComponent(component, curve, name, index):
 
 
 def utilityIsVersionAtLeast(major, minor):
-    if BLENDER_VERSION[0] > major:
+    if bpy.app.version[0] > major:
         return True
-    elif BLENDER_VERSION[0] == major and BLENDER_VERSION[1] >= minor:
+    elif bpy.app.version[0] == major and bpy.app.version[1] >= minor:
         return True
     return False
 
@@ -46,11 +41,19 @@ def utilityClearKeyframePoints(fcurve):
         fcurve.keyframe_points.remove(keyframe)
 
 
+def utilityFindShaderNode(material, bl_idname):
+    for node in material.node_tree.nodes.values():
+        if node.bl_idname == bl_idname:
+            return node
+
+    return None
+
+
 def utilityAssignBSDFMaterialSlots(material, slots, path):
     # We will two shaders, one for metalness and one for specular
     if "metal" in slots:
         # Principled is default shader node
-        shader = material.node_tree.nodes[PRINCIPLED_BSDF]
+        shader = utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled")
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
@@ -64,11 +67,15 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
     else:
         # We need to create the specular node, removing principled first
         material.node_tree.nodes.remove(
-            material.node_tree.nodes[PRINCIPLED_BSDF])
-        material_output = material.node_tree.nodes.get(MATERIAL_OUTPUT)
-        shader = material.node_tree.nodes.new(SPECULAR_BSDF)
+            utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled"))
+        material_output = utilityFindShaderNode(
+            material, "ShaderNodeOutputMaterial")
+
+        shader = material.node_tree.nodes.new("ShaderNodeEeveeSpecular")
+
         material.node_tree.links.new(
             material_output.inputs[0], shader.outputs[0])
+
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
