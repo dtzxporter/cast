@@ -937,6 +937,8 @@ def importInstanceNodes(self, nodes, context, path):
                 instance.Name() or instanceName, None)
             newInstance.instance_type = 'COLLECTION'
             newInstance.instance_collection = base
+            newInstance.show_instancer_for_render = False
+            newInstance.show_instancer_for_viewport = False
 
             position = instance.Position()
             rotation = instance.Rotation()

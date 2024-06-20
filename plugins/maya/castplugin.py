@@ -31,7 +31,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.51"
+version = "1.52"
 
 
 def utilityAbout():
