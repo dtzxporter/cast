@@ -917,6 +917,8 @@ def importInstanceNodes(self, nodes, context, path):
     instanceGroup = bpy.data.collections.new("%s_instances" % name)
 
     for instancePath, instances in uniqueInstances.items():
+        instanceName = os.path.splitext(os.path.basename(instancePath))[0]
+
         try:
             bpy.ops.import_scene.cast(filepath=instancePath)
         except:
@@ -931,7 +933,8 @@ def importInstanceNodes(self, nodes, context, path):
         baseGroup.children.link(base)
 
         for instance in instances:
-            newInstance = bpy.data.objects.new(instance.Name(), None)
+            newInstance = bpy.data.objects.new(
+                instance.Name() or instanceName, None)
             newInstance.instance_type = 'COLLECTION'
             newInstance.instance_collection = base
 
