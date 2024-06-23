@@ -31,7 +31,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.52"
+version = "1.53"
 
 
 def utilityAbout():
@@ -761,13 +761,13 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
     largestFrame = OpenMaya.MTime(0, timeUnit)
 
-    tempBufferX = OpenMaya.MScriptUtil()
-    tempBufferY = OpenMaya.MScriptUtil()
-    tempBufferZ = OpenMaya.MScriptUtil()
+    # We must have three tracks here
+    if None in tracks:
+        return (smallestFrame, largestFrame)
 
-    valuesX = [0.0] * len(frameBuffer)
-    valuesY = [0.0] * len(frameBuffer)
-    valuesZ = [0.0] * len(frameBuffer)
+    valuesX = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
+    valuesY = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
+    valuesZ = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
 
     for frame in frameBuffer:
         time = OpenMaya.MTime(frame, timeUnit) + frameStart
@@ -789,19 +789,15 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     elif mode == "additive":
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
-            eulerSamples = [0.0, 0.0, 0.0]
+
+            sampleX = tracks[0][0].evaluate(frame)
+            sampleY = tracks[1][0].evaluate(frame)
+            sampleZ = tracks[2][0].evaluate(frame)
 
             frame = timeBuffer[slot]
 
-            if tracks[0] is not None:
-                eulerSamples[0] = tracks[0][0].evaluate(frame)
-            if tracks[1] is not None:
-                eulerSamples[1] = tracks[1][0].evaluate(frame)
-            if tracks[2] is not None:
-                eulerSamples[2] = tracks[2][0].evaluate(frame)
-
             additiveQuat = OpenMaya.MEulerRotation(
-                eulerSamples[0], eulerSamples[1], eulerSamples[2]).asQuaternion()
+                sampleX, sampleY, sampleZ).asQuaternion()
             frameQuat = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
@@ -812,10 +808,7 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
             valuesY[slot] = euler.y
             valuesZ[slot] = euler.z
     elif mode == "relative":
-        if tracks[0] is not None:
-            rest = utilityGetRestData(tracks[0][1], "rotation_quaternion")
-        else:
-            rest = OpenMaya.MQuaternion()
+        rest = utilityGetRestData(tracks[0][1], "rotation_quaternion")
 
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
@@ -831,21 +824,20 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
 
-    tempBufferX.createFromList(valuesX, len(valuesX))
-    tempBufferY.createFromList(valuesY, len(valuesY))
-    tempBufferZ.createFromList(valuesZ, len(valuesZ))
+    tracks[0][0].addKeys(timeBuffer,
+                         valuesX,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
-    if tracks[0] is not None:
-        tracks[0][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferX.asDoublePtr(), timeBuffer.length(
-        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+    tracks[1][0].addKeys(timeBuffer,
+                         valuesY,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
-    if tracks[1] is not None:
-        tracks[1][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferY.asDoublePtr(), timeBuffer.length(
-        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
-
-    if tracks[2] is not None:
-        tracks[2][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferZ.asDoublePtr(), timeBuffer.length(
-        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+    tracks[2][0].addKeys(timeBuffer,
+                         valuesZ,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
     return (smallestFrame, largestFrame)
 
@@ -859,7 +851,7 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     scriptUtil = OpenMaya.MScriptUtil()
 
     # We must have one track here
-    if tracks[0] is None:
+    if None in tracks:
         return (smallestFrame, largestFrame)
 
     track = tracks[0][0]
@@ -915,7 +907,9 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
 
-    track.addKeys(timeBuffer, curveValueBuffer, OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+    track.addKeys(timeBuffer,
+                  curveValueBuffer,
+                  OpenMayaAnim.MFnAnimCurve.kTangentLinear,
                   OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
     return (smallestFrame, largestFrame)
