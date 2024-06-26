@@ -790,11 +790,11 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
 
+            frame = timeBuffer[slot]
+
             sampleX = tracks[0][0].evaluate(frame)
             sampleY = tracks[1][0].evaluate(frame)
             sampleZ = tracks[2][0].evaluate(frame)
-
-            frame = timeBuffer[slot]
 
             additiveQuat = OpenMaya.MEulerRotation(
                 sampleX, sampleY, sampleZ).asQuaternion()
