@@ -848,8 +848,6 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
     largestFrame = OpenMaya.MTime(0, timeUnit)
 
-    scriptUtil = OpenMaya.MScriptUtil()
-
     # We must have one track here
     if None in tracks:
         return (smallestFrame, largestFrame)
@@ -868,10 +866,10 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     # Default track mode is absolute meaning that the
     # values are what they should be in the curve already
     if mode == "absolute" or mode is None:
-        scriptUtil.createFromList([x for x in valueBuffer], len(valueBuffer))
+        curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
-        curveValueBuffer = OpenMaya.MDoubleArray(
-            scriptUtil.asDoublePtr(), len(valueBuffer))
+        for i, value in enumerate(valueBuffer):
+            curveValueBuffer[i] = value
     # Additive curves are applied to any existing curve value in the scene
     # so we will add it to the sample at the given time
     elif mode == "additive":
