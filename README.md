@@ -20,6 +20,7 @@ The goal of cast is to create an easy to use format for models, animations, mate
 
 # Coming from SEAnim/SEModel:
 - SECast, a lossless converter to cast: [SECast](https://dtzxporter.com/tools/secast)
+- **Note:** If your tool supports exporting to cast directly, that is always better.
 
 # FAQ:
 - Frequently asked questions: [FAQ](FAQ.md)
