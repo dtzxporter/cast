@@ -1367,7 +1367,7 @@ def importModelNode(model, path):
 
             for index, vertexIndex in enumerate(indices):
                 vertexPositions.set(
-                    vertexIndex, positions[index * 3], positions[(index * 3) + 1], positions[(index*3) + 2], 1.0)
+                    vertexIndex, positions[index * 3], positions[(index * 3) + 1], positions[(index * 3) + 2], 1.0)
 
             targetMesh.setPoints(vertexPositions)
 
