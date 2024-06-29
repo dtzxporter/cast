@@ -822,7 +822,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 	 <tr>
   		<td>Key Property Name (kp)</td>
-   		<td>String (s) [rq, tx, ty, tz, sx, sy, sz, vb]</td>
+   		<td>String (s) [rq, tx, ty, tz, sx, sy, sz, bs, vb]</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
@@ -866,10 +866,11 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   - `sx` Scale 'X' and expects `f` values.
   - `sy` Scale 'Y' and expects `f` values.
   - `sz` Scale 'Z' and expects `f` values.
+  - `bs` BlendShape Weight and expects `f` values.
   - `vb` Visibility and expects `b`, `h`, or `i` values.
     - `=0` = hidden.
     - `>=1` = visible.
-- The properties `tx`, `ty`, `tz`, `sx`, `sy`, `sz`, `vb` should interpolate linearly.
+- The properties `tx`, `ty`, `tz`, `sx`, `sy`, `sz`, `bs`, `vb` should interpolate linearly.
 - The property `rq` should interpolate with quaternion slerp.
 
 ### CurveModeOverride:
