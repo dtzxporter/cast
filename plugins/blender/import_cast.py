@@ -620,6 +620,59 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
     return (smallestFrame, largestFrame)
 
 
+def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
+    smallestFrame = sys.maxsize
+    largestFrame = 0
+
+    # We need to find every instance of the shape key in the armatures available meshes.
+    # Each mesh has it's own copy of the key, which needs it's own curve...
+    curves = []
+
+    for child in armature.children_recursive:
+        if child.type != "MESH":
+            continue
+        if not child.data.shape_keys:
+            continue
+        if not nodeName in child.data.shape_keys.key_blocks:
+            continue
+
+        mesh = child.data
+
+        # Each mesh has it's own animation action, which contains the curves for each key.
+        try:
+            mesh.animation_data.action
+        except:
+            mesh.animation_data_create()
+
+        action = mesh.animation_data.action or bpy.data.actions.new(
+            animName)
+
+        mesh.animation_data.action = action
+        mesh.animation_data.action.use_fake_user = True
+
+        curve = action.fcurves.find(data_path="shape_keys.key_blocks[\"%s\"].value" %
+                                    nodeName, index=0) or action.fcurves.new(data_path="shape_keys.key_blocks[\"%s\"].value" %
+                                                                             nodeName, index=0, action_group=nodeName)
+
+        # We found a mesh that has a matching shape key, add the curve.
+        curves.append(curve)
+
+    # For every curve add the values directly.
+    keyFrameBuffer = node.KeyFrameBuffer()
+    keyValueBuffer = node.KeyValueBuffer()
+
+    for curve in curves:
+        for frame, value in zip(keyFrameBuffer, keyValueBuffer):
+            frame = frame + startFrame
+
+            smallestFrame = min(frame, smallestFrame)
+            largestFrame = max(frame, largestFrame)
+
+            curve.keyframe_points.insert(frame, value=value, options={'FAST'})
+
+    return (smallestFrame, largestFrame)
+
+
 def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
@@ -654,6 +707,11 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
         scale = Vector((1.0, 1.0, 1.0))
 
         for i, frame in enumerate(keyFrameBuffer):
+            frame = frame + startFrame
+
+            smallestFrame = min(frame, smallestFrame)
+            largestFrame = max(frame, largestFrame)
+
             if mode == "absolute" or mode is None:
                 scale[axis] = keyValueBuffer[i]
 
@@ -850,6 +908,11 @@ def importAnimationNode(self, node, path):
         if property == "rq":
             (smallestFrame, largestFrame) = importRotCurveNode(
                 x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+            wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+            wantedLargestFrame = max(largestFrame, wantedLargestFrame)
+        elif property == "bs":
+            (smallestFrame, largestFrame) = importBlendShapeCurveNode(
+                x, nodeName, animName, selectedObject, startFrame)
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "tx":
