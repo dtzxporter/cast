@@ -31,7 +31,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.54"
+version = "1.55"
 
 
 def utilityAbout():
@@ -1300,41 +1300,84 @@ def importModelNode(model, path):
     utilityEndProgress(progress)
 
     blendShapes = model.BlendShapes()
+    blendShapesByBaseShape = {}
+
+    # Merge the blend shapes together by their base shapes, so we only create one deformer per base.
+    for blendShape in blendShapes:
+        baseShapeHash = blendShape.BaseShape().Hash()
+
+        if baseShapeHash not in meshHandles:
+            continue
+        if baseShapeHash not in blendShapesByBaseShape:
+            blendShapesByBaseShape[baseShapeHash] = [blendShape]
+        else:
+            blendShapesByBaseShape[baseShapeHash].append(blendShape)
+
     progress = utilityCreateProgress("Importing shapes...", len(blendShapes))
 
-    for blendShape in blendShapes:
-        # We need one base shape and 1+ target shapes
-        if blendShape.BaseShape() is None or blendShape.BaseShape().Hash() not in meshHandles:
-            continue
-        if blendShape.TargetShapes() is None:
-            continue
+    # Iterate over blend shapes by base shapes.
+    for blendShapes in blendShapesByBaseShape.values():
+        baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
+        baseShapeDagNode = OpenMaya.MFnDagNode(baseShape)
+        baseShapeTransform = OpenMaya.MFnDagNode(baseShapeDagNode.parent(0))
 
-        # Default to 1.0 when value is not present
-        baseShape = meshHandles[blendShape.BaseShape().Hash()]
-        targetShapes = [meshHandles[x.Hash()]
-                        for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
-        targetWeightScales = blendShape.TargetWeightScales() or []
-        targetWeightScaleCount = len(targetWeightScales)
+        # Create the target shapes.
+        targetShapes = [cmds.duplicate(
+            baseShapeDagNode.fullPathName(), ic=True) for _ in blendShapes]
 
-        # Create the deformer on the base shape
+        # Create the deformer on the abse shape.
         blendDeformer = OpenMayaAnim.MFnBlendShapeDeformer()
         blendDeformer.create(baseShape)
 
-        if blendShape.Name() is not None:
-            blendDeformer.setName(blendShape.Name())
+        # Create the targets in the deformer and set the new vertex data.
+        for i, (targetShape, blendShape) in enumerate(zip(targetShapes, blendShapes)):
+            # Place the new shape key under the base shape so that the key name will be unique to that mesh.
+            cmds.parent(targetShape[0], baseShapeTransform.fullPathName())
+            newShape = cmds.rename(targetShape[0], blendShape.Name())
 
-        # Assign the targets
-        for i, targetShape in enumerate(targetShapes):
-            if i < targetWeightScaleCount:
-                fullWeight = targetWeightScales[i]
-            else:
-                fullWeight = 1.0
-            blendDeformer.addTarget(baseShape, i, targetShape, fullWeight)
+            # Get the actual mesh name.
+            newShapeShapes = cmds.listRelatives(
+                newShape, shapes=True, fullPath=True)
+
+            # Grab a handle to the new shape, which will be our target mesh.
+            selectList = OpenMaya.MSelectionList()
+            selectList.add(newShapeShapes[0])
+
+            # Get the mesh object.
+            targetShape = OpenMaya.MObject()
+            selectList.getDependNode(0, targetShape)
+            targetMesh = OpenMaya.MFnMesh(targetShape)
+
+            # Rename the actual mesh to the key name.
+            cmds.rename(newShapeShapes[0], blendShape.Name())
+
+            # Set the shape positions.
+            indices = blendShape.TargetShapeVertexIndices()
+            positions = blendShape.TargetShapeVertexPositions()
+
+            if not indices or not positions:
+                cmds.warning(
+                    "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShapeDagNode.name()))
+                utilityStepProgress(progress)
+                continue
+
+            vertexPositions = OpenMaya.MFloatPointArray()
+
+            targetMesh.getPoints(vertexPositions)
+
+            for index, vertexIndex in enumerate(indices):
+                vertexPositions.set(
+                    vertexIndex, positions[index * 3], positions[(index * 3) + 1], positions[(index*3) + 2], 1.0)
+
+            targetMesh.setPoints(vertexPositions)
+
+            blendDeformer.addTarget(baseShape, i, targetShape,
+                                    max(0.0, blendShape.TargetWeightScale() or 1.0))
             blendTargetParent = OpenMaya.MFnDagNode(targetShape).parent(0)
-            # Sets the parent meshes transform to invisible, to hide the target.
-            utilitySetVisibility(blendTargetParent, False)
 
-        utilityStepProgress(progress)
+            # Prevent rendering of the target mesh shapes.
+            utilitySetVisibility(blendTargetParent, False)
+            utilityStepProgress(progress)
     utilityEndProgress(progress)
 
     # Import any ik handles now that the meshes are bound because the constraints may
