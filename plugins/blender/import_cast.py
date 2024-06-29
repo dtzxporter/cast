@@ -489,16 +489,16 @@ def importModelNode(self, model, path):
                 10.0, blendShape.TargetWeightScale() or 1.0)
 
             indices = blendShape.TargetShapeVertexIndices()
-            deltas = blendShape.TargetShapeVertexDeltas()
+            positions = blendShape.TargetShapeVertexPositions()
 
-            if not indices or not deltas:
+            if not indices or not positions:
                 self.report(
-                    {'WARNING'}, "Ignoring blend shape \"%s\" no indices or deltas specified." % blendShape.Name())
+                    {'WARNING'}, "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
                 continue
 
             for index, vertexIndex in enumerate(indices):
-                newShape.data[vertexIndex].co = Vector((deltas[index * 3], deltas[(index * 3) + 1], deltas[(index * 3) + 2])) + \
-                    basis.data[vertexIndex].co
+                newShape.data[vertexIndex].co = Vector(
+                    (positions[index * 3], positions[(index * 3) + 1], positions[(index * 3) + 2]))
 
     # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
     if self.import_ik:
