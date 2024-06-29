@@ -460,43 +460,45 @@ def importModelNode(self, model, path):
         collection.objects.link(meshObj)
 
     blendShapes = model.BlendShapes()
+    blendShapesByBaseShape = {}
 
+    # Merge the blend shapes together by their base shapes, so we only create a basis once.
     for blendShape in blendShapes:
-        # We need one base shape and 1+ target shapes
-        if blendShape.BaseShape() is None or blendShape.BaseShape().Hash() not in meshHandles:
-            continue
-        if blendShape.TargetShapes() is None:
-            continue
+        baseShapeHash = blendShape.BaseShape().Hash()
 
-        baseShape = meshHandles[blendShape.BaseShape().Hash()]
-        targetShapes = [meshHandles[x.Hash()]
-                        for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
-        targetWeightScales = blendShape.TargetWeightScales() or []
-        targetWeightScaleCount = len(targetWeightScales)
+        if baseShapeHash not in meshHandles:
+            continue
+        if baseShapeHash not in blendShapesByBaseShape:
+            blendShapesByBaseShape[baseShapeHash] = [blendShape]
+        else:
+            blendShapesByBaseShape[baseShapeHash].append(blendShape)
 
+    # Iterate over the blend shapes by base shapes.
+    for blendShapes in blendShapesByBaseShape.values():
+        baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
+
+        # The basis will automatically load the base shape's vertex positions.
         basis = baseShape[0].shape_key_add(name="Basis")
         basis.interpolation = "KEY_LINEAR"
 
-        for i, shape in enumerate(targetShapes):
-            if len(basis.data) != len(shape[1].vertices):
+        for blendShape in blendShapes:
+            newShape = baseShape[0].shape_key_add(
+                name=blendShape.Name(), from_mix=False)
+            newShape.interpolation = "KEY_LINEAR"
+            newShape.slider_max = min(
+                10.0, blendShape.TargetWeightScale() or 1.0)
+
+            indices = blendShape.TargetShapeVertexIndices()
+            deltas = blendShape.TargetShapeVertexDeltas()
+
+            if not indices or not deltas:
                 self.report(
-                    {'WARNING'}, "Unable to create blend shape \"%s\" with a different number of vertices." % shape[0].name)
+                    {'WARNING'}, "Ignoring blend shape \"%s\" no indices or deltas specified." % blendShape.Name())
                 continue
 
-            newShape = baseShape[0].shape_key_add(
-                name=shape[0].name, from_mix=False)
-            newShape.interpolation = "KEY_LINEAR"
-
-            if i < targetWeightScaleCount:
-                if targetWeightScales[i] > 10.0:
-                    self.report(
-                        {'WARNING'}, "Clamping blend shape \"%s\" scale to 10.0." % shape[0].name)
-                newShape.slider_max = min(10.0, targetWeightScales[i])
-
-            for v, value in enumerate(shape[1].vertices):
-                newShape.data[v].co = value.co
-
-            shape[0].hide_viewport = True
+            for index, vertexIndex in enumerate(indices):
+                newShape.data[vertexIndex].co = Vector((deltas[index * 3], deltas[(index * 3) + 1], deltas[(index * 3) + 2])) + \
+                    basis.data[vertexIndex].co
 
     # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
     if self.import_ik:

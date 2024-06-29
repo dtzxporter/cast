@@ -720,54 +720,66 @@ class Mesh(CastNode):
 
 
 class BlendShape(CastNode):
-    """A blend shape deformer that defines a base mesh shape, and corrosponding target mesh shapes."""
+    """A blend shape key that defines a base mesh shape, and corresponding target mesh values."""
 
     def __init__(self):
         super(BlendShape, self).__init__(0x68736C62)
 
     def Name(self):
-        """The name of this blend shape deformer."""
+        """The name of this blend shape."""
         n = self.properties.get("n")
         if n is not None:
             return n.values[0]
         return None
 
     def SetName(self, name):
-        """Sets the name of this blend shape deformer."""
+        """Sets the name of this blend shape."""
         self.CreateProperty("n", "s").values = [name]
 
     def BaseShape(self):
-        """The base mesh shape."""
+        """The base shape."""
         b = self.properties.get("b")
         if b is not None:
             return self.parentNode.ChildByHash(b.values[0])
         return None
 
     def SetBaseShape(self, hash):
-        """Sets the base mesh shape."""
+        """Sets the base shape."""
         self.CreateProperty("b", "l").values = [hash]
 
-    def TargetShapes(self):
-        """A collection of target mesh shapes."""
-        t = self.properties.get("t")
-        if t is not None:
-            return [self.parentNode.ChildByHash(x) for x in t.values]
+    def TargetShapeVertexIndices(self):
+        """A collection of target shape vertex indices."""
+        vi = self.properties.get("vi")
+        if vi is not None:
+            return vi.values
         return None
 
-    def SetTargetShapes(self, hashes):
-        """Sets a collection of target mesh shapes."""
-        self.CreateProperty("t", "l").values = list(hashes)
+    def SetTargetShapeVertexIndices(self, indices):
+        """Sets a collection of target shape vertex indices."""
+        self.CreateProperty("vi", castTypeForMaximum(
+            indices)).values = list(indices)
 
-    def TargetWeightScales(self):
-        """A collection of target mesh scale values."""
+    def TargetShapeVertexDeltas(self):
+        """A collection of target shape vertex deltas."""
+        vd = self.properties.get("vd")
+        if vd is not None:
+            return vd.values
+        return None
+
+    def SetTargetShapeVertexDeltas(self, deltas):
+        """Sets a collection of target shape vertex deltas."""
+        self.CreateProperty("vd", "3v").values = list(sum(deltas, ()))
+
+    def TargetWeightScale(self):
+        """The target shape scale value."""
         ts = self.properties.get("ts")
         if ts is not None:
-            return ts.values
+            return ts.values[0]
         return None
 
-    def SetTargetWeightScales(self, scales):
-        """Sets a collection of target mesh scale values."""
-        self.CreateProperty("ts", "f").values = list(scales)
+    def SetTargetWeightScale(self, scale):
+        """Sets the target shape scale value."""
+        self.CreateProperty("ts", "f").values = [scale]
 
 
 class Skeleton(CastNode):

@@ -300,7 +300,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   		<td>Name (n)</td>
    		<td>String (s)</td>
 		<td>False</td>
-		<td>False</td>
+		<td>True</td>
  	</tr>
 	<tr>
   		<td>Base Shape (Hash of CastNode:Mesh) (b)</td>
@@ -309,13 +309,19 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>True</td>
  	</tr>
 	<tr>
-  		<td>Target Shapes (Hashes of CastNode:Mesh) (t)</td>
-   		<td>Integer 64 (l)</td>
+  		<td>Target Shape Vertex Indices (vi)</td>
+   		<td>Byte (b), Short (h), Integer 32 (i)</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
 	<tr>
-  		<td>Target Weight Scales (ts)</td>
+		<td>Target Shape Vertex Deltas (vd)</td>
+		<td>Vector 3 (v3)</td>
+		<td>True</td>
+		<td>True</td>
+	</tr>
+	<tr>
+  		<td>Target Weight Scale (ts)</td>
    		<td>Float (f)</td>
 		<td>True</td>
 		<td>False</td>
@@ -323,8 +329,10 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 </table>
 
 **Notes**:
-- At a minimum one `Base Shape` and one `Target Shape` must be present.
-- `Target Weight Scales` indicates the maximum value the target shape can deform to. The count usually will match `Target Shape(s)` but if it does not plugins should fall back to 1.0 as the default.
+- The `Base Shape` must be an existing cast mesh.
+- The `Target Shape Vertex Indices` and `Target Shape Vertex Deltas` must be the same length as they are paired together.
+- `Target Shape Vertex Deltas` are added (+=) to the `Base Shape`'s corresponding vertex position.
+- `Target Weight Scale` indicates the maximum value the target shape can deform to and should default to `1.0`.
 
 ### Skeleton:
 <table>

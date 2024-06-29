@@ -318,7 +318,7 @@ namespace Cast
     }
 
     /// <summary>
-    /// A blend shape deformer that defines a base mesh shape, and corrosponding target mesh shapes.
+    /// A blend shape key that defines a base mesh shape, and corresponding target mesh values.
     /// </summary>
     public class BlendShape : CastNode
     {
@@ -342,7 +342,7 @@ namespace Cast
         }
 
         /// <summary>
-        /// The base mesh shape.
+        /// The base shape.
         /// </summary>
         /// <returns></returns>
         public Mesh BaseShape()
@@ -356,32 +356,44 @@ namespace Cast
         }
 
         /// <summary>
-        /// A collection of target mesh shapes.
+        /// A collection of target shape vertex indices.
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<Mesh> TargetShapes()
+        public IEnumerable<int> TargetShapeVertexIndices()
         {
-            if (Properties.TryGetValue("t", out CastProperty Value))
+            if (Properties.TryGetValue("vi", out CastProperty Value))
             {
                 foreach (var Item in Value.Values)
                 {
-                    yield return (Mesh)ChildByHash((ulong)Item);
+                    yield return (int)Item;
                 }
             }
         }
 
         /// <summary>
-        /// A collection of target mesh scale values.
+        /// A collection of target shape vertex deltas.
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<float> TargetWeightScales()
+        public IEnumerable<Vector3> TargetShapeVertexDeltas()
         {
-            if (Properties.TryGetValue("ts", out CastProperty Value))
+            if (Properties.TryGetValue("vd", out CastProperty Value))
             {
                 foreach (var Item in Value.Values)
                 {
-                    yield return (float)Item;
+                    yield return (Vector3)Item;
                 }
+            }
+        }
+
+        /// <summary>
+        /// The target shape scale value.
+        /// </summary>
+        /// <returns></returns>
+        public float TargetWeightScale()
+        {
+            if (Properties.TryGetValue("ts", out CastProperty Value))
+            {
+                return (float)Value.Values[0];
             }
         }
     }
