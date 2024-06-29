@@ -371,12 +371,12 @@ namespace Cast
         }
 
         /// <summary>
-        /// A collection of target shape vertex deltas.
+        /// A collection of target shape vertex positions.
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<Vector3> TargetShapeVertexDeltas()
+        public IEnumerable<Vector3> TargetShapeVertexPositions()
         {
-            if (Properties.TryGetValue("vd", out CastProperty Value))
+            if (Properties.TryGetValue("vp", out CastProperty Value))
             {
                 foreach (var Item in Value.Values)
                 {

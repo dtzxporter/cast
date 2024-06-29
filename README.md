@@ -315,7 +315,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>True</td>
  	</tr>
 	<tr>
-		<td>Target Shape Vertex Deltas (vd)</td>
+		<td>Target Shape Vertex Positions (vp)</td>
 		<td>Vector 3 (v3)</td>
 		<td>True</td>
 		<td>True</td>
@@ -330,8 +330,8 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 
 **Notes**:
 - The `Base Shape` must be an existing cast mesh.
-- The `Target Shape Vertex Indices` and `Target Shape Vertex Deltas` must be the same length as they are paired together.
-- `Target Shape Vertex Deltas` are added (+=) to the `Base Shape`'s corresponding vertex position.
+- The `Target Shape Vertex Indices` and `Target Shape Vertex Positions` must be the same length as they are paired together.
+- `Target Shape Vertex Positions` is the final value of each changed vertex position ignoring the `Base Shape`'s corresponding vertex.
 - `Target Weight Scale` indicates the maximum value the target shape can deform to and should default to `1.0`.
 
 ### Skeleton:

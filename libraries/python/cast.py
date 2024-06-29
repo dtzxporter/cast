@@ -759,16 +759,16 @@ class BlendShape(CastNode):
         self.CreateProperty("vi", castTypeForMaximum(
             indices)).values = list(indices)
 
-    def TargetShapeVertexDeltas(self):
-        """A collection of target shape vertex deltas."""
-        vd = self.properties.get("vd")
-        if vd is not None:
-            return vd.values
+    def TargetShapeVertexPositions(self):
+        """A collection of target shape vertex positions."""
+        vp = self.properties.get("vp")
+        if vp is not None:
+            return vp.values
         return None
 
-    def SetTargetShapeVertexDeltas(self, deltas):
-        """Sets a collection of target shape vertex deltas."""
-        self.CreateProperty("vd", "3v").values = list(sum(deltas, ()))
+    def SetTargetShapeVertexPositions(self, positions):
+        """Sets a collection of target shape vertex positions."""
+        self.CreateProperty("vp", "3v").values = list(sum(positions, ()))
 
     def TargetWeightScale(self):
         """The target shape scale value."""
