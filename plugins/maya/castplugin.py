@@ -31,7 +31,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.55"
+version = "1.56"
 
 
 def utilityAbout():
@@ -466,6 +466,14 @@ def utilityClearAnimation():
             pass
         except ValueError:
             pass
+    for deformer in cmds.ls(type="blendShape", long=True):
+        for weight in cmds.blendShape(deformer, target=True, query=True):
+            try:
+                cmds.setAttr("%s.%s" % (deformer, weight.split("|")[-1]), 0.0)
+            except RuntimeError:
+                pass
+            except ValueError:
+                pass
 
 
 def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMethod="linear"):
@@ -838,6 +846,52 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
                          valuesZ,
                          OpenMayaAnim.MFnAnimCurve.kTangentLinear,
                          OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+
+    return (smallestFrame, largestFrame)
+
+
+def utilityImportBlendShapeTrackData(shapeName, timeUnit, frameStart, frameBuffer, valueBuffer):
+    smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
+    largestFrame = OpenMaya.MTime(0, timeUnit)
+
+    deformers = []
+
+    # Grab all of the deformer nodes so we can determine if they have this shape key.
+    for deformer in cmds.ls(type="blendShape"):
+        if cmds.objExists("%s.%s" % (deformer, shapeName)):
+            cmds.setAttr("%s.%s" % (deformer, shapeName), 0)
+            deformers.append(deformer)
+
+    if not deformers:
+        return (smallestFrame, largestFrame)
+
+    track = OpenMayaAnim.MFnAnimCurve()
+    track.create(OpenMayaAnim.MFnAnimCurve.kAnimCurveTL)
+    track.setName("%s_weight" % shapeName)
+
+    timeBuffer = OpenMaya.MTimeArray()
+    curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
+
+    for i, frame in enumerate(frameBuffer):
+        time = OpenMaya.MTime(frame, timeUnit) + frameStart
+
+        smallestFrame = min(time, smallestFrame)
+        largestFrame = max(time, largestFrame)
+
+        timeBuffer.append(time)
+        curveValueBuffer[i] = valueBuffer[i]
+
+    if timeBuffer.length() <= 0:
+        return (smallestFrame, largestFrame)
+
+    track.addKeys(timeBuffer,
+                  curveValueBuffer,
+                  OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                  OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+
+    for deformer in deformers:
+        cmds.connectAttr("%s.output" % track.name(), "%s.%s" %
+                         (deformer, shapeName))
 
     return (smallestFrame, largestFrame)
 
@@ -1426,6 +1480,12 @@ def importCurveNode(node, path, timeUnit, startFrame, overrides):
 
     nodeName = node.NodeName()
     propertyName = node.KeyPropertyName()
+    keyFrameBuffer = node.KeyFrameBuffer()
+    keyValueBuffer = node.KeyValueBuffer()
+
+    # Special case for blend shapes because it requires one curve to N deformer(s).
+    if propertyName == "bs":
+        return utilityImportBlendShapeTrackData(nodeName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer)
 
     smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
     largestFrame = OpenMaya.MTime(0, timeUnit)
@@ -1438,9 +1498,6 @@ def importCurveNode(node, path, timeUnit, startFrame, overrides):
 
     if tracks is None:
         return (smallestFrame, largestFrame)
-
-    keyFrameBuffer = node.KeyFrameBuffer()
-    keyValueBuffer = node.KeyValueBuffer()
 
     # Resolve any override if necessary.
     nodeMode = node.Mode()
