@@ -160,7 +160,7 @@ def utilityGetBindposeScale(poseBone):
     return bindPoseScale
 
 
-def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
+def importSkeletonConstraintNode(self, skeleton, poses):
     if skeleton is None:
         return
 
@@ -202,7 +202,11 @@ def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
             ct.target_space = 'LOCAL_OWNER_ORIENT'
 
 
-def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
+def importMergeModel(self, selectedObj, skeletonObj, poses):
+    return
+
+
+def importSkeletonIKNode(self, skeleton, poses):
     if skeleton is None:
         return
 
@@ -448,10 +452,10 @@ def importModelNode(self, model, path):
 
                 for x in range(len(newMesh.vertices)):
                     for j in range(maximumInfluence):
-                        index = j + (x * maximumInfluence)
+                        i = j + (x * maximumInfluence)
 
-                        boneGroups[weightBoneBuffer[index]].add(
-                            (x,), weightValueBuffer[index], "ADD")
+                        boneGroups[weightBoneBuffer[i]].add(
+                            (x,), weightValueBuffer[i], "ADD")
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(len(newMesh.vertices)):
@@ -496,20 +500,29 @@ def importModelNode(self, model, path):
                     {'WARNING'}, "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
                 continue
 
-            for index, vertexIndex in enumerate(indices):
+            for i, vertexIndex in enumerate(indices):
                 newShape.data[vertexIndex].co = Vector(
-                    (positions[index * 3], positions[(index * 3) + 1], positions[(index * 3) + 2]))
+                    (positions[i * 3], positions[(i * 3) + 1], positions[(i * 3) + 2]))
+
+    # Merge with the existing skeleton here if one is selected and we have a skeleton.
+    selectedObject = bpy.context.object
+
+    if self.import_merge:
+        if selectedObject and selectedObject.type == 'ARMATURE':
+            importMergeModel(self, selectedObject, skeletonObj, poses)
+        else:
+            self.report(
+                {'WARNING'}, "You must select an armature to merge to.")
 
     # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
     if self.import_ik:
-        importSkeletonIKNode(self, model.Skeleton(), skeletonObj, poses)
+        importSkeletonIKNode(self, model.Skeleton(), poses)
 
     # Import any constraints after ik.
     if self.import_constraints:
-        importSkeletonConstraintNode(
-            self, model.Skeleton(), skeletonObj, poses)
+        importSkeletonConstraintNode(self, model.Skeleton(), poses)
 
-    # Relink the collection after the mesh is built
+    # Relink the collection after the mesh is built.
     bpy.context.view_layer.active_layer_collection.collection.children.link(
         collection)
 
