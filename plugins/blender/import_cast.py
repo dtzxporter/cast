@@ -160,7 +160,7 @@ def utilityGetBindposeScale(poseBone):
     return bindPoseScale
 
 
-def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
+def importSkeletonConstraintNode(self, skeleton, poses):
     if skeleton is None:
         return
 
@@ -202,7 +202,121 @@ def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
             ct.target_space = 'LOCAL_OWNER_ORIENT'
 
 
-def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
+def importMergeModel(self, selectedObj, skeletonObj, poses):
+    # Find matching root bones in the selected object.
+    # If we had none by the end of the transaction, warn the user that the models aren't compatible.
+    foundMatchingRoot = False
+
+    missingBones = []
+
+    for bone in skeletonObj.pose.bones:
+        if not bone.name in selectedObj.pose.bones:
+            missingBones.append(bone.name)
+            continue
+
+        if bone.parent is not None:
+            continue
+
+        foundMatchingRoot = True
+
+        # Move the models bone to the existing bone in the scene's position.
+        bone.matrix = selectedObj.pose.bones[bone.name].matrix
+
+    if not foundMatchingRoot:
+        self.report(
+            {"WARNING"}, "Could not find compatible root bones make sure the skeletons are compatible.")
+        return
+
+    bpy.context.view_layer.objects.active = skeletonObj
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Create missing bones.
+    while missingBones:
+        for bone in [x for x in missingBones]:
+            bone = skeletonObj.data.edit_bones[bone]
+
+            # If the parent doesn't exist yet, skip it.
+            if bone.parent and not bone.parent.name in selectedObj.data.edit_bones:
+                continue
+            elif bone.parent:
+                parent = selectedObj.data.edit_bones[bone.parent.name]
+            else:
+                parent = None
+
+            # Calculate the new world space matrix.
+            newParent = parent.matrix if parent else Matrix.Identity()
+            oldParent = skeletonObj.data.edit_bones[bone.name].parent.matrix \
+                if newParent else Matrix.Identity()
+
+            relative = oldParent.inverted() @ \
+                skeletonObj.data.edit_bones[bone.name].matrix
+            world = newParent @ relative
+
+            newBone = selectedObj.data.edit_bones.new(bone.name)
+            newBone.tail = 0, 0.0025, 0  # I am sorry but blender sucks
+            newBone.parent = parent
+            newBone.matrix = world
+
+            missingBones.remove(bone.name)
+
+    bpy.context.view_layer.objects.active = skeletonObj
+    bpy.ops.object.mode_set(mode='POSE')
+
+    # Make sure that any bone in poses update for ik/constraints later.
+    for bone in poses.keys():
+        poses[bone] = skeletonObj.pose.bones[bone]
+
+    bpy.context.view_layer.objects.active = skeletonObj
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    for child in skeletonObj.children:
+        if not child.type == "MESH":
+            continue
+
+        shapes = []
+
+        if child.data.shape_keys:
+            for shape in child.data.shape_keys.key_blocks:
+                shapes.append(shape)
+
+        child.select_set(True)
+
+        # Bake the new mesh rest position so that we can copy the weights and modifiers.
+        bpy.context.view_layer.objects.active = child
+        bpy.ops.object.convert(target="MESH")
+
+        child.select_set(False)
+        child.parent = selectedObj
+
+        for shape in shapes:
+            newShape = child.shape_key_add(name=shape.name, from_mix=False)
+            newShape.interpolation = shape.interpolation
+            newShape.slider_max = shape.slider_max
+
+            points = [None] * (len(shape.data) * 3)
+
+            shape.data.foreach_get("co", points)
+            newShape.data.foreach_set("co", points)
+
+        for collection in list(child.users_collection):
+            collection.objects.unlink(child)
+        for collection in selectedObj.users_collection:
+            collection.objects.link(child)
+
+        # Create a new armature modifier as the old one gets destroyed. The vertex groups stay.
+        modifier = child.modifiers.new('Armature Rig', 'ARMATURE')
+        modifier.object = selectedObj
+        modifier.use_bone_envelopes = False
+        modifier.use_vertex_groups = True
+
+    # Remove the armature, bones, and then the collection created for this mesh.
+    oldCollection = skeletonObj.users_collection[0]
+
+    bpy.data.objects.remove(skeletonObj, do_unlink=True)
+    bpy.data.collections.remove(oldCollection, do_unlink=True)
+
+
+def importSkeletonIKNode(self, skeleton, poses):
     if skeleton is None:
         return
 
@@ -332,7 +446,7 @@ def importMaterialNode(path, material):
     return material.Name(), materialNew
 
 
-def importModelNode(self, model, path):
+def importModelNode(self, model, path, selectedObject):
     # Extract the name of this model from the path
     modelName = model.Name() or os.path.splitext(os.path.basename(path))[0]
 
@@ -448,10 +562,10 @@ def importModelNode(self, model, path):
 
                 for x in range(len(newMesh.vertices)):
                     for j in range(maximumInfluence):
-                        index = j + (x * maximumInfluence)
+                        i = j + (x * maximumInfluence)
 
-                        boneGroups[weightBoneBuffer[index]].add(
-                            (x,), weightValueBuffer[index], "ADD")
+                        boneGroups[weightBoneBuffer[i]].add(
+                            (x,), weightValueBuffer[i], "ADD")
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(len(newMesh.vertices)):
@@ -496,22 +610,29 @@ def importModelNode(self, model, path):
                     {'WARNING'}, "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
                 continue
 
-            for index, vertexIndex in enumerate(indices):
+            for i, vertexIndex in enumerate(indices):
                 newShape.data[vertexIndex].co = Vector(
-                    (positions[index * 3], positions[(index * 3) + 1], positions[(index * 3) + 2]))
+                    (positions[i * 3], positions[(i * 3) + 1], positions[(i * 3) + 2]))
+
+    # Relink the collection after the mesh is built.
+    bpy.context.view_layer.active_layer_collection.collection.children.link(
+        collection)
+
+    # Merge with the existing skeleton here if one is selected and we have a skeleton.
+    if self.import_merge:
+        if selectedObject and selectedObject.type == 'ARMATURE':
+            importMergeModel(self, selectedObject, skeletonObj, poses)
+        else:
+            self.report(
+                {'WARNING'}, "You must select an armature to merge to.")
 
     # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
     if self.import_ik:
-        importSkeletonIKNode(self, model.Skeleton(), skeletonObj, poses)
+        importSkeletonIKNode(self, model.Skeleton(), poses)
 
     # Import any constraints after ik.
     if self.import_constraints:
-        importSkeletonConstraintNode(
-            self, model.Skeleton(), skeletonObj, poses)
-
-    # Relink the collection after the mesh is built
-    bpy.context.view_layer.active_layer_collection.collection.children.link(
-        collection)
+        importSkeletonConstraintNode(self, model.Skeleton(), poses)
 
 
 def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
@@ -841,9 +962,7 @@ def importNotificationTrackNode(node, action, frameStart):
     return (smallestFrame, largestFrame)
 
 
-def importAnimationNode(self, node, path):
-    # The object which the animation node should be applied to.
-    selectedObject = bpy.context.object
+def importAnimationNode(self, node, path, selectedObject):
     # Check that the selected object is an 'ARMATURE'.
     if selectedObject is None or selectedObject.type != 'ARMATURE':
         raise Exception(
@@ -1031,11 +1150,14 @@ def importCast(self, context, path):
 
     instances = []
 
+    # Grab the selected object before we start importing because it deselects after creating another object.
+    selectedObject = bpy.context.object
+
     for root in cast.Roots():
         for child in root.ChildrenOfType(Model):
-            importModelNode(self, child, path)
+            importModelNode(self, child, path, selectedObject)
         for child in root.ChildrenOfType(Animation):
-            importAnimationNode(self, child, path)
+            importAnimationNode(self, child, path, selectedObject)
         for child in root.ChildrenOfType(Instance):
             instances.append(child)
 
