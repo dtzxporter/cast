@@ -383,9 +383,9 @@ def utilitySetVisibility(object, visible):
     cmds.setAttr("%s.visibility" % dag.fullPathName(), visible)
 
 
-def utilityStepProgress(instance):
+def utilityStepProgress(instance, status=""):
     try:
-        cmds.progressBar(instance, edit=True, step=1)
+        cmds.progressBar(instance, edit=True, status=status, step=1)
     except RuntimeError:
         pass
 
@@ -1120,14 +1120,14 @@ def importSkeletonNode(skeleton):
         handles[i] = newBone
         indexes[bone.Hash()] = i
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Importing skeleton...")
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
             cmds.parent(handles[i].fullPathName(),
                         handles[bone.ParentIndex()].fullPathName())
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Importing skeleton...")
 
     for i, bone in enumerate(bones):
         newBone = handles[i]
@@ -1156,7 +1156,7 @@ def importSkeletonNode(skeleton):
 
             newBone.setScale(scaleUtility.asDoublePtr())
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Importing skeleton...")
     utilityEndProgress(progress)
 
     return (handles, paths, indexes, jointTransform)
@@ -1198,7 +1198,7 @@ def importModelNode(model, path):
     progress = utilityCreateProgress("Importing meshes...", len(meshes))
     meshHandles = {}
 
-    for mesh in meshes:
+    for m, mesh in enumerate(meshes):
         newMeshTransform = OpenMaya.MFnTransform()
         newMeshNode = newMeshTransform.create(meshNode)
         newMeshTransform.setName(mesh.Name() or "CastMesh")
@@ -1373,7 +1373,8 @@ def importModelNode(model, path):
                 cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
                 weightedValueBuffer = [0.0] * (weightedBonesCount)
 
-        utilityStepProgress(progress)
+        utilityStepProgress(
+            progress, "Importing mesh [%d] of [%d]..." % (m + 1, len(meshes)))
     utilityEndProgress(progress)
 
     blendShapes = model.BlendShapes()
@@ -1435,7 +1436,7 @@ def importModelNode(model, path):
             if not indices or not positions:
                 cmds.warning(
                     "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShapeDagNode.name()))
-                utilityStepProgress(progress)
+                utilityStepProgress(progress, "Importing shapes...")
                 continue
 
             vertexPositions = OpenMaya.MFloatPointArray()
@@ -1454,7 +1455,7 @@ def importModelNode(model, path):
 
             # Prevent rendering of the target mesh shapes.
             utilitySetVisibility(blendTargetParent, False)
-            utilityStepProgress(progress)
+            utilityStepProgress(progress, "Importing shapes...")
     utilityEndProgress(progress)
 
     # Import any ik handles now that the meshes are bound because the constraints may
@@ -1618,12 +1619,13 @@ def importAnimationNode(node, path):
 
     progress = utilityCreateProgress("Importing animation...", len(curves))
 
-    for x in curves:
+    for i, x in enumerate(curves):
         (smallestFrame, largestFrame) = importCurveNode(
             x, path, wantedFps, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
-        utilityStepProgress(progress)
+        utilityStepProgress(
+            progress, "Importing curve [%d] of [%d]..." % (i + 1, len(curves)))
 
     utilityEndProgress(progress)
 
@@ -1884,7 +1886,7 @@ def exportAnimation(root, objects):
             else:
                 curveNode.SetFloatKeyValueBuffer(keyvalues)
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Exporting animation...")
     utilityEndProgress(progress)
 
     # Collect and create notification tracks.
