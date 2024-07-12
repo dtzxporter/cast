@@ -28,6 +28,8 @@ sceneSettings = {
     "importConstraints": True,
     "exportAnim": True,
     "exportModel": True,
+    "createStingrayMaterials": True,
+    "createStandardMaterials": False,
 }
 
 # Shared version number
@@ -239,6 +241,15 @@ def utilitySetToggleItem(name, value=False):
     utilitySaveSettings()
 
 
+def utilitySetRadioItem(names):
+    for name in names:
+        if name in sceneSettings:
+            sceneSettings[name] = bool(cmds.menuItem(
+                name, query=True, radioButton=True))
+
+    utilitySaveSettings()
+
+
 def utilityLerp(a, b, time):
     return (a + time * (b - a))
 
@@ -328,7 +339,7 @@ def utilityLoadSettings():
         text = file.read()
         file.close()
 
-        diskSettings = json.loads(text.decode("utf-8"))
+        diskSettings = json.loads(text)
     except:
         diskSettings = {}
 
@@ -348,7 +359,7 @@ def utilitySaveSettings():
 
     try:
         file = open(settingsPath, "w")
-        file.write(json.dumps(sceneSettings).encode("utf-8"))
+        file.write(json.dumps(sceneSettings))
         file.close()
     except:
         pass
@@ -434,6 +445,18 @@ def utilityCreateMenu():
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
+
+    cmds.menuItem(label="Material", subMenu=True)
+
+    cmds.menuItem("createStingrayMaterials", label="Create Stingray Materials", annotation="Creates Stingray compatible materials",
+                  radioButton=utilityQueryToggleItem("createStingrayMaterials"), command=lambda x: utilitySetRadioItem(["createStingrayMaterials", "createStandardMaterials"]))
+
+    cmds.menuItem("createStandardMaterials", label="Create Standard Materials", annotation="Creates Standard compatible materials",
+                  radioButton=utilityQueryToggleItem("createStandardMaterials"), command=lambda x: utilitySetRadioItem(["createStandardMaterials", "createStingrayMaterials"]))
+
+    cmds.setParent(animMenu, menu=True)
+    cmds.setParent(menu, menu=True)
+
     cmds.menuItem(divider=True)
 
     cmds.menuItem(label="Remove Namespaces", annotation="Removes all namespaces in the scene",
