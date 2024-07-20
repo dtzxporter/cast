@@ -20,6 +20,7 @@ The goal of cast is to create an easy to use format for models, animations, mate
 
 # Coming from SEAnim/SEModel:
 - SECast, a lossless converter to cast: [SECast](https://dtzxporter.com/tools/secast)
+- **Note:** If your tool supports exporting to cast directly, that is always better.
 
 # FAQ:
 - Frequently asked questions: [FAQ](FAQ.md)
@@ -67,6 +68,7 @@ enum class CastId : uint32_t
 	Constraint = 0x74736E63,
 	Animation = 0x6D696E61,
 	Curve = 0x76727563,
+	CurveModeOverride = 0x564F4D43,
 	NotificationTrack = 0x6669746E,
 	Material = 0x6C74616D,
 	File = 0x656C6966,
@@ -298,7 +300,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   		<td>Name (n)</td>
    		<td>String (s)</td>
 		<td>False</td>
-		<td>False</td>
+		<td>True</td>
  	</tr>
 	<tr>
   		<td>Base Shape (Hash of CastNode:Mesh) (b)</td>
@@ -307,13 +309,19 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>True</td>
  	</tr>
 	<tr>
-  		<td>Target Shapes (Hashes of CastNode:Mesh) (t)</td>
-   		<td>Integer 64 (l)</td>
+  		<td>Target Shape Vertex Indices (vi)</td>
+   		<td>Byte (b), Short (h), Integer 32 (i)</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
 	<tr>
-  		<td>Target Weight Scales (ts)</td>
+		<td>Target Shape Vertex Positions (vp)</td>
+		<td>Vector 3 (v3)</td>
+		<td>True</td>
+		<td>True</td>
+	</tr>
+	<tr>
+  		<td>Target Weight Scale (ts)</td>
    		<td>Float (f)</td>
 		<td>True</td>
 		<td>False</td>
@@ -321,8 +329,10 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 </table>
 
 **Notes**:
-- At a minimum one `Base Shape` and one `Target Shape` must be present.
-- `Target Weight Scales` indicates the maximum value the target shape can deform to. The count usually will match `Target Shape(s)` but if it does not plugins should fall back to 1.0 as the default.
+- The `Base Shape` must be an existing cast mesh.
+- The `Target Shape Vertex Indices` and `Target Shape Vertex Positions` must be the same length as they are paired together.
+- `Target Shape Vertex Positions` is the final value of each changed vertex position ignoring the `Base Shape`'s corresponding vertex.
+- `Target Weight Scale` indicates the maximum value the target shape can deform to and should default to `1.0`.
 
 ### Skeleton:
 <table>
@@ -738,7 +748,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>Skeleton, Curve, NotificiationTrack</td>
+   		<td>Skeleton, Curve, CurveModeOverride, NotificiationTrack</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>
@@ -812,7 +822,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 	 <tr>
   		<td>Key Property Name (kp)</td>
-   		<td>String (s) [rq, tx, ty, tz, sx, sy, sz, vb]</td>
+   		<td>String (s) [rq, tx, ty, tz, sx, sy, sz, bs, vb]</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
@@ -856,9 +866,80 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   - `sx` Scale 'X' and expects `f` values.
   - `sy` Scale 'Y' and expects `f` values.
   - `sz` Scale 'Z' and expects `f` values.
+  - `bs` BlendShape Weight and expects `f` values.
   - `vb` Visibility and expects `b`, `h`, or `i` values.
     - `=0` = hidden.
     - `>=1` = visible.
+- The properties `tx`, `ty`, `tz`, `sx`, `sy`, `sz`, `bs`, `vb` should interpolate linearly.
+- The property `rq` should interpolate with quaternion slerp.
+
+### CurveModeOverride:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Animation</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	<tr>
+  		<td>Node Name (nn)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Mode (m)</td>
+   		<td>String (s) [additive, absolute, relative]</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Override Translation Curves (ot)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Override Rotation Curves (or)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Override Scale Curves (os)</td>
+   		<td>Byte (b) [True, False]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+**Notes:**
+- See `Curve` notes above for the definition of each `Mode` value.
+- `Override Translation Curves` should default to `False` when not specified.
+- `Override Rotation Curves` should default to `False` when not specified.
+- `Override Scale Curves` should default to `False` when not specified.
+- The override node and all of it's children should override their curves mode to the new mode.
+- The override node must be present at the time of processing in order to determine if a child bone is a descendent.
 
 ### NotificationTrack:
 <table>

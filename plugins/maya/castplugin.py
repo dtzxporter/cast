@@ -19,9 +19,6 @@ try:
 except NameError:
     xrange = range
 
-# Used for scene reset cache
-sceneResetCache = {}
-
 # Used for various configuration
 sceneSettings = {
     "importAtTime": False,
@@ -31,10 +28,12 @@ sceneSettings = {
     "importConstraints": True,
     "exportAnim": True,
     "exportModel": True,
+    "createStingrayMaterials": True,
+    "createStandardMaterials": False,
 }
 
 # Shared version number
-version = "1.40"
+version = "1.57"
 
 
 def utilityAbout():
@@ -242,6 +241,15 @@ def utilitySetToggleItem(name, value=False):
     utilitySaveSettings()
 
 
+def utilitySetRadioItem(names):
+    for name in names:
+        if name in sceneSettings:
+            sceneSettings[name] = bool(cmds.menuItem(
+                name, query=True, radioButton=True))
+
+    utilitySaveSettings()
+
+
 def utilityLerp(a, b, time):
     return (a + time * (b - a))
 
@@ -281,6 +289,38 @@ def utilitySlerp(qa, qb, t):
     return qm
 
 
+def utilityResolveCurveModeOverride(name, mode, overrides, isTranslate=False, isRotate=False, isScale=False):
+    if not overrides:
+        return mode
+
+    try:
+        parentTree = cmds.ls(name, long=True)[0].split('|')[1:-1]
+
+        if not parentTree:
+            return mode
+
+        for parentName in parentTree:
+            if parentName.find(":") >= -1:
+                parentName = parentName[parentName.find(":") + 1:]
+
+            for override in overrides:
+                if isTranslate and not override.OverrideTranslationCurves():
+                    continue
+                elif isRotate and not override.OverrideRotationCurves():
+                    continue
+                elif isScale and not override.OverrideScaleCurves():
+                    continue
+
+                if parentName == override.NodeName():
+                    return override.Mode()
+
+        return mode
+    except IndexError:
+        return mode
+    except RuntimeError:
+        return mode
+
+
 def utilityQueryToggleItem(name):
     if name in sceneSettings:
         return sceneSettings[name]
@@ -299,7 +339,7 @@ def utilityLoadSettings():
         text = file.read()
         file.close()
 
-        diskSettings = json.loads(text.decode("utf-8"))
+        diskSettings = json.loads(text)
     except:
         diskSettings = {}
 
@@ -319,7 +359,7 @@ def utilitySaveSettings():
 
     try:
         file = open(settingsPath, "w")
-        file.write(json.dumps(sceneSettings).encode("utf-8"))
+        file.write(json.dumps(sceneSettings))
         file.close()
     except:
         pass
@@ -343,9 +383,9 @@ def utilitySetVisibility(object, visible):
     cmds.setAttr("%s.visibility" % dag.fullPathName(), visible)
 
 
-def utilityStepProgress(instance):
+def utilityStepProgress(instance, status=""):
     try:
-        cmds.progressBar(instance, edit=True, step=1)
+        cmds.progressBar(instance, edit=True, status=status, step=1)
     except RuntimeError:
         pass
 
@@ -405,6 +445,18 @@ def utilityCreateMenu():
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
+
+    cmds.menuItem(label="Material", subMenu=True)
+
+    cmds.menuItem("createStingrayMaterials", label="Create Stingray Materials", annotation="Creates Stingray compatible materials",
+                  radioButton=utilityQueryToggleItem("createStingrayMaterials"), command=lambda x: utilitySetRadioItem(["createStingrayMaterials", "createStandardMaterials"]))
+
+    cmds.menuItem("createStandardMaterials", label="Create Standard Materials", annotation="Creates Standard compatible materials",
+                  radioButton=utilityQueryToggleItem("createStandardMaterials"), command=lambda x: utilitySetRadioItem(["createStandardMaterials", "createStingrayMaterials"]))
+
+    cmds.setParent(animMenu, menu=True)
+    cmds.setParent(menu, menu=True)
+
     cmds.menuItem(divider=True)
 
     cmds.menuItem(label="Remove Namespaces", annotation="Removes all namespaces in the scene",
@@ -419,26 +471,32 @@ def utilityCreateMenu():
 
 
 def utilityClearAnimation():
-    # First we must remove all existing animation curves
-    # this deletes all curve channels
-    global sceneResetCache
-
     cmds.delete(all=True, c=True)
 
-    for transPath in sceneResetCache:
+    for jointPath in cmds.ls(type="joint", long=True):
         try:
             selectList = OpenMaya.MSelectionList()
-            selectList.add(transPath)
+            selectList.add(jointPath)
 
             dagPath = OpenMaya.MDagPath()
             selectList.getDagPath(0, dagPath)
 
+            restPosition = utilityGetSavedNodeData(dagPath)
+
             transform = OpenMaya.MFnTransform(dagPath)
-            transform.resetFromRestPosition()
+            transform.set(restPosition)
         except RuntimeError:
             pass
-
-    sceneResetCache = {}
+        except ValueError:
+            pass
+    for deformer in cmds.ls(type="blendShape", long=True):
+        for weight in cmds.blendShape(deformer, target=True, query=True):
+            try:
+                cmds.setAttr("%s.%s" % (deformer, weight.split("|")[-1]), 0.0)
+            except RuntimeError:
+                pass
+            except ValueError:
+                pass
 
 
 def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMethod="linear"):
@@ -628,22 +686,54 @@ def utilityGetRestData(restTransform, component):
         raise Exception("Invalid component was specified!")
 
 
+def utilityGetSavedNodeData(dagPath):
+    # At this point we must have the attribute, as it's always called from the save function.
+    restTransform = cmds.getAttr(
+        "%s.castRestPosition" % dagPath.fullPathName())
+
+    # Convert to matrix, then back to transformation matrix.
+    restTransformMatrix = OpenMaya.MMatrix()
+    restTransformMatrixDoubles = OpenMaya.MScriptUtil()
+    restTransformMatrixDoubles.createMatrixFromList(
+        restTransform, restTransformMatrix)
+
+    # Make the transformation matrix.
+    restTransform = OpenMaya.MTransformationMatrix(restTransformMatrix)
+
+    return restTransform
+
+
 def utilitySaveNodeData(dagPath):
-    global sceneResetCache
+    # Check if we already had the bone saved, if there is a runtime error, we already have it saved.
+    if cmds.objExists("%s.castRestPosition" % dagPath.fullPathName()):
+        return utilityGetSavedNodeData(dagPath)
+
+    # Create the new attribute.
+    cmds.addAttr(dagPath.fullPathName(), longName="castRestPosition",
+                 attributeType="matrix", storable=True, writable=True, readable=True)
 
     # Grab the transform first
     transform = OpenMaya.MFnTransform(dagPath)
+
     restTransform = transform.transformation()
+    restTransformMatrix = restTransform.asMatrix()
 
-    # If we already had the bone saved, just return it's saved rest position.
-    if dagPath.fullPathName() in sceneResetCache:
-        return transform.restPosition()
+    # Convert matrix to double array.
+    restDoubles = [0.0] * 16
 
-    sceneResetCache[dagPath.fullPathName()] = None
+    for x in xrange(4):
+        restDoubles[x *
+                    4] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 0)
+        restDoubles[(
+            x * 4) + 1] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 1)
+        restDoubles[(
+            x * 4) + 2] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 2)
+        restDoubles[(
+            x * 4) + 3] = OpenMaya.MScriptUtil.getDoubleArrayItem(restTransformMatrix[x], 3)
 
-    # We are going to save the rest position on the node
-    # so we can reset the scene later
-    transform.setRestPosition(restTransform)
+    # Set the attribute.
+    cmds.setAttr("%s.castRestPosition" %
+                 dagPath.fullPathName(), restDoubles, type="matrix")
 
     # Required to handle relative transforms.
     return restTransform
@@ -702,13 +792,13 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
     largestFrame = OpenMaya.MTime(0, timeUnit)
 
-    tempBufferX = OpenMaya.MScriptUtil()
-    tempBufferY = OpenMaya.MScriptUtil()
-    tempBufferZ = OpenMaya.MScriptUtil()
+    # We must have three tracks here
+    if None in tracks:
+        return (smallestFrame, largestFrame)
 
-    valuesX = [0.0] * len(frameBuffer)
-    valuesY = [0.0] * len(frameBuffer)
-    valuesZ = [0.0] * len(frameBuffer)
+    valuesX = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
+    valuesY = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
+    valuesZ = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
 
     for frame in frameBuffer:
         time = OpenMaya.MTime(frame, timeUnit) + frameStart
@@ -730,19 +820,15 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     elif mode == "additive":
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
-            eulerSamples = [0.0, 0.0, 0.0]
 
             frame = timeBuffer[slot]
 
-            if tracks[0] is not None:
-                eulerSamples[0] = tracks[0][0].evaluate(frame)
-            if tracks[1] is not None:
-                eulerSamples[1] = tracks[1][0].evaluate(frame)
-            if tracks[2] is not None:
-                eulerSamples[2] = tracks[2][0].evaluate(frame)
+            sampleX = tracks[0][0].evaluate(frame)
+            sampleY = tracks[1][0].evaluate(frame)
+            sampleZ = tracks[2][0].evaluate(frame)
 
             additiveQuat = OpenMaya.MEulerRotation(
-                eulerSamples[0], eulerSamples[1], eulerSamples[2]).asQuaternion()
+                sampleX, sampleY, sampleZ).asQuaternion()
             frameQuat = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
@@ -753,10 +839,7 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
             valuesY[slot] = euler.y
             valuesZ[slot] = euler.z
     elif mode == "relative":
-        if tracks[0] is not None:
-            rest = utilityGetRestData(tracks[0][1], "rotation_quaternion")
-        else:
-            rest = OpenMaya.MQuaternion()
+        rest = utilityGetRestData(tracks[0][1], "rotation_quaternion")
 
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
@@ -772,21 +855,66 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
 
-    tempBufferX.createFromList(valuesX, len(valuesX))
-    tempBufferY.createFromList(valuesY, len(valuesY))
-    tempBufferZ.createFromList(valuesZ, len(valuesZ))
+    tracks[0][0].addKeys(timeBuffer,
+                         valuesX,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
-    if tracks[0] is not None:
-        tracks[0][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferX.asDoublePtr(), timeBuffer.length(
-        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+    tracks[1][0].addKeys(timeBuffer,
+                         valuesY,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
-    if tracks[1] is not None:
-        tracks[1][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferY.asDoublePtr(), timeBuffer.length(
-        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+    tracks[2][0].addKeys(timeBuffer,
+                         valuesZ,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                         OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
-    if tracks[2] is not None:
-        tracks[2][0].addKeys(timeBuffer, OpenMaya.MDoubleArray(tempBufferZ.asDoublePtr(), timeBuffer.length(
-        )), OpenMayaAnim.MFnAnimCurve.kTangentLinear, OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+    return (smallestFrame, largestFrame)
+
+
+def utilityImportBlendShapeTrackData(shapeName, timeUnit, frameStart, frameBuffer, valueBuffer):
+    smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
+    largestFrame = OpenMaya.MTime(0, timeUnit)
+
+    deformers = []
+
+    # Grab all of the deformer nodes so we can determine if they have this shape key.
+    for deformer in cmds.ls(type="blendShape"):
+        if cmds.objExists("%s.%s" % (deformer, shapeName)):
+            cmds.setAttr("%s.%s" % (deformer, shapeName), 0)
+            deformers.append(deformer)
+
+    if not deformers:
+        return (smallestFrame, largestFrame)
+
+    track = OpenMayaAnim.MFnAnimCurve()
+    track.create(OpenMayaAnim.MFnAnimCurve.kAnimCurveTL)
+    track.setName("%s_weight" % shapeName)
+
+    timeBuffer = OpenMaya.MTimeArray()
+    curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
+
+    for i, frame in enumerate(frameBuffer):
+        time = OpenMaya.MTime(frame, timeUnit) + frameStart
+
+        smallestFrame = min(time, smallestFrame)
+        largestFrame = max(time, largestFrame)
+
+        timeBuffer.append(time)
+        curveValueBuffer[i] = valueBuffer[i]
+
+    if timeBuffer.length() <= 0:
+        return (smallestFrame, largestFrame)
+
+    track.addKeys(timeBuffer,
+                  curveValueBuffer,
+                  OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+                  OpenMayaAnim.MFnAnimCurve.kTangentLinear)
+
+    for deformer in deformers:
+        cmds.connectAttr("%s.output" % track.name(), "%s.%s" %
+                         (deformer, shapeName))
 
     return (smallestFrame, largestFrame)
 
@@ -797,10 +925,8 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
     largestFrame = OpenMaya.MTime(0, timeUnit)
 
-    scriptUtil = OpenMaya.MScriptUtil()
-
     # We must have one track here
-    if tracks[0] is None:
+    if None in tracks:
         return (smallestFrame, largestFrame)
 
     track = tracks[0][0]
@@ -817,10 +943,10 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     # Default track mode is absolute meaning that the
     # values are what they should be in the curve already
     if mode == "absolute" or mode is None:
-        scriptUtil.createFromList([x for x in valueBuffer], len(valueBuffer))
+        curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
-        curveValueBuffer = OpenMaya.MDoubleArray(
-            scriptUtil.asDoublePtr(), len(valueBuffer))
+        for i, value in enumerate(valueBuffer):
+            curveValueBuffer[i] = value
     # Additive curves are applied to any existing curve value in the scene
     # so we will add it to the sample at the given time
     elif mode == "additive":
@@ -856,7 +982,9 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
 
-    track.addKeys(timeBuffer, curveValueBuffer, OpenMayaAnim.MFnAnimCurve.kTangentLinear,
+    track.addKeys(timeBuffer,
+                  curveValueBuffer,
+                  OpenMayaAnim.MFnAnimCurve.kTangentLinear,
                   OpenMayaAnim.MFnAnimCurve.kTangentLinear)
 
     return (smallestFrame, largestFrame)
@@ -992,14 +1120,14 @@ def importSkeletonNode(skeleton):
         handles[i] = newBone
         indexes[bone.Hash()] = i
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Importing skeleton...")
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
             cmds.parent(handles[i].fullPathName(),
                         handles[bone.ParentIndex()].fullPathName())
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Importing skeleton...")
 
     for i, bone in enumerate(bones):
         newBone = handles[i]
@@ -1028,7 +1156,7 @@ def importSkeletonNode(skeleton):
 
             newBone.setScale(scaleUtility.asDoublePtr())
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Importing skeleton...")
     utilityEndProgress(progress)
 
     return (handles, paths, indexes, jointTransform)
@@ -1070,7 +1198,7 @@ def importModelNode(model, path):
     progress = utilityCreateProgress("Importing meshes...", len(meshes))
     meshHandles = {}
 
-    for mesh in meshes:
+    for m, mesh in enumerate(meshes):
         newMeshTransform = OpenMaya.MFnTransform()
         newMeshNode = newMeshTransform.create(meshNode)
         newMeshTransform.setName(mesh.Name() or "CastMesh")
@@ -1245,45 +1373,89 @@ def importModelNode(model, path):
                 cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
                 weightedValueBuffer = [0.0] * (weightedBonesCount)
 
-        utilityStepProgress(progress)
+        utilityStepProgress(
+            progress, "Importing mesh [%d] of [%d]..." % (m + 1, len(meshes)))
     utilityEndProgress(progress)
 
     blendShapes = model.BlendShapes()
+    blendShapesByBaseShape = {}
+
+    # Merge the blend shapes together by their base shapes, so we only create one deformer per base.
+    for blendShape in blendShapes:
+        baseShapeHash = blendShape.BaseShape().Hash()
+
+        if baseShapeHash not in meshHandles:
+            continue
+        if baseShapeHash not in blendShapesByBaseShape:
+            blendShapesByBaseShape[baseShapeHash] = [blendShape]
+        else:
+            blendShapesByBaseShape[baseShapeHash].append(blendShape)
+
     progress = utilityCreateProgress("Importing shapes...", len(blendShapes))
 
-    for blendShape in blendShapes:
-        # We need one base shape and 1+ target shapes
-        if blendShape.BaseShape() is None or blendShape.BaseShape().Hash() not in meshHandles:
-            continue
-        if blendShape.TargetShapes() is None:
-            continue
+    # Iterate over blend shapes by base shapes.
+    for blendShapes in blendShapesByBaseShape.values():
+        baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
+        baseShapeDagNode = OpenMaya.MFnDagNode(baseShape)
+        baseShapeTransform = OpenMaya.MFnDagNode(baseShapeDagNode.parent(0))
 
-        # Default to 1.0 when value is not present
-        baseShape = meshHandles[blendShape.BaseShape().Hash()]
-        targetShapes = [meshHandles[x.Hash()]
-                        for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
-        targetWeightScales = blendShape.TargetWeightScales() or []
-        targetWeightScaleCount = len(targetWeightScales)
+        # Create the target shapes.
+        targetShapes = [cmds.duplicate(
+            baseShapeDagNode.fullPathName(), ic=True) for _ in blendShapes]
 
-        # Create the deformer on the base shape
+        # Create the deformer on the abse shape.
         blendDeformer = OpenMayaAnim.MFnBlendShapeDeformer()
         blendDeformer.create(baseShape)
 
-        if blendShape.Name() is not None:
-            blendDeformer.setName(blendShape.Name())
+        # Create the targets in the deformer and set the new vertex data.
+        for i, (targetShape, blendShape) in enumerate(zip(targetShapes, blendShapes)):
+            # Place the new shape key under the base shape so that the key name will be unique to that mesh.
+            cmds.parent(targetShape[0], baseShapeTransform.fullPathName())
+            newShape = cmds.rename(targetShape[0], blendShape.Name())
 
-        # Assign the targets
-        for i, targetShape in enumerate(targetShapes):
-            if i < targetWeightScaleCount:
-                fullWeight = targetWeightScales[i]
-            else:
-                fullWeight = 1.0
-            blendDeformer.addTarget(baseShape, i, targetShape, fullWeight)
+            # Get the actual mesh name.
+            newShapeShapes = cmds.listRelatives(
+                newShape, shapes=True, fullPath=True)
+
+            # Grab a handle to the new shape, which will be our target mesh.
+            selectList = OpenMaya.MSelectionList()
+            selectList.add(newShapeShapes[0])
+
+            # Get the mesh object.
+            targetShape = OpenMaya.MObject()
+            selectList.getDependNode(0, targetShape)
+            targetMesh = OpenMaya.MFnMesh(targetShape)
+
+            # Rename the actual mesh to the key name.
+            cmds.rename(newShapeShapes[0], blendShape.Name())
+
+            # Set the shape positions.
+            indices = blendShape.TargetShapeVertexIndices()
+            positions = blendShape.TargetShapeVertexPositions()
+
+            if not indices or not positions:
+                cmds.warning(
+                    "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShapeDagNode.name()))
+                utilityStepProgress(progress, "Importing shapes...")
+                continue
+
+            vertexPositions = OpenMaya.MFloatPointArray()
+
+            targetMesh.getPoints(vertexPositions)
+
+            for index, vertexIndex in enumerate(indices):
+                vertexPositions.set(
+                    vertexIndex, positions[index * 3], positions[(index * 3) + 1], positions[(index * 3) + 2], 1.0)
+
+            targetMesh.setPoints(vertexPositions)
+
+            blendDeformer.addTarget(baseShape, i, targetShape,
+                                    max(0.0, blendShape.TargetWeightScale() or 1.0))
             blendTargetParent = OpenMaya.MFnDagNode(targetShape).parent(0)
-            # Sets the parent meshes transform to invisible, to hide the target.
-            utilitySetVisibility(blendTargetParent, False)
 
-        utilityStepProgress(progress)
+            # Prevent rendering of the target mesh shapes.
+            utilitySetVisibility(blendTargetParent, False)
+            utilityStepProgress(progress, "Importing shapes...")
     utilityEndProgress(progress)
 
     # Import any ik handles now that the meshes are bound because the constraints may
@@ -1298,7 +1470,7 @@ def importModelNode(model, path):
             model.Skeleton(), handles, paths, indexes, jointTransform)
 
 
-def importCurveNode(node, path, timeUnit, startFrame):
+def importCurveNode(node, path, timeUnit, startFrame, overrides):
     propertySwitcher = {
         "rq": ["rx", "ry", "rz"],
         "tx": ["tx"],
@@ -1332,6 +1504,12 @@ def importCurveNode(node, path, timeUnit, startFrame):
 
     nodeName = node.NodeName()
     propertyName = node.KeyPropertyName()
+    keyFrameBuffer = node.KeyFrameBuffer()
+    keyValueBuffer = node.KeyValueBuffer()
+
+    # Special case for blend shapes because it requires one curve to N deformer(s).
+    if propertyName == "bs":
+        return utilityImportBlendShapeTrackData(nodeName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer)
 
     smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
     largestFrame = OpenMaya.MTime(0, timeUnit)
@@ -1345,11 +1523,21 @@ def importCurveNode(node, path, timeUnit, startFrame):
     if tracks is None:
         return (smallestFrame, largestFrame)
 
-    keyFrameBuffer = node.KeyFrameBuffer()
-    keyValueBuffer = node.KeyValueBuffer()
+    # Resolve any override if necessary.
+    nodeMode = node.Mode()
+
+    if propertyName in ["tx", "ty", "tz"]:
+        nodeMode = utilityResolveCurveModeOverride(
+            nodeName, nodeMode, overrides, isTranslate=True)
+    elif propertyName in ["rq"]:
+        nodeMode = utilityResolveCurveModeOverride(
+            nodeName, nodeMode, overrides, isRotate=True)
+    elif propertyName in ["sx", "sy", "sz"]:
+        nodeMode = utilityResolveCurveModeOverride(
+            nodeName, nodeMode, overrides, isScale=True)
 
     (smallestFrame, largestFrame) = trackSwitcher[propertyName](
-        tracks, propertyName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, node.Mode(), node.AdditiveBlendWeight())
+        tracks, propertyName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, nodeMode, node.AdditiveBlendWeight())
 
     # Make sure we have at least one quaternion track to set the interpolation mode to
     if propertyName == "rq":
@@ -1427,14 +1615,17 @@ def importAnimationNode(node, path):
     wantedLargestFrame = OpenMaya.MTime(1, wantedFps)
 
     curves = node.Curves()
+    curveModeOverrides = node.CurveModeOverrides()
+
     progress = utilityCreateProgress("Importing animation...", len(curves))
 
-    for x in curves:
+    for i, x in enumerate(curves):
         (smallestFrame, largestFrame) = importCurveNode(
-            x, path, wantedFps, startFrame)
+            x, path, wantedFps, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
-        utilityStepProgress(progress)
+        utilityStepProgress(
+            progress, "Importing curve [%d] of [%d]..." % (i + 1, len(curves)))
 
     utilityEndProgress(progress)
 
@@ -1593,6 +1784,16 @@ def exportAnimation(root, objects):
     startFrame = int(cmds.playbackOptions(query=True, ast=True))
     endFrame = int(cmds.playbackOptions(query=True, aet=True))
 
+    # Make sure the frames are positive, for startFrame, force it to be 0 if it's < 0.
+    # If endFrame is < 0, force a fatal error.
+    if startFrame < 0:
+        cmds.warning(
+            "Animation start time was negative [%d], defaulting to 0." % startFrame)
+        startFrame = 0
+    if endFrame < 0:
+        cmds.error("Animation end time must not be negative.")
+        return
+
     simpleProperties = [
         ["translateX", "tx"],
         ["translateY", "ty"],
@@ -1685,7 +1886,7 @@ def exportAnimation(root, objects):
             else:
                 curveNode.SetFloatKeyValueBuffer(keyvalues)
 
-        utilityStepProgress(progress)
+        utilityStepProgress(progress, "Exporting animation...")
     utilityEndProgress(progress)
 
     # Collect and create notification tracks.

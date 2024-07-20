@@ -7,10 +7,6 @@ from mathutils import *
 from bpy_extras.io_utils import unpack_list
 from .cast import Cast, CastColor, Model, Animation, Instance, File
 
-PRINCIPLED_BSDF = bpy.app.translations.pgettext_data("Principled BSDF")
-SPECULAR_BSDF = bpy.app.translations.pgettext_data("ShaderNodeEeveeSpecular")
-BLENDER_VERSION = bpy.app.version
-
 
 def utilityBuildPath(root, asset):
     if os.path.isabs(asset):
@@ -29,30 +25,35 @@ def utilityStashCurveComponent(component, curve, name, index):
         component[name] = value
 
 
-def utilityClearKeyframePoints(fcurve):
-    # For whatever reason, the clear method was introduced in blender 4.0...
-    clear = getattr(fcurve.keyframe_points, "clear", None)
+def utilityIsVersionAtLeast(major, minor):
+    if bpy.app.version[0] > major:
+        return True
+    elif bpy.app.version[0] == major and bpy.app.version[1] >= minor:
+        return True
+    return False
 
-    if callable(clear):
+
+def utilityClearKeyframePoints(fcurve):
+    if utilityIsVersionAtLeast(4, 0):
         return fcurve.keyframe_points.clear()
 
     for keyframe in reversed(fcurve.keyframe_points.values()):
         fcurve.keyframe_points.remove(keyframe)
 
 
-def utilityIsVersionAtLeast(major, minor):
-    if BLENDER_VERSION[0] > major:
-        return True
-    elif BLENDER_VERSION[0] == major and BLENDER_VERSION[1] >= minor:
-        return True
-    return False
+def utilityFindShaderNode(material, bl_idname):
+    for node in material.node_tree.nodes.values():
+        if node.bl_idname == bl_idname:
+            return node
+
+    return None
 
 
 def utilityAssignBSDFMaterialSlots(material, slots, path):
     # We will two shaders, one for metalness and one for specular
     if "metal" in slots:
         # Principled is default shader node
-        shader = material.node_tree.nodes[PRINCIPLED_BSDF]
+        shader = utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled")
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
@@ -66,11 +67,15 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
     else:
         # We need to create the specular node, removing principled first
         material.node_tree.nodes.remove(
-            material.node_tree.nodes[PRINCIPLED_BSDF])
-        material_output = material.node_tree.nodes.get("Material Output")
-        shader = material.node_tree.nodes.new(SPECULAR_BSDF)
+            utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled"))
+        material_output = utilityFindShaderNode(
+            material, "ShaderNodeOutputMaterial")
+
+        shader = material.node_tree.nodes.new("ShaderNodeEeveeSpecular")
+
         material.node_tree.links.new(
             material_output.inputs[0], shader.outputs[0])
+
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
@@ -128,6 +133,23 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
                                                                               (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
+def utilityResolveCurveModeOverride(bone, mode, overrides, isTranslate=False, isRotate=False, isScale=False):
+    if not overrides:
+        return mode
+
+    for parent in bone.parent_recursive:
+        for override in overrides:
+            if isTranslate and not override.OverrideTranslationCurves():
+                continue
+            elif isRotate and not override.OverrideRotationCurves():
+                continue
+            elif isScale and not override.OverrideScaleCurves():
+                continue
+
+            if parent.name == override.NodeName():
+                return override.Mode()
+
+
 def utilityGetBindposeScale(poseBone):
     bindPoseScale = Matrix.LocRotScale(None, None, Vector((1.0, 1.0, 1.0)))
 
@@ -138,7 +160,7 @@ def utilityGetBindposeScale(poseBone):
     return bindPoseScale
 
 
-def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
+def importSkeletonConstraintNode(self, skeleton, poses):
     if skeleton is None:
         return
 
@@ -180,7 +202,121 @@ def importSkeletonConstraintNode(self, skeleton, skeletonObj, poses):
             ct.target_space = 'LOCAL_OWNER_ORIENT'
 
 
-def importSkeletonIKNode(self, skeleton, skeletonObj, poses):
+def importMergeModel(self, selectedObj, skeletonObj, poses):
+    # Find matching root bones in the selected object.
+    # If we had none by the end of the transaction, warn the user that the models aren't compatible.
+    foundMatchingRoot = False
+
+    missingBones = []
+
+    for bone in skeletonObj.pose.bones:
+        if not bone.name in selectedObj.pose.bones:
+            missingBones.append(bone.name)
+            continue
+
+        if bone.parent is not None:
+            continue
+
+        foundMatchingRoot = True
+
+        # Move the models bone to the existing bone in the scene's position.
+        bone.matrix = selectedObj.pose.bones[bone.name].matrix
+
+    if not foundMatchingRoot:
+        self.report(
+            {"WARNING"}, "Could not find compatible root bones make sure the skeletons are compatible.")
+        return
+
+    bpy.context.view_layer.objects.active = skeletonObj
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Create missing bones.
+    while missingBones:
+        for bone in [x for x in missingBones]:
+            bone = skeletonObj.data.edit_bones[bone]
+
+            # If the parent doesn't exist yet, skip it.
+            if bone.parent and not bone.parent.name in selectedObj.data.edit_bones:
+                continue
+            elif bone.parent:
+                parent = selectedObj.data.edit_bones[bone.parent.name]
+            else:
+                parent = None
+
+            # Calculate the new world space matrix.
+            newParent = parent.matrix if parent else Matrix.Identity()
+            oldParent = skeletonObj.data.edit_bones[bone.name].parent.matrix \
+                if newParent else Matrix.Identity()
+
+            relative = oldParent.inverted() @ \
+                skeletonObj.data.edit_bones[bone.name].matrix
+            world = newParent @ relative
+
+            newBone = selectedObj.data.edit_bones.new(bone.name)
+            newBone.tail = 0, 0.0025, 0  # I am sorry but blender sucks
+            newBone.parent = parent
+            newBone.matrix = world
+
+            missingBones.remove(bone.name)
+
+    bpy.context.view_layer.objects.active = skeletonObj
+    bpy.ops.object.mode_set(mode='POSE')
+
+    # Make sure that any bone in poses update for ik/constraints later.
+    for bone in poses.keys():
+        poses[bone] = skeletonObj.pose.bones[bone]
+
+    bpy.context.view_layer.objects.active = skeletonObj
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    for child in skeletonObj.children:
+        if not child.type == "MESH":
+            continue
+
+        shapes = []
+
+        if child.data.shape_keys:
+            for shape in child.data.shape_keys.key_blocks:
+                shapes.append(shape)
+
+        child.select_set(True)
+
+        # Bake the new mesh rest position so that we can copy the weights and modifiers.
+        bpy.context.view_layer.objects.active = child
+        bpy.ops.object.convert(target="MESH")
+
+        child.select_set(False)
+        child.parent = selectedObj
+
+        for shape in shapes:
+            newShape = child.shape_key_add(name=shape.name, from_mix=False)
+            newShape.interpolation = shape.interpolation
+            newShape.slider_max = shape.slider_max
+
+            points = [None] * (len(shape.data) * 3)
+
+            shape.data.foreach_get("co", points)
+            newShape.data.foreach_set("co", points)
+
+        for collection in list(child.users_collection):
+            collection.objects.unlink(child)
+        for collection in selectedObj.users_collection:
+            collection.objects.link(child)
+
+        # Create a new armature modifier as the old one gets destroyed. The vertex groups stay.
+        modifier = child.modifiers.new('Armature Rig', 'ARMATURE')
+        modifier.object = selectedObj
+        modifier.use_bone_envelopes = False
+        modifier.use_vertex_groups = True
+
+    # Remove the armature, bones, and then the collection created for this mesh.
+    oldCollection = skeletonObj.users_collection[0]
+
+    bpy.data.objects.remove(skeletonObj, do_unlink=True)
+    bpy.data.collections.remove(oldCollection, do_unlink=True)
+
+
+def importSkeletonIKNode(self, skeleton, poses):
     if skeleton is None:
         return
 
@@ -310,7 +446,7 @@ def importMaterialNode(path, material):
     return material.Name(), materialNew
 
 
-def importModelNode(self, model, path):
+def importModelNode(self, model, path, selectedObject):
     # Extract the name of this model from the path
     modelName = model.Name() or os.path.splitext(os.path.basename(path))[0]
 
@@ -426,10 +562,10 @@ def importModelNode(self, model, path):
 
                 for x in range(len(newMesh.vertices)):
                     for j in range(maximumInfluence):
-                        index = j + (x * maximumInfluence)
+                        i = j + (x * maximumInfluence)
 
-                        boneGroups[weightBoneBuffer[index]].add(
-                            (x,), weightValueBuffer[index], "ADD")
+                        boneGroups[weightBoneBuffer[i]].add(
+                            (x,), weightValueBuffer[i], "ADD")
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(len(newMesh.vertices)):
@@ -438,59 +574,68 @@ def importModelNode(self, model, path):
         collection.objects.link(meshObj)
 
     blendShapes = model.BlendShapes()
+    blendShapesByBaseShape = {}
 
+    # Merge the blend shapes together by their base shapes, so we only create a basis once.
     for blendShape in blendShapes:
-        # We need one base shape and 1+ target shapes
-        if blendShape.BaseShape() is None or blendShape.BaseShape().Hash() not in meshHandles:
-            continue
-        if blendShape.TargetShapes() is None:
-            continue
+        baseShapeHash = blendShape.BaseShape().Hash()
 
-        baseShape = meshHandles[blendShape.BaseShape().Hash()]
-        targetShapes = [meshHandles[x.Hash()]
-                        for x in blendShape.TargetShapes() if x.Hash() in meshHandles]
-        targetWeightScales = blendShape.TargetWeightScales() or []
-        targetWeightScaleCount = len(targetWeightScales)
+        if baseShapeHash not in meshHandles:
+            continue
+        if baseShapeHash not in blendShapesByBaseShape:
+            blendShapesByBaseShape[baseShapeHash] = [blendShape]
+        else:
+            blendShapesByBaseShape[baseShapeHash].append(blendShape)
 
+    # Iterate over the blend shapes by base shapes.
+    for blendShapes in blendShapesByBaseShape.values():
+        baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
+
+        # The basis will automatically load the base shape's vertex positions.
         basis = baseShape[0].shape_key_add(name="Basis")
         basis.interpolation = "KEY_LINEAR"
 
-        for i, shape in enumerate(targetShapes):
-            if len(basis.data) != len(shape[1].vertices):
+        for blendShape in blendShapes:
+            newShape = baseShape[0].shape_key_add(
+                name=blendShape.Name(), from_mix=False)
+            newShape.interpolation = "KEY_LINEAR"
+            newShape.slider_max = min(
+                10.0, blendShape.TargetWeightScale() or 1.0)
+
+            indices = blendShape.TargetShapeVertexIndices()
+            positions = blendShape.TargetShapeVertexPositions()
+
+            if not indices or not positions:
                 self.report(
-                    {'WARNING'}, "Unable to create blend shape \"%s\" with a different number of vertices." % shape[0].name)
+                    {'WARNING'}, "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
                 continue
 
-            newShape = baseShape[0].shape_key_add(
-                name=shape[0].name, from_mix=False)
-            newShape.interpolation = "KEY_LINEAR"
+            for i, vertexIndex in enumerate(indices):
+                newShape.data[vertexIndex].co = Vector(
+                    (positions[i * 3], positions[(i * 3) + 1], positions[(i * 3) + 2]))
 
-            if i < targetWeightScaleCount:
-                if targetWeightScales[i] > 10.0:
-                    self.report(
-                        {'WARNING'}, "Clamping blend shape \"%s\" scale to 10.0." % shape[0].name)
-                newShape.slider_max = min(10.0, targetWeightScales[i])
-
-            for v, value in enumerate(shape[1].vertices):
-                newShape.data[v].co = value.co
-
-            shape[0].hide_viewport = True
-
-    # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
-    if self.import_ik:
-        importSkeletonIKNode(self, model.Skeleton(), skeletonObj, poses)
-
-    # Import any constraints after ik.
-    if self.import_constraints:
-        importSkeletonConstraintNode(
-            self, model.Skeleton(), skeletonObj, poses)
-
-    # Relink the collection after the mesh is built
+    # Relink the collection after the mesh is built.
     bpy.context.view_layer.active_layer_collection.collection.children.link(
         collection)
 
+    # Merge with the existing skeleton here if one is selected and we have a skeleton.
+    if self.import_merge:
+        if selectedObject and selectedObject.type == 'ARMATURE':
+            importMergeModel(self, selectedObject, skeletonObj, poses)
+        else:
+            self.report(
+                {'WARNING'}, "You must select an armature to merge to.")
 
-def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
+    # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
+    if self.import_ik:
+        importSkeletonIKNode(self, model.Skeleton(), poses)
+
+    # Import any constraints after ik.
+    if self.import_constraints:
+        importSkeletonConstraintNode(self, model.Skeleton(), poses)
+
+
+def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -498,7 +643,8 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
-    mode = node.Mode()
+    mode = utilityResolveCurveModeOverride(
+        bone, node.Mode(), overrides, isRotate=True)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("rotation_quaternion", 0), ("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3)]]
@@ -506,12 +652,60 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
 
-    # Rotation keyframes in blender are independent from other data.
-    for i in range(0, len(keyValueBuffer), 4):
-        rotation = Quaternion(
-            (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2])).to_matrix().to_3x3()
+    # https://devtalk.blender.org/t/quaternion-interpolation/15883
+    # Blender interpolates rotations as-if they are separate components.
+    # This logic is of course, broken, so we must interpolate ourselves.
+    rotations = []
+    keyframes = []
 
-        frame = keyFrameBuffer[int(i / 4)] + startFrame
+    if len(keyFrameBuffer) > 0:
+        minFrame = min(keyFrameBuffer)
+        maxFrame = max(keyFrameBuffer)
+
+        existing = {}
+
+        for i in range(0, len(keyValueBuffer), 4):
+            existing[keyFrameBuffer[int(i / 4)]] = Quaternion(
+                (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2]))
+
+        lastKeyframeValue = None
+        lastKeyframeFrame = None
+        nextKeyframeValue = None
+        nextKeyframeFrame = None
+
+        for frame in range(minFrame, maxFrame + 1):
+            if frame in existing:
+                value = existing[frame]
+
+                lastKeyframeValue = value
+                lastKeyframeFrame = frame
+
+                rotations.append(value)
+                keyframes.append(frame)
+                continue
+
+            if lastKeyframeValue is None or lastKeyframeFrame is None:
+                continue
+
+            if nextKeyframeFrame is None or nextKeyframeFrame <= frame:
+                for nextFrame in range(frame + 1, maxFrame + 1):
+                    if nextFrame in existing:
+                        nextKeyframeValue = existing[nextFrame]
+                        nextKeyframeFrame = nextFrame
+                        break
+
+            if nextKeyframeFrame is not None and nextKeyframeFrame > frame:
+                if lastKeyframeValue != nextKeyframeValue:
+                    rotations.append(lastKeyframeValue.slerp(
+                        nextKeyframeValue, (frame - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
+                    keyframes.append(frame)
+                continue
+
+    # Rotation keyframes in blender are independent from other data.
+    for i in range(0, len(keyframes)):
+        rotation = rotations[i].to_matrix().to_3x3()
+
+        frame = keyframes[i] + startFrame
 
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
@@ -547,7 +741,60 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame):
     return (smallestFrame, largestFrame)
 
 
-def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
+def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
+    smallestFrame = sys.maxsize
+    largestFrame = 0
+
+    # We need to find every instance of the shape key in the armatures available meshes.
+    # Each mesh has it's own copy of the key, which needs it's own curve...
+    curves = []
+
+    for child in armature.children_recursive:
+        if child.type != "MESH":
+            continue
+        if not child.data.shape_keys:
+            continue
+        if not nodeName in child.data.shape_keys.key_blocks:
+            continue
+
+        mesh = child.data
+
+        # Each mesh has it's own animation action, which contains the curves for each key.
+        try:
+            mesh.animation_data.action
+        except:
+            mesh.animation_data_create()
+
+        action = mesh.animation_data.action or bpy.data.actions.new(
+            animName)
+
+        mesh.animation_data.action = action
+        mesh.animation_data.action.use_fake_user = True
+
+        curve = action.fcurves.find(data_path="shape_keys.key_blocks[\"%s\"].value" %
+                                    nodeName, index=0) or action.fcurves.new(data_path="shape_keys.key_blocks[\"%s\"].value" %
+                                                                             nodeName, index=0, action_group=nodeName)
+
+        # We found a mesh that has a matching shape key, add the curve.
+        curves.append(curve)
+
+    # For every curve add the values directly.
+    keyFrameBuffer = node.KeyFrameBuffer()
+    keyValueBuffer = node.KeyValueBuffer()
+
+    for curve in curves:
+        for frame, value in zip(keyFrameBuffer, keyValueBuffer):
+            frame = frame + startFrame
+
+            smallestFrame = min(frame, smallestFrame)
+            largestFrame = max(frame, largestFrame)
+
+            curve.keyframe_points.insert(frame, value=value, options={'FAST'})
+
+    return (smallestFrame, largestFrame)
+
+
+def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -555,6 +802,13 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
+    mode = None
+
+    for node in nodes:
+        if node is not None:
+            mode = node.Mode()
+
+    mode = utilityResolveCurveModeOverride(bone, mode, overrides, isScale=True)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("scale", 0), ("scale", 1), ("scale", 2)]]
@@ -571,10 +825,14 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
         keyFrameBuffer = node.KeyFrameBuffer()
         keyValueBuffer = node.KeyValueBuffer()
 
-        mode = node.Mode()
         scale = Vector((1.0, 1.0, 1.0))
 
         for i, frame in enumerate(keyFrameBuffer):
+            frame = frame + startFrame
+
+            smallestFrame = min(frame, smallestFrame)
+            largestFrame = max(frame, largestFrame)
+
             if mode == "absolute" or mode is None:
                 scale[axis] = keyValueBuffer[i]
 
@@ -600,7 +858,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame)
     return (smallestFrame, largestFrame)
 
 
-def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
+def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -613,6 +871,9 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame):
     for node in nodes:
         if node is not None:
             mode = node.Mode()
+
+    mode = utilityResolveCurveModeOverride(
+        bone, mode, overrides, isTranslate=True)
 
     tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
         ("location", 0), ("location", 1), ("location", 2)]]
@@ -701,9 +962,7 @@ def importNotificationTrackNode(node, action, frameStart):
     return (smallestFrame, largestFrame)
 
 
-def importAnimationNode(self, node, path):
-    # The object which the animation node should be applied to.
-    selectedObject = bpy.context.object
+def importAnimationNode(self, node, path, selectedObject):
     # Check that the selected object is an 'ARMATURE'.
     if selectedObject is None or selectedObject.type != 'ARMATURE':
         raise Exception(
@@ -747,6 +1006,7 @@ def importAnimationNode(self, node, path):
         startFrame = 0
 
     curves = node.Curves()
+    curveModeOverrides = node.CurveModeOverrides()
 
     # Create a list of pose bones that match the curves..
     poseBones = {}
@@ -766,7 +1026,12 @@ def importAnimationNode(self, node, path):
 
         if property == "rq":
             (smallestFrame, largestFrame) = importRotCurveNode(
-                x, nodeName, action.fcurves, poseBones, path, startFrame)
+                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+            wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
+            wantedLargestFrame = max(largestFrame, wantedLargestFrame)
+        elif property == "bs":
+            (smallestFrame, largestFrame) = importBlendShapeCurveNode(
+                x, nodeName, animName, selectedObject, startFrame)
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "tx":
@@ -784,13 +1049,13 @@ def importAnimationNode(self, node, path):
 
     for nodeName, x in locCurves.items():
         (smallestFrame, largestFrame) = importLocCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame)
+            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     for nodeName, x in scaleCurves.items():
         (smallestFrame,  largestFrame) = importScaleCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame)
+            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
@@ -836,6 +1101,8 @@ def importInstanceNodes(self, nodes, context, path):
     instanceGroup = bpy.data.collections.new("%s_instances" % name)
 
     for instancePath, instances in uniqueInstances.items():
+        instanceName = os.path.splitext(os.path.basename(instancePath))[0]
+
         try:
             bpy.ops.import_scene.cast(filepath=instancePath)
         except:
@@ -850,9 +1117,12 @@ def importInstanceNodes(self, nodes, context, path):
         baseGroup.children.link(base)
 
         for instance in instances:
-            newInstance = bpy.data.objects.new(instance.Name(), None)
+            newInstance = bpy.data.objects.new(
+                instance.Name() or instanceName, None)
             newInstance.instance_type = 'COLLECTION'
             newInstance.instance_collection = base
+            newInstance.show_instancer_for_render = False
+            newInstance.show_instancer_for_viewport = False
 
             position = instance.Position()
             rotation = instance.Rotation()
@@ -880,11 +1150,14 @@ def importCast(self, context, path):
 
     instances = []
 
+    # Grab the selected object before we start importing because it deselects after creating another object.
+    selectedObject = bpy.context.object
+
     for root in cast.Roots():
         for child in root.ChildrenOfType(Model):
-            importModelNode(self, child, path)
+            importModelNode(self, child, path, selectedObject)
         for child in root.ChildrenOfType(Animation):
-            importAnimationNode(self, child, path)
+            importAnimationNode(self, child, path, selectedObject)
         for child in root.ChildrenOfType(Instance):
             instances.append(child)
 

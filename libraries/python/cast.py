@@ -326,9 +326,17 @@ class Animation(CastNode):
         """The collection of curves for this animation."""
         return self.ChildrenOfType(Curve)
 
+    def CurveModeOverrides(self):
+        """The collection of curve mode overrides for this animation."""
+        return self.ChildrenOfType(CurveModeOverride)
+
     def CreateCurve(self):
         """Creates a new curve in this animation."""
         return self.CreateChild(Curve())
+
+    def CreateCurveModeOverride(self):
+        """Creates a new curve mode override in this animation."""
+        return self.CreateChild(CurveModeOverride())
 
     def Notifications(self):
         """The collection of notification tracks for this animation."""
@@ -444,6 +452,77 @@ class Curve(CastNode):
     def SetAdditiveBlendWeight(self, value):
         """Sets the weight to use when blending this animation."""
         self.CreateProperty("ab", "f").values = [value]
+
+
+class CurveModeOverride(CastNode):
+    """An override for an animation curves mode."""
+
+    def __init__(self):
+        super(CurveModeOverride, self).__init__(0x564F4D43)
+
+    def NodeName(self):
+        """The name of the node that is the start of this override."""
+        nn = self.properties.get("nn")
+        if nn is not None:
+            return nn.values[0]
+        return None
+
+    def SetNodeName(self, name):
+        """Sets the name of the node that is the start of this override."""
+        self.CreateProperty("nn", "s").values = [name]
+
+    def Mode(self):
+        """The mode for this override."""
+        m = self.properties.get("m")
+        if m is not None:
+            return m.values[0]
+        return None
+
+    def SetMode(self, mode):
+        """Sets the mode for this override."""
+        self.CreateProperty("m", "s").values = [mode]
+
+    def OverrideTranslationCurves(self):
+        """Whether or not the override effects translations."""
+        ot = self.properties.get("ot")
+        if ot is not None:
+            return ot.values[0] >= 1
+        return False
+
+    def SetOverrideTranslationCurves(self, enabled):
+        """Sets whether or not the override effects translations."""
+        if enabled:
+            self.CreateProperty("ot", "b").values = [1]
+        else:
+            self.CreateProperty("ot", "b").values = [0]
+
+    def OverrideRotationCurves(self):
+        """Whether or not the override effects rotations."""
+        orr = self.properties.get("or")
+        if orr is not None:
+            return orr.values[0] >= 1
+        return False
+
+    def SetOverrideRotationCurves(self, enabled):
+        """Sets whether or not the override effects rotations."""
+        if enabled:
+            self.CreateProperty("or", "b").values = [1]
+        else:
+            self.CreateProperty("or", "b").values = [0]
+
+    def OverrideScaleCurves(self):
+        """Whether or not the override effects scales."""
+        os = self.properties.get("os")
+        if os is not None:
+            return os.values[0] >= 1
+        return False
+
+    def SetOverrideScaleCurves(self, enabled):
+        """Sets whether or not the override effects scales."""
+        if enabled:
+            self.CreateProperty("os", "b").values = [1]
+        else:
+            self.CreateProperty("os", "b").values = [0]
 
 
 class NotificationTrack(CastNode):
@@ -641,54 +720,66 @@ class Mesh(CastNode):
 
 
 class BlendShape(CastNode):
-    """A blend shape deformer that defines a base mesh shape, and corrosponding target mesh shapes."""
+    """A blend shape key that defines a base mesh shape, and corresponding target mesh values."""
 
     def __init__(self):
         super(BlendShape, self).__init__(0x68736C62)
 
     def Name(self):
-        """The name of this blend shape deformer."""
+        """The name of this blend shape."""
         n = self.properties.get("n")
         if n is not None:
             return n.values[0]
         return None
 
     def SetName(self, name):
-        """Sets the name of this blend shape deformer."""
+        """Sets the name of this blend shape."""
         self.CreateProperty("n", "s").values = [name]
 
     def BaseShape(self):
-        """The base mesh shape."""
+        """The base shape."""
         b = self.properties.get("b")
         if b is not None:
             return self.parentNode.ChildByHash(b.values[0])
         return None
 
     def SetBaseShape(self, hash):
-        """Sets the base mesh shape."""
+        """Sets the base shape."""
         self.CreateProperty("b", "l").values = [hash]
 
-    def TargetShapes(self):
-        """A collection of target mesh shapes."""
-        t = self.properties.get("t")
-        if t is not None:
-            return [self.parentNode.ChildByHash(x) for x in t.values]
+    def TargetShapeVertexIndices(self):
+        """A collection of target shape vertex indices."""
+        vi = self.properties.get("vi")
+        if vi is not None:
+            return vi.values
         return None
 
-    def SetTargetShapes(self, hashes):
-        """Sets a collection of target mesh shapes."""
-        self.CreateProperty("t", "l").values = list(hashes)
+    def SetTargetShapeVertexIndices(self, indices):
+        """Sets a collection of target shape vertex indices."""
+        self.CreateProperty("vi", castTypeForMaximum(
+            indices)).values = list(indices)
 
-    def TargetWeightScales(self):
-        """A collection of target mesh scale values."""
+    def TargetShapeVertexPositions(self):
+        """A collection of target shape vertex positions."""
+        vp = self.properties.get("vp")
+        if vp is not None:
+            return vp.values
+        return None
+
+    def SetTargetShapeVertexPositions(self, positions):
+        """Sets a collection of target shape vertex positions."""
+        self.CreateProperty("vp", "3v").values = list(sum(positions, ()))
+
+    def TargetWeightScale(self):
+        """The target shape scale value."""
         ts = self.properties.get("ts")
         if ts is not None:
-            return ts.values
+            return ts.values[0]
         return None
 
-    def SetTargetWeightScales(self, scales):
-        """Sets a collection of target mesh scale values."""
-        self.CreateProperty("ts", "f").values = list(scales)
+    def SetTargetWeightScale(self, scale):
+        """Sets the target shape scale value."""
+        self.CreateProperty("ts", "f").values = [scale]
 
 
 class Skeleton(CastNode):
@@ -1174,6 +1265,7 @@ typeSwitcher = {
     0x6C656B73: Skeleton,
     0x6D696E61: Animation,
     0x76727563: Curve,
+    0x564F4D43: CurveModeOverride,
     0x6669746E: NotificationTrack,
     0x656E6F62: Bone,
     0x64686B69: IKHandle,

@@ -41,6 +41,8 @@ namespace Cast
                     return new Animation();
                 case 0x76727563:
                     return new Curve();
+                case 0x564F4D43:
+                    return new CurveModeOverride();
                 case 0x6669746E:
                     return new NotificationTrack();
                 case 0x68736C62:
@@ -316,7 +318,7 @@ namespace Cast
     }
 
     /// <summary>
-    /// A blend shape deformer that defines a base mesh shape, and corrosponding target mesh shapes.
+    /// A blend shape key that defines a base mesh shape, and corresponding target mesh values.
     /// </summary>
     public class BlendShape : CastNode
     {
@@ -340,7 +342,7 @@ namespace Cast
         }
 
         /// <summary>
-        /// The base mesh shape.
+        /// The base shape.
         /// </summary>
         /// <returns></returns>
         public Mesh BaseShape()
@@ -354,32 +356,44 @@ namespace Cast
         }
 
         /// <summary>
-        /// A collection of target mesh shapes.
+        /// A collection of target shape vertex indices.
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<Mesh> TargetShapes()
+        public IEnumerable<int> TargetShapeVertexIndices()
         {
-            if (Properties.TryGetValue("t", out CastProperty Value))
+            if (Properties.TryGetValue("vi", out CastProperty Value))
             {
                 foreach (var Item in Value.Values)
                 {
-                    yield return (Mesh)ChildByHash((ulong)Item);
+                    yield return (int)Item;
                 }
             }
         }
 
         /// <summary>
-        /// A collection of target mesh scale values.
+        /// A collection of target shape vertex positions.
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<float> TargetWeightScales()
+        public IEnumerable<Vector3> TargetShapeVertexPositions()
         {
-            if (Properties.TryGetValue("ts", out CastProperty Value))
+            if (Properties.TryGetValue("vp", out CastProperty Value))
             {
                 foreach (var Item in Value.Values)
                 {
-                    yield return (float)Item;
+                    yield return (Vector3)Item;
                 }
+            }
+        }
+
+        /// <summary>
+        /// The target shape scale value.
+        /// </summary>
+        /// <returns></returns>
+        public float TargetWeightScale()
+        {
+            if (Properties.TryGetValue("ts", out CastProperty Value))
+            {
+                return (float)Value.Values[0];
             }
         }
     }
@@ -1120,6 +1134,15 @@ namespace Cast
         }
 
         /// <summary>
+        /// The collection of curve mode overrides for this animation.
+        /// </summary>
+        /// <returns></returns>
+        public List<CurveModeOverride> CurveModeOverrides()
+        {
+            return ChildrenOfType<CurveModeOverride>();
+        }
+
+        /// <summary>
         /// The collection of notification tracks for this animation.
         /// </summary>
         /// <returns></returns>
@@ -1252,6 +1275,87 @@ namespace Cast
             }
 
             return 1.0f;
+        }
+    }
+
+    /// <summary>
+    /// An override for an animation curves mode.
+    /// </summary>
+    public class CurveModeOverride : CastNode
+    {
+        public CurveModeOverride()
+            : base(0x564F4D43)
+        {
+        }
+
+        /// <summary>
+        /// Sets the name of the node that is the start of this override.
+        /// </summary>
+        /// <returns></returns>
+        public string NodeName()
+        {
+            if (Properties.TryGetValue("nn", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The mode for this override.
+        /// </summary>
+        /// <returns></returns>
+        public string Mode()
+        {
+            if (Properties.TryGetValue("m", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Whether or not the override effects translations.
+        /// </summary>
+        /// <returns></returns>
+        public bool OverrideTranslationCurves()
+        {
+            if (Properties.TryGetValue("ot", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether or not the override effects rotations.
+        /// </summary>
+        /// <returns></returns>
+        public bool OverrideRotationCurves()
+        {
+            if (Properties.TryGetValue("or", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether or not the override effects scales.
+        /// </summary>
+        /// <returns></returns>
+        public bool OverrideScaleCurves()
+        {
+            if (Properties.TryGetValue("os", out CastProperty Value))
+            {
+                return (uint)Value.Values[0] >= 1;
+            }
+
+            return false;
         }
     }
 

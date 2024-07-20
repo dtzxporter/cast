@@ -11,7 +11,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 4, 0),
+    "version": (1, 5, 7),
     "blender": (3, 0, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -66,12 +66,31 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     import_constraints: BoolProperty(
         name="Import Constraints", description="Imports and configures constraints for the models skeleton", default=True)
 
+    import_merge: BoolProperty(
+        name="Import Merge", description="Imports and merges models together with the selected armature")
+
     def draw(self, context):
         self.layout.prop(self, "import_time")
         self.layout.prop(self, "import_reset")
         self.layout.prop(self, "import_skin")
         self.layout.prop(self, "import_ik")
         self.layout.prop(self, "import_constraints")
+        self.layout.prop(self, "import_merge")
+
+        self.layout.separator_spacer()
+
+        if not context.scene.cast_properties.import_scenes_path:
+            row = self.layout.column(align=False)
+            row.label(text="INFO", icon="QUESTION")
+            row.label(text="To import worlds select a")
+            row.label(text="scene path using the Cast")
+            row.label(text="menu on the right of blender.")
+        else:
+            row = self.layout.column(align=False)
+            row.label(text="INFO", icon="QUESTION")
+            row.label(text="A world scene path")
+            row.label(text="has been selected and")
+            row.label(text="is ready to be used.")
 
     def execute(self, context):
         from . import import_cast
@@ -87,7 +106,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
             return {'FINISHED'}
         except Exception as e:
             self.report({'ERROR'}, str(e))
-            return {'CANCELLED'}
+            return {'FINISHED'}
 
     @classmethod
     def poll(self, context):
