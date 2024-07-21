@@ -719,7 +719,6 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
         largestFrame = max(frame, largestFrame)
 
         if mode == "absolute" or mode is None:
-            rotation = rotations[i].to_matrix().to_3x3()
             rotation = inv_rest_quat @ rotations[i]
 
             for axis, track in enumerate(tracks):
