@@ -637,6 +637,10 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
         "pbr": "StingrayPBS"
     }
 
+    # For now until we work out an importer for 'standard' materials.
+    if sceneSettings["createStandardMaterials"]:
+        switcher["pbr"] = "lambert"
+
     loader = {
         "lambert": utilityAssignGenericSlots,
         "phong": utilityAssignGenericSlots,
