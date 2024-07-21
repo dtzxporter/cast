@@ -703,26 +703,30 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
 
     # Rotation keyframes in blender are independent from other data.
     for i in range(0, len(keyframes)):
-        rotation = rotations[i].to_matrix().to_3x3()
-
         frame = keyframes[i] + startFrame
 
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
 
         if mode == "absolute" or mode is None:
+            rotation = rotations[i].to_matrix().to_3x3()
+
             bone.matrix_basis.identity()
 
             if bone.parent is not None:
-                bone.matrix = (bone.parent.matrix.to_3x3() @ rotation).to_4x4()
+                inv_parent = bone.parent.matrix.to_3x3().inverted()
+                inv_rest_quat = \
+                    (inv_parent @ bone.matrix.to_3x3()).to_quaternion().inverted()
             else:
-                bone.matrix = rotation.to_4x4()
+                inv_rest_quat = bone.matrix.to_quaternion().inverted()
+
+            rotation = inv_rest_quat @ rotations[i]
 
             for axis, track in enumerate(tracks):
                 track.keyframe_points.insert(
-                    frame, value=bone.rotation_quaternion[axis], options={'FAST'})
+                    frame, value=rotation[axis], options={'FAST'})
         elif mode == "relative":
-            rotation = rotation.to_quaternion()
+            rotation = rotations[i]
 
             for axis, track in enumerate(tracks):
                 track.keyframe_points.insert(
