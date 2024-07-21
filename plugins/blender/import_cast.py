@@ -701,6 +701,16 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
                     keyframes.append(frame)
                 continue
 
+    # Calculate the inverse rest rotation for this bone.
+    bone.matrix_basis.identity()
+
+    if bone.parent is not None:
+        inv_parent = bone.parent.matrix.to_3x3().inverted()
+        inv_rest_quat = \
+            (inv_parent @ bone.matrix.to_3x3()).to_quaternion().inverted()
+    else:
+        inv_rest_quat = bone.matrix.to_quaternion().inverted()
+
     # Rotation keyframes in blender are independent from other data.
     for i in range(0, len(keyframes)):
         frame = keyframes[i] + startFrame
@@ -710,16 +720,6 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
 
         if mode == "absolute" or mode is None:
             rotation = rotations[i].to_matrix().to_3x3()
-
-            bone.matrix_basis.identity()
-
-            if bone.parent is not None:
-                inv_parent = bone.parent.matrix.to_3x3().inverted()
-                inv_rest_quat = \
-                    (inv_parent @ bone.matrix.to_3x3()).to_quaternion().inverted()
-            else:
-                inv_rest_quat = bone.matrix.to_quaternion().inverted()
-
             rotation = inv_rest_quat @ rotations[i]
 
             for axis, track in enumerate(tracks):
@@ -735,9 +735,6 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
             # I need to get some samples of these before attempting this again.
             raise Exception(
                 "Additive animations are currently not supported in blender.")
-
-    # Reset temporary matrices used to calculate the keyframe locations.
-    bone.matrix_basis.identity()
 
     for track in tracks:
         track.update()
