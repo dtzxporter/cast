@@ -84,7 +84,6 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             "gloss": "Roughness",
             "emissive": "Emissive Color",
             "normal": "Normal",
-            "ao": "Ambient Occlusion"
         }
 
     # Loop and connect the slots
