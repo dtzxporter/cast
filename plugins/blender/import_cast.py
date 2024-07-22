@@ -41,6 +41,12 @@ def utilityClearKeyframePoints(fcurve):
         fcurve.keyframe_points.remove(keyframe)
 
 
+def utilityAddKeyframe(fcurve, frame, value, interpolation):
+    keyframe = \
+        fcurve.keyframe_points.insert(frame, value=value, options={'FAST'})
+    keyframe.interpolation = interpolation
+
+
 def utilityFindShaderNode(material, bl_idname):
     for node in material.node_tree.nodes.values():
         if node.bl_idname == bl_idname:
@@ -721,14 +727,12 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
             rotation = inv_rest_quat @ rotations[i]
 
             for axis, track in enumerate(tracks):
-                track.keyframe_points.insert(
-                    frame, value=rotation[axis], options={'FAST'})
+                utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
         elif mode == "relative":
             rotation = rotations[i]
 
             for axis, track in enumerate(tracks):
-                track.keyframe_points.insert(
-                    frame, value=rotation[axis], options={'FAST'})
+                utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
         else:
             # I need to get some samples of these before attempting this again.
             raise Exception(
@@ -788,7 +792,7 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
             smallestFrame = min(frame, smallestFrame)
             largestFrame = max(frame, largestFrame)
 
-            curve.keyframe_points.insert(frame, value=value, options={'FAST'})
+            utilityAddKeyframe(curve, frame, value, "LINEAR")
 
     return (smallestFrame, largestFrame)
 
@@ -838,11 +842,10 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
                 value = (bindPoseInvMatrix @
                          Matrix.LocRotScale(None, None, scale)).to_scale()
 
-                tracks[axis].keyframe_points.insert(
-                    frame, value=value[axis], options={'FAST'})
+                utilityAddKeyframe(tracks[axis], frame, value[axis], "LINEAR")
             elif mode == "relative":
-                tracks[axis].keyframe_points.insert(
-                    frame, value=keyValueBuffer[i], options={'FAST'})
+                utilityAddKeyframe(
+                    tracks[axis], frame, keyValueBuffer[i], "LINEAR")
             else:
                 # I need to get some samples of these before attempting this again.
                 raise Exception(
@@ -883,18 +886,18 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
     for axis, node in enumerate(nodes):
         if node is None:
             if bone.parent is None:
-                tracks[axis].keyframe_points.insert(
-                    0, value=bone.matrix.translation[axis], options={'FAST'})
+                utilityAddKeyframe(
+                    tracks[axis], 0, bone.matrix.translation[axis], "LINEAR")
             else:
-                tracks[axis].keyframe_points.insert(
-                    0, value=(bone.parent.matrix.inverted() @ bone.matrix).translation[axis], options={'FAST'})
+                utilityAddKeyframe(tracks[axis], 0,
+                                   (bone.parent.matrix.inverted() @ bone.matrix).translation[axis], "LINEAR")
         else:
             keyFrameBuffer = node.KeyFrameBuffer()
             keyValueBuffer = node.KeyValueBuffer()
 
             for i, frame in enumerate(keyFrameBuffer):
-                tracks[axis].keyframe_points.insert(
-                    frame, value=keyValueBuffer[i], options={'FAST'})
+                utilityAddKeyframe(
+                    tracks[axis], frame, keyValueBuffer[i], "LINEAR")
                 lastFrame = max(lastFrame, frame)
 
     keyFrameBuffer = []
@@ -931,8 +934,7 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
                 "Additive animations are currently not supported in blender.")
 
         for axis, track in enumerate(tracks):
-            track.keyframe_points.insert(
-                frame, value=bone.location[axis], options={'FAST'})
+            utilityAddKeyframe(track, frame, bone.location[axis], "LINEAR")
 
     # Reset temporary matrices used to calculate the keyframe locations.
     bone.matrix_basis.identity()
