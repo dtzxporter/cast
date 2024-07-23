@@ -41,6 +41,12 @@ def utilityClearKeyframePoints(fcurve):
         fcurve.keyframe_points.remove(keyframe)
 
 
+def utilityAddKeyframe(fcurve, frame, value, interpolation):
+    keyframe = \
+        fcurve.keyframe_points.insert(frame, value=value, options={'FAST'})
+    keyframe.interpolation = interpolation
+
+
 def utilityFindShaderNode(material, bl_idname):
     for node in material.node_tree.nodes.values():
         if node.bl_idname == bl_idname:
@@ -84,7 +90,6 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             "gloss": "Roughness",
             "emissive": "Emissive Color",
             "normal": "Normal",
-            "ao": "Ambient Occlusion"
         }
 
     # Loop and connect the slots
@@ -701,39 +706,37 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
                     keyframes.append(frame)
                 continue
 
+    # Calculate the inverse rest rotation for this bone.
+    bone.matrix_basis.identity()
+
+    if bone.parent is not None:
+        inv_parent = bone.parent.matrix.to_3x3().inverted()
+        inv_rest_quat = \
+            (inv_parent @ bone.matrix.to_3x3()).to_quaternion().inverted()
+    else:
+        inv_rest_quat = bone.matrix.to_quaternion().inverted()
+
     # Rotation keyframes in blender are independent from other data.
     for i in range(0, len(keyframes)):
-        rotation = rotations[i].to_matrix().to_3x3()
-
         frame = keyframes[i] + startFrame
 
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
 
         if mode == "absolute" or mode is None:
-            bone.matrix_basis.identity()
-
-            if bone.parent is not None:
-                bone.matrix = (bone.parent.matrix.to_3x3() @ rotation).to_4x4()
-            else:
-                bone.matrix = rotation.to_4x4()
+            rotation = inv_rest_quat @ rotations[i]
 
             for axis, track in enumerate(tracks):
-                track.keyframe_points.insert(
-                    frame, value=bone.rotation_quaternion[axis], options={'FAST'})
+                utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
         elif mode == "relative":
-            rotation = rotation.to_quaternion()
+            rotation = rotations[i]
 
             for axis, track in enumerate(tracks):
-                track.keyframe_points.insert(
-                    frame, value=rotation[axis], options={'FAST'})
+                utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
         else:
             # I need to get some samples of these before attempting this again.
             raise Exception(
                 "Additive animations are currently not supported in blender.")
-
-    # Reset temporary matrices used to calculate the keyframe locations.
-    bone.matrix_basis.identity()
 
     for track in tracks:
         track.update()
@@ -789,7 +792,7 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
             smallestFrame = min(frame, smallestFrame)
             largestFrame = max(frame, largestFrame)
 
-            curve.keyframe_points.insert(frame, value=value, options={'FAST'})
+            utilityAddKeyframe(curve, frame, value, "LINEAR")
 
     return (smallestFrame, largestFrame)
 
@@ -839,11 +842,10 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
                 value = (bindPoseInvMatrix @
                          Matrix.LocRotScale(None, None, scale)).to_scale()
 
-                tracks[axis].keyframe_points.insert(
-                    frame, value=value[axis], options={'FAST'})
+                utilityAddKeyframe(tracks[axis], frame, value[axis], "LINEAR")
             elif mode == "relative":
-                tracks[axis].keyframe_points.insert(
-                    frame, value=keyValueBuffer[i], options={'FAST'})
+                utilityAddKeyframe(
+                    tracks[axis], frame, keyValueBuffer[i], "LINEAR")
             else:
                 # I need to get some samples of these before attempting this again.
                 raise Exception(
@@ -884,18 +886,18 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
     for axis, node in enumerate(nodes):
         if node is None:
             if bone.parent is None:
-                tracks[axis].keyframe_points.insert(
-                    0, value=bone.matrix.translation[axis], options={'FAST'})
+                utilityAddKeyframe(
+                    tracks[axis], 0, bone.matrix.translation[axis], "LINEAR")
             else:
-                tracks[axis].keyframe_points.insert(
-                    0, value=(bone.parent.matrix.inverted() @ bone.matrix).translation[axis], options={'FAST'})
+                utilityAddKeyframe(tracks[axis], 0,
+                                   (bone.parent.matrix.inverted() @ bone.matrix).translation[axis], "LINEAR")
         else:
             keyFrameBuffer = node.KeyFrameBuffer()
             keyValueBuffer = node.KeyValueBuffer()
 
             for i, frame in enumerate(keyFrameBuffer):
-                tracks[axis].keyframe_points.insert(
-                    frame, value=keyValueBuffer[i], options={'FAST'})
+                utilityAddKeyframe(
+                    tracks[axis], frame, keyValueBuffer[i], "LINEAR")
                 lastFrame = max(lastFrame, frame)
 
     keyFrameBuffer = []
@@ -932,8 +934,7 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
                 "Additive animations are currently not supported in blender.")
 
         for axis, track in enumerate(tracks):
-            track.keyframe_points.insert(
-                frame, value=bone.location[axis], options={'FAST'})
+            utilityAddKeyframe(track, frame, bone.location[axis], "LINEAR")
 
     # Reset temporary matrices used to calculate the keyframe locations.
     bone.matrix_basis.identity()
@@ -983,6 +984,10 @@ def importAnimationNode(self, node, path, selectedObject):
     bpy.ops.object.mode_set(mode='POSE')
 
     if self.import_reset:
+        if selectedObject.animation_data.action:
+            bpy.data.actions.remove(
+                selectedObject.animation_data.action, do_unlink=True)
+
         action = bpy.data.actions.new(animName)
     else:
         action = selectedObject.animation_data.action or bpy.data.actions.new(
@@ -1015,6 +1020,13 @@ def importAnimationNode(self, node, path, selectedObject):
         for bone in selectedObject.pose.bones:
             if x.NodeName().lower() == bone.name.lower():
                 poseBones[x.NodeName()] = bone
+
+    # Make sure the bones are at rest.
+    if self.import_reset:
+        for poseBone in selectedObject.pose.bones:
+            poseBone.bone.select = True
+
+        bpy.ops.pose.transforms_clear()
 
     # Create a list of the separate location and scale curves because their curves are separate.
     locCurves = {}

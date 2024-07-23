@@ -33,7 +33,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.57"
+version = "1.61"
 
 
 def utilityAbout():
@@ -636,6 +636,10 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
         "phong": "phong",
         "pbr": "StingrayPBS"
     }
+
+    # For now until we work out an importer for 'standard' materials.
+    if sceneSettings["createStandardMaterials"]:
+        switcher["pbr"] = "lambert"
 
     loader = {
         "lambert": utilityAssignGenericSlots,
