@@ -984,10 +984,6 @@ def importAnimationNode(self, node, path, selectedObject):
     bpy.ops.object.mode_set(mode='POSE')
 
     if self.import_reset:
-        if selectedObject.animation_data.action:
-            bpy.data.actions.remove(
-                selectedObject.animation_data.action, do_unlink=True)
-
         action = bpy.data.actions.new(animName)
     else:
         action = selectedObject.animation_data.action or bpy.data.actions.new(
@@ -1021,12 +1017,12 @@ def importAnimationNode(self, node, path, selectedObject):
             if x.NodeName().lower() == bone.name.lower():
                 poseBones[x.NodeName()] = bone
 
-    # Make sure the bones are at rest.
     if self.import_reset:
-        for poseBone in selectedObject.pose.bones:
-            poseBone.bone.select = True
+        for bone in selectedObject.pose.bones:
+            bone.matrix_basis.identity()
 
-        bpy.ops.pose.transforms_clear()
+        # Make sure the depsgraph is updated before processing the next animation.
+        bpy.context.evaluated_depsgraph_get().update()
 
     # Create a list of the separate location and scale curves because their curves are separate.
     locCurves = {}
