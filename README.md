@@ -694,6 +694,12 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
 		<td>False</td>
  	</tr>
+	<tr>
+  		<td>Anisotropy File Hash (aniso)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
 	 <tr>
   		<td>Extra (x) File Hash (extra%d)</td>
    		<td>Integer 64 (l)</td>
