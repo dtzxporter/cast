@@ -1,9 +1,11 @@
 import c4d
 import os
 import array
-import math
-from c4d import plugins, bitmaps, Vector, gui, BaseObject
 import mxutils
+
+
+from c4d import plugins, bitmaps, Vector, gui, BaseObject
+
 
 RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "res")
 mxutils.ImportSymbols(RESOURCE_DIR)
@@ -22,6 +24,7 @@ class CastLoader(plugins.SceneLoaderData):
         importCast(doc, node, name)
         return c4d.FILEERROR_NONE
 
+
 def importCast(doc, node, path):
     cast = Cast.load(path)
 
@@ -36,8 +39,8 @@ def importCast(doc, node, path):
             instances.append(child)
 
     if len(instances) > 0:
-        importInstanceNodes(doc, instances, path)
-        
+        importInstanceNodes(doc, instances, node, path)
+
 """
 We are using Blender unpack_list for convinience
 https://github.com/blender/blender/blob/main/scripts/modules/bpy_extras/io_utils.py#L370
@@ -49,23 +52,21 @@ def unpack_list(list_of_tuples):
         flat_list_extend(t)
     return flat_list
 
-def utilityQuaternionToEuler(q):
-    x, y, z, w = q
-    sinr_cosp = 2 * (w * x + y * z)
-    cosr_cosp = 1 - 2 * (x * x + y * y)
-    roll = math.atan2(sinr_cosp, cosr_cosp)
 
-    sinp = 2 * (w * y - z * x)
-    if abs(sinp) >= 1:
-        pitch = math.copysign(math.pi / 2, sinp)
-    else:
-        pitch = math.asin(sinp)
+def utilityQuaternionToEuler(tempQuat):
+        quaternion = c4d.Quaternion()
+        quaternion.w = tempQuat[3]
+        quaternion.v = Vector(tempQuat[0], tempQuat[1], -tempQuat[2])
 
-    siny_cosp = 2 * (w * z + x * y)
-    cosy_cosp = 1 - 2 * (y * y + z * z)
-    yaw = math.atan2(siny_cosp, cosy_cosp)
+        m = c4d.Matrix()
+        m = quaternion.GetMatrix()
+        mToHPB = c4d.utils.MatrixToHPB
 
-    return roll, pitch, -yaw
+        rotationOrder = c4d.ROTATIONORDER_HPB
+        rotation = mToHPB(m, rotationOrder)
+
+        return rotation
+
 
 def utilityAddTextureMaterialSlots(slotName, texPath, mat, shaderType):
     shader = c4d.BaseList2D(c4d.Xbitmap)
@@ -77,6 +78,7 @@ def utilityAddTextureMaterialSlots(slotName, texPath, mat, shaderType):
 
     mat[shaderType] = shader
     mat.InsertShader(shader)
+
 
 def utilityAssignMaterialSlots(doc, material, slots, path):
     switcher = {
@@ -95,6 +97,7 @@ def utilityAssignMaterialSlots(doc, material, slots, path):
         texturePath = os.path.dirname(path) + "\\" + connection.Path()
         utilityAddTextureMaterialSlots(slot, texturePath, material, switcher[slot])
 
+
 def utilityWriteNormalTag(tag, normalList):
     # Retrieves the write buffer array
     buffer = tag.GetLowlevelDataAddressW()
@@ -107,12 +110,13 @@ def utilityWriteNormalTag(tag, normalList):
     data = data.tobytes()
     buffer[:len(data)] = data
 
+
 def importMaterialNode(doc, path, material):
     materials = doc.GetMaterials()
     for mat in materials:
         if mat.GetName() == material.Name():
             return mat
-        
+
     materialNew = c4d.BaseMaterial(c4d.Mmaterial)
     materialNew.SetName(material.Name())
 
@@ -123,8 +127,8 @@ def importMaterialNode(doc, path, material):
 
     return materialNew
 
-def importModelNode(doc, node, model, path):
 
+def importModelNode(doc, node, model, path):
     # Extract the name of this model from the path
     modelName = model.Name() or os.path.splitext(os.path.basename(path))[0]
     # Create a collection for our objects
@@ -139,10 +143,10 @@ def importModelNode(doc, node, model, path):
 
     meshes = model.Meshes()
     meshHandles = {}
-    
+
     for mesh in meshes:
-        newMesh = BaseObject(c4d.Opolygon) #c4d.CallCommand(13039) #bpy.data.meshes.new("polySurfaceMesh")
-        newMesh.SetName(mesh.Name() or "CastMesh") # meshObj = bpy.data.objects.new(mesh.Name() or "CastMesh", newMesh)
+        newMesh = BaseObject(c4d.Opolygon)
+        newMesh.SetName(mesh.Name() or "CastMesh")
         
         meshHandles[mesh.Hash()] = (newMesh)
 
@@ -154,14 +158,14 @@ def importModelNode(doc, node, model, path):
         facesCount = int(faceIndicesCount / 3)
         faces = unpack_list([(faces[x + 2], faces[x + 1], faces[x + 0])
                         for x in range(0, faceIndicesCount, 3)])
-        
+
         newMesh.ResizeObject(vertexCount, facesCount)
 
         # Vertice
         for i in range(0, len(vertexPositions), 3):
             vertexIndex = i // 3
             x, y, z = vertexPositions[i:i+3]
-            newMesh.SetPoint(vertexIndex, Vector(x, y, -z)) # Matching the Maya default import
+            newMesh.SetPoint(vertexIndex, Vector(x, y, -z))
 
         # Faces
         for i in range(0, faceIndicesCount, 3):
@@ -173,6 +177,7 @@ def importModelNode(doc, node, model, path):
         for i in range(mesh.UVLayerCount()):
             uvTag = c4d.UVWTag(facesCount)
             uvBuffer = mesh.VertexUVLayerBuffer(0)
+
             uvUnpacked = unpack_list([(uvBuffer[x * 2], 1.0 - uvBuffer[(x * 2) + 1]) for x in faces])
             for i in range(0, len(uvUnpacked), 6):
                 polyIndex = i // 6
@@ -215,7 +220,7 @@ def importModelNode(doc, node, model, path):
             # Maps data from float to int16 value
             normalListToSet = [int(component * 32000.0)
                    for n in normalList for component in (n.x, n.y, n.z)]
-            
+
             utilityWriteNormalTag(normaltag, normalListToSet)
             newMesh.InsertTag(normaltag)
 
@@ -257,7 +262,6 @@ def importModelNode(doc, node, model, path):
                             1.0
                         )
             weightTag.Message(c4d.MSG_UPDATE)
-            c4d.EventAdd()
 
         meshMaterial = mesh.Material()
         if meshMaterial is not None:
@@ -268,13 +272,16 @@ def importModelNode(doc, node, model, path):
 
         doc.InsertObject(newMesh, parent=modelNull)
         newMesh.Message(c4d.MSG_UPDATE)
-        c4d.EventAdd()
 
     if node[CAST_IMPORT_IK_HANDLES]:
         importSkeletonIKNode(doc, modelNull, model.Skeleton(), boneIndexes)
 
     if node[CAST_IMPORT_CONSTRAINTS]:
         importSkeletonConstraintNode(model.Skeleton(), boneIndexes)
+    c4d.EventAdd()
+
+    return modelNull
+
 
 def importSkeletonConstraintNode(skeleton, boneIndexes):
     if skeleton is None:
@@ -290,7 +297,7 @@ def importSkeletonConstraintNode(skeleton, boneIndexes):
         constraintTag = c4d.BaseTag(CONSTRAINT_TAG)
         constraintBone.InsertTag(constraintTag)
         constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR] = True
-        
+
         # Disabling all constraints, cause default is enabled
         constraintTag[CONSTRAIN_POS] = False
         constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR_CONSTRAIN_P_X] = False
@@ -345,6 +352,7 @@ def importSkeletonConstraintNode(skeleton, boneIndexes):
         if constraint.Name() is not None:
             constraintTag[c4d.ID_BASELIST_NAME] = constraint.Name()
 
+
 def importSkeletonIKNode(doc, modelNull, skeleton, boneIndexes):
     if skeleton is None or not skeleton.IKHandles():
         return
@@ -366,21 +374,21 @@ def importSkeletonIKNode(doc, modelNull, skeleton, boneIndexes):
         ikTag[c4d.ID_CA_IK_TAG_SOLVER] = 2
         ikTag[c4d.ID_CA_IK_TAG_TIP] = endBone
         ikTag[c4d.ID_CA_IK_TAG_TARGET] = ikTargetNull
-        
+
         poleVectorBone = handle.PoleVectorBone()
         if poleVectorBone is not None:
             poleVector = boneIndexes[poleVectorBone.Hash()]
-            ikPoleNull = BaseObject(c4d.Onull)
-            ikPoleNull.SetName(poleVector.GetName() + "_Pole")
-            ikPoleNull.SetMg(poleVector.GetMg())
-            ikPoleNull.SetAbsRot(Vector(0, 0, 0))
-            
-            doc.InsertObject(ikPoleNull, startBone)
-            
             ikTag[c4d.ID_CA_IK_TAG_POLE] = poleVector
+            ikTag[c4d.ID_CA_IK_TAG_POLE_AXIS] = POLE_AXIS_X
+            ikTag[c4d.ID_CA_IK_TAG_POLE_TWIST] = poleVector[c4d.ID_BASEOBJECT_REL_ROTATION,c4d.VECTOR_X]
 
+        poleBone = handle.PoleBone()
+        if poleBone is not None:
+            # Warn until we figure out how to emulate this effectively.
+            gui.MessageDialog(text="Unable to setup %s fully due to Cinema 4D not supporting pole (twist) bones." % poleBone.Name(), type=c4d.GEMB_ICONEXCLAMATION)
         startBone.InsertTag(ikTag)
-            
+  
+
 def importSkeletonNode(modelNull, skeleton):
     if skeleton is None:
         return None
@@ -392,18 +400,18 @@ def importSkeletonNode(modelNull, skeleton):
     for i, bone in enumerate(bones):
         newBone = BaseObject(c4d.Ojoint)
         newBone.SetName(bone.Name())
-        
+
         tX, tY, tZ = bone.LocalPosition()
         translation = Vector(tX, tY, -tZ)
 
-        rX, rY, rZ = utilityQuaternionToEuler(bone.LocalRotation())
-        newBone.SetRotationOrder(c4d.ROTATIONORDER_XYZGLOBAL)
+        tempQuat = bone.LocalRotation()
+        rotation = utilityQuaternionToEuler(tempQuat)
 
-        scale_tuple = bone.Scale() or (1.0, 1.0, 1.0)
-        scale = Vector(scale_tuple[0], scale_tuple[1], scale_tuple[2])
+        scaleTuple = bone.Scale() or (1.0, 1.0, 1.0)
+        scale = Vector(scaleTuple[0], scaleTuple[1], scaleTuple[2])
 
         newBone.SetAbsPos(translation)
-        newBone.SetAbsRot(Vector(rX, rY, rZ))
+        newBone.SetAbsRot(rotation)
         newBone.SetAbsScale(scale)
 
         handles[i] = newBone
@@ -417,16 +425,82 @@ def importSkeletonNode(modelNull, skeleton):
 
     return boneIndexes
 
-def importAnimationNode(doc, animation, path):
+
+def importAnimationNode():
     gui.MessageDialog(text="Animations are currently not supported.", type=c4d.GEMB_ICONSTOP)
 
-def importInstanceNodes(doc, nodes, path):
-    gui.MessageDialog(text="Instances are currently not supported.", type=c4d.GEMB_ICONSTOP)
+
+def importInstanceNodes(doc, nodes, node, path):
+    rootPath = c4d.storage.LoadDialog(title='Select the root directory where instance scenes are located', flags=2)
+
+    if rootPath is None:
+        return gui.MessageDialog(text="Unable to import instances without a root directory!", type=c4d.GEMB_ICONSTOP)
+
+    uniqueInstances = {}
+
+    for instance in nodes:
+        refs = os.path.join(rootPath, instance.ReferenceFile().Path())
+
+        if refs in uniqueInstances:
+            uniqueInstances[refs].append(instance)
+        else:
+            uniqueInstances[refs] = [instance]
+
+    name = os.path.splitext(os.path.basename(path))[0]
+
+    # Create a collection for our objects
+    rootNull = BaseObject(c4d.Onull)
+    rootNull.SetName(name)
+    doc.InsertObject(rootNull)
+
+    instanceNull = BaseObject(c4d.Onull)
+    instanceNull.SetName("%s_instances" % name)
+    instanceNull.InsertUnder(rootNull)
+
+    sceneNull = BaseObject(c4d.Onull)
+    sceneNull.SetName("%s_scenes" % name)
+    sceneNull.InsertUnder(rootNull)
+    # Disable source models visibility
+    sceneNull[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = 1
+    sceneNull[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = 1
+
+    for instancePath, instances in uniqueInstances.items():
+        instanceName = os.path.splitext(os.path.basename(instancePath))[0]
+
+        try:
+            cast = Cast.load(instancePath)
+            for root in cast.Roots():
+                for child in root.ChildrenOfType(Model):
+                    modelNull = importModelNode(doc, node, child, instancePath)
+            modelNull.InsertUnder(sceneNull)
+        except:
+            print("Failed to import instance: %s" % instancePath)
+            continue
+
+        for instance in instances:
+            # Creates instance object
+            newInstance = c4d.InstanceObject()
+
+            newInstance.SetName(instance.Name() or instanceName)
+            newInstance.InsertUnder(instanceNull)
+
+            tX, tY, tZ = instance.Position()
+            translation = Vector(tX, tY, -tZ)
+
+            tempQuat = instance.Rotation()
+            rotation = utilityQuaternionToEuler(tempQuat)
+
+            scaleTuple = instance.Scale() or (1.0, 1.0, 1.0)
+            scale = Vector(scaleTuple[0], scaleTuple[1], scaleTuple[2])
+
+            newInstance.SetAbsPos(translation)
+            newInstance.SetAbsRot(rotation)
+            newInstance.SetAbsScale(scale)
+
+            newInstance.SetReferenceObject(modelNull)
+
 
 if __name__ == '__main__':
-    dir,fn=os.path.split(__file__)
-    bmp=bitmaps.BaseBitmap()
-    bmp.InitWith(os.path.join(dir,"res","icon.png"))
     reg=plugins.RegisterSceneLoaderPlugin(id=PLUGIN_ID,
                                           str=__pluginname__,
                                           info=0,
