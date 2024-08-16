@@ -683,7 +683,7 @@ def utilityGetRestData(restTransform, component):
         scale.createFromList([1.0, 1.0, 1.0], 3)
         scalePtr = scale.asDoublePtr()
 
-        restTransform.getScale(scalePtr)
+        restTransform.getScale(scalePtr, OpenMaya.MSpace.kTransform)
 
         return (OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 0), OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 1), OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 2))
     else:
