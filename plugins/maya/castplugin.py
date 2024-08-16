@@ -850,7 +850,7 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
             frame = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
-            euler = (rest * frame).asEulerRotation()
+            euler = (frame * rest).asEulerRotation()
 
             valuesX[slot] = euler.x
             valuesY[slot] = euler.y
