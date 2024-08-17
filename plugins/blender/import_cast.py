@@ -640,7 +640,7 @@ def importModelNode(self, model, path, selectedObject):
         importSkeletonConstraintNode(self, model.Skeleton(), poses)
 
 
-def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
+def importRotCurveNode(self, node, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -723,7 +723,7 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
 
-        if mode == "absolute" or mode is None:
+        if mode == "absolute" or mode == "additive" or mode is None:
             rotation = inv_rest_quat @ rotations[i]
 
             for axis, track in enumerate(tracks):
@@ -733,10 +733,11 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
 
             for axis, track in enumerate(tracks):
                 utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
-        else:
-            # I need to get some samples of these before attempting this again.
-            raise Exception(
-                "Additive animations are currently not supported in blender.")
+
+    # Warn the user that additive animations aren't supported.
+    if mode == "additive":
+        self.report(
+            {'WARNING'}, "Curve: %s was additive, blending isn't supported yet." % nodeName)
 
     for track in tracks:
         track.update()
@@ -797,7 +798,7 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
     return (smallestFrame, largestFrame)
 
 
-def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
+def importScaleCurveNodes(self, nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -836,7 +837,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
             smallestFrame = min(frame, smallestFrame)
             largestFrame = max(frame, largestFrame)
 
-            if mode == "absolute" or mode is None:
+            if mode == "absolute" or mode == "additive" or mode is None:
                 scale[axis] = keyValueBuffer[i]
 
                 value = (bindPoseInvMatrix @
@@ -846,10 +847,11 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
             elif mode == "relative":
                 utilityAddKeyframe(
                     tracks[axis], frame, keyValueBuffer[i], "LINEAR")
-            else:
-                # I need to get some samples of these before attempting this again.
-                raise Exception(
-                    "Additive animations are currently not supported in blender.")
+
+    # Warn the user that additive animations aren't supported.
+    if mode == "additive":
+        self.report(
+            {'WARNING'}, "Curve: %s was additive, blending isn't supported yet." % nodeName)
 
     # Reset temporary matrices used to calculate the keyframe locations.
     bone.matrix_basis.identity()
@@ -860,7 +862,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
     return (smallestFrame, largestFrame)
 
 
-def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
+def importLocCurveNodes(self, nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -921,20 +923,21 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
 
-        if mode == "absolute" or mode is None:
+        if mode == "absolute" or mode == "additive" or mode is None:
             if bone.parent is not None:
                 bone.matrix.translation = bone.parent.matrix @ offset
             else:
                 bone.matrix.translation = offset
         elif mode == "relative":
             bone.matrix_basis.translation = bone.bone.matrix.inverted() @ offset
-        else:
-            # I need to get some samples of these before attempting this again.
-            raise Exception(
-                "Additive animations are currently not supported in blender.")
 
         for axis, track in enumerate(tracks):
             utilityAddKeyframe(track, frame, bone.location[axis], "LINEAR")
+
+    # Warn the user that additive animations aren't supported.
+    if mode == "additive":
+        self.report(
+            {'WARNING'}, "Curve: %s was additive, blending isn't supported yet." % nodeName)
 
     # Reset temporary matrices used to calculate the keyframe locations.
     bone.matrix_basis.identity()
@@ -1033,8 +1036,8 @@ def importAnimationNode(self, node, path, selectedObject):
         property = x.KeyPropertyName()
 
         if property == "rq":
-            (smallestFrame, largestFrame) = importRotCurveNode(
-                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+            (smallestFrame, largestFrame) = importRotCurveNode(self,
+                                                               x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "bs":
@@ -1056,14 +1059,14 @@ def importAnimationNode(self, node, path, selectedObject):
             utilityStashCurveComponent(scaleCurves, x, nodeName, 2)
 
     for nodeName, x in locCurves.items():
-        (smallestFrame, largestFrame) = importLocCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+        (smallestFrame, largestFrame) = importLocCurveNodes(self,
+                                                            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     for nodeName, x in scaleCurves.items():
-        (smallestFrame,  largestFrame) = importScaleCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+        (smallestFrame,  largestFrame) = importScaleCurveNodes(self,
+                                                               x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
