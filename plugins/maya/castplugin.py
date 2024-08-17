@@ -33,7 +33,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.62"
+version = "1.63"
 
 
 def utilityAbout():
@@ -804,6 +804,10 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     valuesY = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
     valuesZ = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
 
+    trackXExists = tracks[0][0].numKeys() > 0
+    trackYExists = tracks[1][0].numKeys() > 0
+    trackZExists = tracks[2][0].numKeys() > 0
+
     for frame in frameBuffer:
         time = OpenMaya.MTime(frame, timeUnit) + frameStart
 
@@ -822,14 +826,26 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
             valuesY[slot] = euler.y
             valuesZ[slot] = euler.z
     elif mode == "additive":
+        rest = utilityGetRestData(
+            tracks[0][1], "rotation_quaternion").asEulerRotation()
+
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
 
             frame = timeBuffer[slot]
 
-            sampleX = tracks[0][0].evaluate(frame)
-            sampleY = tracks[1][0].evaluate(frame)
-            sampleZ = tracks[2][0].evaluate(frame)
+            if trackXExists:
+                sampleX = tracks[0][0].evaluate(frame)
+            else:
+                sampleX = rest.x
+            if trackYExists:
+                sampleY = tracks[1][0].evaluate(frame)
+            else:
+                sampleY = rest.y
+            if trackZExists:
+                sampleZ = tracks[2][0].evaluate(frame)
+            else:
+                sampleZ = rest.z
 
             additiveQuat = OpenMaya.MEulerRotation(
                 sampleX, sampleY, sampleZ).asQuaternion()
@@ -934,6 +950,8 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         return (smallestFrame, largestFrame)
 
     track = tracks[0][0]
+    trackExists = track.numKeys() > 0
+
     restTransform = tracks[0][1]
 
     for frame in frameBuffer:
@@ -943,6 +961,20 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         largestFrame = max(time, largestFrame)
 
         timeBuffer.append(time)
+
+    restSwitcher = {
+        "tx": lambda: utilityGetRestData(restTransform, "translation")[0],
+        "ty": lambda: utilityGetRestData(restTransform, "translation")[1],
+        "tz": lambda: utilityGetRestData(restTransform, "translation")[2],
+        "sx": lambda: utilityGetRestData(restTransform, "scale")[0],
+        "sy": lambda: utilityGetRestData(restTransform, "scale")[1],
+        "sz": lambda: utilityGetRestData(restTransform, "scale")[2],
+    }
+
+    if property in restSwitcher:
+        rest = restSwitcher[property]()
+    else:
+        rest = 0.0
 
     # Default track mode is absolute meaning that the
     # values are what they should be in the curve already
@@ -957,7 +989,10 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
         for i, value in enumerate(valueBuffer):
-            sample = track.evaluate(timeBuffer[i])
+            if trackExists:
+                sample = track.evaluate(timeBuffer[i])
+            else:
+                sample = rest
 
             curveValueBuffer[i] = utilityLerp(
                 sample, sample + value, blendWeight)
@@ -965,20 +1000,6 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     # we will add it to the rest position
     elif mode == "relative":
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
-
-        restSwitcher = {
-            "tx": lambda: utilityGetRestData(restTransform, "translation")[0],
-            "ty": lambda: utilityGetRestData(restTransform, "translation")[1],
-            "tz": lambda: utilityGetRestData(restTransform, "translation")[2],
-            "sx": lambda: utilityGetRestData(restTransform, "scale")[0],
-            "sy": lambda: utilityGetRestData(restTransform, "scale")[1],
-            "sz": lambda: utilityGetRestData(restTransform, "scale")[2],
-        }
-
-        if property in restSwitcher:
-            rest = restSwitcher[property]()
-        else:
-            rest = 0.0
 
         for i, value in enumerate(valueBuffer):
             curveValueBuffer[i] = rest + value
