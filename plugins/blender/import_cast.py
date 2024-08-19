@@ -508,7 +508,7 @@ def importModelNode(self, model, path, selectedObject):
                 [(uvBuffer[x * 2], 1.0 - uvBuffer[(x * 2) + 1]) for x in faces]))
 
         for i in range(mesh.ColorLayerCount()):
-            vertexColors = mesh.VertexColorBuffer(i)
+            vertexColors = mesh.VertexColorLayerBuffer(i)
             newMesh.vertex_colors.new(do_init=False)
             newMesh.vertex_colors[i].data.foreach_set(
                 "color", unpack_list([CastColor.fromInteger(vertexColors[x]) for x in faces]))
