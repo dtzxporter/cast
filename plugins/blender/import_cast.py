@@ -507,10 +507,10 @@ def importModelNode(self, model, path, selectedObject):
             newMesh.uv_layers[i].data.foreach_set("uv", unpack_list(
                 [(uvBuffer[x * 2], 1.0 - uvBuffer[(x * 2) + 1]) for x in faces]))
 
-        vertexColors = mesh.VertexColorBuffer()
-        if vertexColors is not None:
+        for i in range(mesh.ColorLayerCount()):
+            vertexColors = mesh.VertexColorBuffer(i)
             newMesh.vertex_colors.new(do_init=False)
-            newMesh.vertex_colors[0].data.foreach_set(
+            newMesh.vertex_colors[i].data.foreach_set(
                 "color", unpack_list([CastColor.fromInteger(vertexColors[x]) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
