@@ -33,7 +33,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.63"
+version = "1.64"
 
 
 def utilityAbout():
@@ -1301,15 +1301,19 @@ def importModelNode(model, path):
 
             newMesh.setVertexNormals(vertexNormalBuffer, vertexIndexBuffer)
 
-        vertexColors = mesh.VertexColorBuffer()
-        if vertexColors is not None:
+        colorLayerCount = mesh.ColorLayerCount()
+        for i in xrange(colorLayerCount):
+            colorLayer = mesh.VertexColorLayerBuffer(i)
             scriptUtil = OpenMaya.MScriptUtil()
             scriptUtil.createFromList(
-                [x for xs in [CastColor.fromInteger(x) for x in vertexColors] for x in xs], len(vertexColors) * 4)
+                [x for xs in [CastColor.fromInteger(x) for x in colorLayer] for x in xs], len(colorLayer) * 4)
 
             vertexColorBuffer = OpenMaya.MColorArray(
-                scriptUtil.asFloat4Ptr(), len(vertexColors))
+                scriptUtil.asFloat4Ptr(), len(colorLayer))
 
+            newColorName = newMesh.createColorSetWithName("color%d" % i)
+
+            newMesh.setCurrentColorSetName(newColorName)
             newMesh.setVertexColors(vertexColorBuffer, vertexIndexBuffer)
 
         uvLayerCount = mesh.UVLayerCount()
@@ -1350,7 +1354,7 @@ def importModelNode(model, path):
 
             if i > 0:
                 newUVName = newMesh.createUVSetWithName(
-                    ("map%d" % (i + 1)))
+                    "map%d" % (i + 1))
             else:
                 newUVName = newMesh.currentUVSetName()
 
