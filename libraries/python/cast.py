@@ -586,14 +586,31 @@ class Mesh(CastNode):
 
     def UVLayerCount(self):
         """Gets the number of uv layers in this mesh."""
-        uc = self.properties.get("ul")
-        if uc is not None:
-            return uc.values[0]
+        ul = self.properties.get("ul")
+        if ul is not None:
+            return ul.values[0]
         return 0
 
     def SetUVLayerCount(self, count):
         """Sets the number of uv layers in this mesh."""
         self.CreateProperty("ul", "b").values = [count]
+
+    def ColorLayerCount(self):
+        """Gets the number of color layers in this mesh."""
+        cl = self.properties.get("cl")
+        if cl is not None:
+            return cl.values[0]
+
+        # Check for old cast vertex color format.
+        # If it exists, always return 1 layer.
+        if "vc" in self.properties:
+            return 1
+        else:
+            return 0
+
+    def SetColorLayerCount(self, count):
+        """Sets the number of color layers in this mesh."""
+        self.CreateProperty("cl", "b").values = [count]
 
     def MaximumWeightInfluence(self):
         """The maximum weight influence for this mesh."""
@@ -662,16 +679,23 @@ class Mesh(CastNode):
         """Sets the collection of vertex tangents for this mesh."""
         self.CreateProperty("vt", "3v").values = list(sum(values, ()))
 
-    def VertexColorBuffer(self):
-        """The collection of vertex colors for this mesh."""
-        vc = self.properties.get("vc")
-        if vc is not None:
-            return vc.values
+    def VertexColorLayerBuffer(self, index):
+        """The vertex color layer collection for the given layer index."""
+        cl = self.properties.get("c%d" % index)
+        if cl is not None:
+            return cl.values
+
+        # Support old cast vertex color specification.
+        # If the user asks for index[0], return the original vertex colors.
+        if index == 0:
+            vc = self.properties.get("vc")
+            if vc is not None:
+                return vc.values
         return None
 
-    def SetVertexColorBuffer(self, values):
-        """Sets the collection of vertex colors for this mesh."""
-        self.CreateProperty("vc", "i").values = list(values)
+    def SetVertexColorBuffer(self, index, values):
+        """Sets the vertex color layer collection for the given layer index."""
+        self.CreateProperty("c%d" % index, "i").values = list(values)
 
     def VertexUVLayerBuffer(self, index):
         """The uv layer collection for the given layer index."""
