@@ -1303,7 +1303,7 @@ def importModelNode(model, path):
 
         colorLayerCount = mesh.ColorLayerCount()
         for i in xrange(colorLayerCount):
-            colorLayer = mesh.VertexColorBuffer(i)
+            colorLayer = mesh.VertexColorLayerBuffer(i)
             scriptUtil = OpenMaya.MScriptUtil()
             scriptUtil.createFromList(
                 [x for xs in [CastColor.fromInteger(x) for x in colorLayer] for x in xs], len(colorLayer) * 4)
@@ -1311,11 +1311,7 @@ def importModelNode(model, path):
             vertexColorBuffer = OpenMaya.MColorArray(
                 scriptUtil.asFloat4Ptr(), len(colorLayer))
 
-            if i > 0:
-                newColorName = newMesh.createColorSetWithName(
-                    "color%d" % (i + 1))
-            else:
-                newColorName = newMesh.currentColorSetName()
+            newColorName = newMesh.createColorSetWithName("color%d" % i)
 
             newMesh.setCurrentColorSetName(newColorName)
             newMesh.setVertexColors(vertexColorBuffer, vertexIndexBuffer)
