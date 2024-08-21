@@ -287,8 +287,10 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
 
             meshNode.SetUVLayerCount(len(vertexUVLayers))
 
-            if len(vertexColorLayers) > 0:
-                meshNode.SetVertexColorBuffer(vertexColorLayers[0])
+            for colorLayer, vertexColors in enumerate(vertexColorLayers):
+                meshNode.SetVertexColorBuffer(colorLayer, vertexColors)
+
+            meshNode.SetColorLayerCount(len(vertexColorLayers))
 
             meshNode.SetFaceBuffer(faceBuffer)
 
