@@ -73,6 +73,7 @@ enum class CastId : uint32_t
 	Material = 0x6C74616D,
 	File = 0x656C6966,
 	Instance = 0x74736E69,
+	Metadata = 0x6174656D,
 };
 ```
 
@@ -1057,6 +1058,59 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>True</td>
 	</tr>
 </table>
+
+### Metadata:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Parent</td>
+   		<td>Root</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	<tr>
+  		<td>Author (a)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Software (s)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Up Axis (up)</td>
+   		<td>String (s) [x, y, z]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+**Notes:**
+- `Author` and `Software` are just for tagging cast files and have no use outside of metadata.
+- `Up Axis` can be used as a hint to software to adjust the scene to match a specific up axis.
+- A cast file can have any number of meta nodes but properties designed for hinting should only use the first metadata node instance.
 
 <br>
 
