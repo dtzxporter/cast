@@ -479,6 +479,14 @@ def save(self, context, filepath=""):
     cast = Cast()
     root = cast.CreateRoot()
 
+    meta = root.CreateMetadata()
+    meta.SetSoftware("Cast v%d.%d%d for Blender v%d.%d.%d" %
+                     (self.bl_version[0], self.bl_version[1], self.bl_version[2],
+                      bpy.app.version[0], bpy.app.version[1], bpy.app.version[2]))
+
+    if self.up_axis:
+        meta.SetUpAxis(self.up_axis)
+
     if self.incl_animation:
         # Check that the selected object is an 'ARMATURE' if we're exporting selected animations.
         if self.export_selected and (selectedObject is not None and selectedObject.type != 'ARMATURE'):
