@@ -1261,6 +1261,46 @@ class Instance(CastNode):
         self.CreateProperty("s", "3v").values = list(scale)
 
 
+class Metadata(CastNode):
+    """A collection of metadata for a cast scene."""
+
+    def __init__(self):
+        super(Metadata, self).__init__(0x6174656D)
+
+    def Author(self):
+        """The author of this scene."""
+        author = self.properties.get("a")
+        if author is not None:
+            return author.values[0]
+        return None
+
+    def SetAuthor(self, author):
+        """Sets the author of this scene."""
+        self.CreateProperty("a", "s").values = [author]
+
+    def Software(self):
+        """The software that created this scene."""
+        software = self.properties.get("s")
+        if software is not None:
+            return software.values[0]
+        return None
+
+    def SetSoftware(self, software):
+        """Sets the software that created this scene."""
+        self.CreateProperty("s", "s").values = [software]
+
+    def UpAxis(self):
+        """The up axis for this scene."""
+        up = self.properties.get("up")
+        if up is not None:
+            return up.values[0]
+        return None
+
+    def SetUpAxis(self, up):
+        """Sets the up axis for this scene."""
+        self.CreateProperty("up", "s").values = [up]
+
+
 class Root(CastNode):
     """A root node."""
 
@@ -1278,6 +1318,10 @@ class Root(CastNode):
     def CreateInstance(self):
         """Creates a new instance node."""
         return self.CreateChild(Instance())
+
+    def CreateMetadata(self):
+        """Creates a new metadata node."""
+        return self.CreateChild(Metadata())
 
 
 typeSwitcher = {
@@ -1297,6 +1341,7 @@ typeSwitcher = {
     0x6C74616D: Material,
     0x656C6966: File,
     0x74736E69: Instance,
+    0x6174656D: Metadata,
 }
 
 
