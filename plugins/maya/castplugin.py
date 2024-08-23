@@ -10,7 +10,7 @@ import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
 
 
-from cast import Cast, CastColor, Model, Animation, Instance, File
+from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File
 
 # Support Python 3.0+
 try:
@@ -26,18 +26,20 @@ sceneSettings = {
     "importReset": False,
     "importIK": True,
     "importConstraints": True,
+    "importAxis": True,
     "exportAnim": True,
     "exportModel": True,
+    "exportAxis": True,
     "createStingrayMaterials": True,
     "createStandardMaterials": False,
 }
 
 # Shared version number
-version = "1.64"
+version = "1.65"
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version %s" % version,
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version v%s" % version,
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -453,6 +455,19 @@ def utilityCreateMenu():
 
     cmds.menuItem("createStandardMaterials", label="Create Standard Materials", annotation="Creates Standard compatible materials",
                   radioButton=utilityQueryToggleItem("createStandardMaterials"), command=lambda x: utilitySetRadioItem(["createStandardMaterials", "createStingrayMaterials"]))
+
+    cmds.setParent(animMenu, menu=True)
+    cmds.setParent(menu, menu=True)
+
+    cmds.menuItem(label="Scene", subMenu=True)
+
+    cmds.menuItem("importAxis", label="Import Up Axis", annotation="Imports and sets the up axis for the scene",
+                  checkBox=utilityQueryToggleItem("importAxis"), command=lambda x: utilitySetToggleItem("importAxis"))
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("exportAxis", label="Export Up Axis", annotation="Include up axis information when exporting",
+                  checkBox=utilityQueryToggleItem("exportAxis"), command=lambda x: utilitySetToggleItem("exportAxis"))
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
@@ -1781,10 +1796,24 @@ def importInstanceNodes(nodes, path):
     cmds.setAttr("%s.visibility" % baseGroup.fullPathName(), False)
 
 
+def importMetadata(meta):
+    if sceneSettings["importAxis"]:
+        axis = meta.UpAxis()
+
+        if axis == "y" or axis == "z":
+            currentAxis = cmds.upAxis(q=True, ax=True)
+
+            if currentAxis != axis:
+                cmds.upAxis(ax=axis, rv=True)
+        elif axis:
+            cmds.warning("Up axis '%s' not supported!" % axis)
+
+
 def importCast(path):
     cast = Cast.load(path)
 
     instances = []
+    meta = None
 
     for root in cast.Roots():
         for child in root.ChildrenOfType(Model):
@@ -1794,8 +1823,14 @@ def importCast(path):
         for child in root.ChildrenOfType(Instance):
             instances.append(child)
 
+        # Grab the first defined meta node, if there is one.
+        meta = meta or root.ChildOfType(Metadata)
+
     if len(instances) > 0:
         importInstanceNodes(instances, path)
+
+    if meta:
+        importMetadata(meta)
 
 
 def exportAnimation(root, objects):
@@ -1933,6 +1968,12 @@ def exportAnimation(root, objects):
 def exportCast(path, exportSelected):
     cast = Cast()
     root = cast.CreateRoot()
+
+    meta = root.CreateMetadata()
+    meta.SetSoftware("Cast v%s for %s" % (version, cmds.about(product=True)))
+
+    if sceneSettings["exportAxis"]:
+        meta.SetUpAxis(cmds.upAxis(query=True, ax=True))
 
     if sceneSettings["exportAnim"]:
         if exportSelected:
