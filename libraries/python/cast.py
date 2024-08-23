@@ -169,6 +169,13 @@ class CastNode(object):
         self.hash = castNextHash()
         self.parentNode = None
 
+    def ChildOfType(self, pType):
+        """Finds the first child that matches the given type."""
+        for x in self.childNodes:
+            if x.__class__ is pType:
+                return x
+        return None
+
     def ChildrenOfType(self, pType):
         """Finds all children that match the given type."""
         return [x for x in self.childNodes if x.__class__ is pType]
