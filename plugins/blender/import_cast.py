@@ -117,11 +117,20 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], normalMap.outputs["Normal"])
         elif slot == "gloss":
+            if texture.image is not None:
+                texture.image.colorspace_settings.name = "Non-Color"
+
             invert = material.node_tree.nodes.new("ShaderNodeInvert")
             material.node_tree.links.new(
                 invert.inputs["Color"], texture.outputs["Color"])
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], invert.outputs["Color"])
+        elif slot == "roughness":
+            if texture.image is not None:
+                texture.image.colorspace_settings.name = "Non-Color"
+
+            material.node_tree.links.new(
+                shader.inputs[switcher[slot]], texture.outputs["Color"])
         else:
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], texture.outputs["Color"])
