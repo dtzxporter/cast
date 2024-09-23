@@ -3,16 +3,16 @@ import os
 import array
 import mxutils
 
+from c4d import plugins, Vector, Vector4d, CPolygon, gui, BaseObject
 
-from c4d import plugins, bitmaps, Vector, gui, BaseObject
+PLUGIN_ID = 1062992
+PLUGIN_RES_DIR = os.path.join(os.path.dirname(__file__), "res")
 
-
-RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "res")
-mxutils.ImportSymbols(RESOURCE_DIR)
-with mxutils.LocalImportPath(RESOURCE_DIR):
+with mxutils.LocalImportPath(PLUGIN_RES_DIR):
     from cast import Cast, CastColor, Model, Animation, Instance, File
 
 __pluginname__ = "Cast"
+
 
 class CastLoader(plugins.SceneLoaderData):
     def Identify(self, node, name, probe, size):
@@ -41,40 +41,31 @@ def importCast(doc, node, path):
     if len(instances) > 0:
         importInstanceNodes(doc, instances, node, path)
 
-"""
-We are using Blender unpack_list for convinience
-https://github.com/blender/blender/blob/main/scripts/modules/bpy_extras/io_utils.py#L370
-"""
-def unpack_list(list_of_tuples):
-    flat_list = []
-    flat_list_extend = flat_list.extend  # a tiny bit faster
-    for t in list_of_tuples:
-        flat_list_extend(t)
-    return flat_list
+
+def utilityBuildPath(root, asset):
+    if os.path.isabs(asset):
+        return asset
+
+    root = os.path.dirname(root)
+    return os.path.join(root, asset)
 
 
 def utilityQuaternionToEuler(tempQuat):
-        quaternion = c4d.Quaternion()
-        quaternion.w = tempQuat[3]
-        quaternion.v = Vector(tempQuat[0], tempQuat[1], -tempQuat[2])
+    quaternion = c4d.Quaternion()
+    quaternion.w = tempQuat[3]
+    quaternion.v = Vector(tempQuat[0], tempQuat[1], -tempQuat[2])
 
-        m = c4d.Matrix()
-        m = quaternion.GetMatrix()
-        mToHPB = c4d.utils.MatrixToHPB
-
-        rotationOrder = c4d.ROTATIONORDER_HPB
-        rotation = mToHPB(m, rotationOrder)
-
-        return rotation
+    return c4d.utils.MatrixToHPB(quaternion.GetMatrix(), c4d.ROTATIONORDER_HPB)
 
 
 def utilityAddTextureMaterialSlots(slotName, texPath, mat, shaderType):
     shader = c4d.BaseList2D(c4d.Xbitmap)
     shader[c4d.BITMAPSHADER_FILENAME] = texPath
     shader.SetName(slotName)
+
     if slotName == "normal":
         mat[c4d.MATERIAL_USE_NORMAL] = True
-        shader[c4d.BITMAPSHADER_COLORPROFILE] = 1  # Linear color space
+        shader[c4d.BITMAPSHADER_COLORPROFILE] = c4d.BITMAPSHADER_COLORPROFILE_LINEAR
 
     mat[shaderType] = shader
     mat.InsertShader(shader)
@@ -94,15 +85,16 @@ def utilityAssignMaterialSlots(doc, material, slots, path):
         if not slot in switcher:
             continue
 
-        texturePath = os.path.dirname(path) + "\\" + connection.Path()
-        utilityAddTextureMaterialSlots(slot, texturePath, material, switcher[slot])
+        utilityAddTextureMaterialSlots(
+            slot, utilityBuildPath(path, connection.Path()), material, switcher[slot])
 
 
 def utilityWriteNormalTag(tag, normalList):
     # Retrieves the write buffer array
     buffer = tag.GetLowlevelDataAddressW()
     if buffer is None:
-        raise RuntimeError("Failed to retrieves internal write data for the normal tag.")
+        raise RuntimeError(
+            "Failed to retrieves internal write data for the normal tag.")
 
     # Translates list of short int 16 to a BitSeq (string are byte in Python 2.7)
     data = array.array('h')
@@ -113,6 +105,8 @@ def utilityWriteNormalTag(tag, normalList):
 
 def importMaterialNode(doc, path, material):
     materials = doc.GetMaterials()
+
+    # If you already created the material, ignore this
     for mat in materials:
         if mat.GetName() == material.Name():
             return mat
@@ -120,9 +114,11 @@ def importMaterialNode(doc, path, material):
     materialNew = c4d.BaseMaterial(c4d.Mmaterial)
     materialNew.SetName(material.Name())
 
+    # TODO: Better PBR Support?
     utilityAssignMaterialSlots(doc, materialNew, material.Slots(), path)
 
     doc.InsertMaterial(materialNew)
+
     materialNew.Message(c4d.MSG_UPDATE)
 
     return materialNew
@@ -131,15 +127,18 @@ def importMaterialNode(doc, path, material):
 def importModelNode(doc, node, model, path):
     # Extract the name of this model from the path
     modelName = model.Name() or os.path.splitext(os.path.basename(path))[0]
+
     # Create a collection for our objects
     modelNull = BaseObject(c4d.Onull)
     modelNull.SetName(modelName)
+
     doc.InsertObject(modelNull)
+
     # Import skeleton for binds, materials for meshes
     boneIndexes = importSkeletonNode(
         modelNull, model.Skeleton())
     materialArray = {x.Name(): importMaterialNode(doc, path, x)
-                 for x in model.Materials()}
+                     for x in model.Materials()}
 
     meshes = model.Meshes()
     meshHandles = {}
@@ -147,67 +146,67 @@ def importModelNode(doc, node, model, path):
     for mesh in meshes:
         newMesh = BaseObject(c4d.Opolygon)
         newMesh.SetName(mesh.Name() or "CastMesh")
-        
-        meshHandles[mesh.Hash()] = (newMesh)
+
+        # Store for later creating blend shapes if necessary.
+        meshHandles[mesh.Hash()] = newMesh
 
         vertexPositions = mesh.VertexPositionBuffer()
         vertexCount = int(len(vertexPositions) / 3)
-        
+
         faces = mesh.FaceBuffer()
         faceIndicesCount = len(faces)
         facesCount = int(faceIndicesCount / 3)
-        faces = unpack_list([(faces[x + 2], faces[x + 1], faces[x + 0])
-                        for x in range(0, faceIndicesCount, 3)])
 
         newMesh.ResizeObject(vertexCount, facesCount)
 
-        # Vertice
-        for i in range(0, len(vertexPositions), 3):
-            vertexIndex = i // 3
-            x, y, z = vertexPositions[i:i+3]
-            newMesh.SetPoint(vertexIndex, Vector(x, y, -z))
+        for i in range(0, vertexCount, 3):
+            newMesh.SetPoint(
+                int(i / 3), Vector(vertexPositions[i], vertexPositions[i + 1], -vertexPositions[i + 2]))
 
-        # Faces
+        # Remap face indices to match c4d's winding order
+        faces = [face for x in range(0, faceIndicesCount, 3)
+                 for face in (faces[x + 2], faces[x + 1], faces[x + 0])]
+
         for i in range(0, faceIndicesCount, 3):
-            polyIndex = i // 3
-            a, b, c = faces[i:i+3]
-            newMesh.SetPolygon(polyIndex, c4d.CPolygon(a, b, c))
+            newMesh.SetPolygon(
+                int(i / 3), CPolygon(faces[i], faces[i + 1], faces[i + 2]))
 
-        # UVW
         for i in range(mesh.UVLayerCount()):
+            uvBuffer = mesh.VertexUVLayerBuffer(i)
             uvTag = c4d.UVWTag(facesCount)
-            uvBuffer = mesh.VertexUVLayerBuffer(0)
 
-            uvUnpacked = unpack_list([(uvBuffer[x * 2], 1.0 - uvBuffer[(x * 2) + 1]) for x in faces])
-            for i in range(0, len(uvUnpacked), 6):
-                polyIndex = i // 6
-                u1, v1, u2, v2, u3, v3 = uvUnpacked[i:i+6]
-                uvTag.SetSlow(polyIndex, Vector(u1, 1-v1,0),
-                    Vector(u2, 1-v2,0),
-                    Vector(u3, 1-v3,0),
-                    Vector(0,0,0))
+            for i in range(0, faceIndicesCount, 3):
+                uvTag.SetSlow(int(i / 3),
+                              Vector(uvBuffer[faces[i] * 2],
+                                     uvBuffer[(faces[i] * 2) + 1], 0),
+                              Vector(uvBuffer[faces[i + 1] * 2],
+                                     uvBuffer[(faces[i + 1] * 2) + 1], 0),
+                              Vector(uvBuffer[faces[i + 2] * 2],
+                                     uvBuffer[(faces[i + 2] * 2) + 1], 0),
+                              Vector(0, 0, 0))
+
             newMesh.InsertTag(uvTag)
 
-        # Vertex Colors
-        vertexColors = mesh.VertexColorBuffer()
-        if vertexColors is not None:
+        for i in range(mesh.ColorLayerCount()):
+            vertexColors = mesh.VertexColorLayerBuffer(i)
             vcTag = c4d.VertexColorTag(vertexCount)
-            vertexColorList = [x for xs in [CastColor.fromInteger(x) for x in vertexColors] for x in xs], len(vertexColors) * 4
             vcData = vcTag.GetDataAddressW()
-            for i in range(0, len(vertexColorList[0]), 4):
-                vIndex = i // 4
-                r, g, b, a = vertexColorList[0][i:i+4]
-                vcTag.SetPoint(vcData,None,None,vIndex,c4d.Vector4d(r, g, b, a))
+
+            for v in range(vertexCount):
+                color = CastColor.fromInteger(vertexColors[v])
+                vcTag.SetPoint(vcData, None, None, v,
+                               Vector4d(color[0], color[1], color[2], color[3]))
+
             newMesh.InsertTag(vcTag)
 
-        # Vertex Normals
         vertexNormals = mesh.VertexNormalBuffer()
         if vertexNormals is not None:
-            # Yeah I don't know what I'm doing here
-            normaltag = c4d.NormalTag(count=newMesh.GetPolygonCount())
+            vnTag = c4d.NormalTag(newMesh.GetPolygonCount())
 
-            normalListUnpacked = unpack_list([(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces])
-            normalList = [Vector(normalListUnpacked[i], normalListUnpacked[i+1], -normalListUnpacked[i+2]) for i in range(0, len(normalListUnpacked), 3)]
+            normalListUnpacked = unpack_list(
+                [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces])
+            normalList = [Vector(normalListUnpacked[i], normalListUnpacked[i+1], -
+                                 normalListUnpacked[i+2]) for i in range(0, len(normalListUnpacked), 3)]
 
             """
             Raw data normal structure for one polygon is 12 int16 value (4 vectors 
@@ -219,10 +218,10 @@ def importModelNode(doc, node, model, path):
 
             # Maps data from float to int16 value
             normalListToSet = [int(component * 32000.0)
-                   for n in normalList for component in (n.x, n.y, n.z)]
+                               for n in normalList for component in (n.x, n.y, n.z)]
 
-            utilityWriteNormalTag(normaltag, normalListToSet)
-            newMesh.InsertTag(normaltag)
+            utilityWriteNormalTag(vnTag, normalListToSet)
+            newMesh.InsertTag(vnTag)
 
         # Weight
         if model.Skeleton() is not None and node[CAST_IMPORT_BIND_SKIN]:
@@ -245,22 +244,23 @@ def importModelNode(doc, node, model, path):
 
                 for x in range(vertexCount):
                     for j in range(maximumInfluence):
-                            weightIndex = j + (x * maximumInfluence)
-                            weightValue = weightTag.GetWeight(weightBoneBuffer[weightIndex], x)
-                            weightValue += weightValueBuffer[weightIndex]
-                            weightTag.SetWeight(
-                                weightBoneBuffer[weightIndex],
-                                x,
-                                weightValue
-                            )
+                        weightIndex = j + (x * maximumInfluence)
+                        weightValue = weightTag.GetWeight(
+                            weightBoneBuffer[weightIndex], x)
+                        weightValue += weightValueBuffer[weightIndex]
+                        weightTag.SetWeight(
+                            weightBoneBuffer[weightIndex],
+                            x,
+                            weightValue
+                        )
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(vertexCount):
-                        weightTag.SetWeight(
-                            weightBoneBuffer[x],
-                            x,
-                            1.0
-                        )
+                    weightTag.SetWeight(
+                        weightBoneBuffer[x],
+                        x,
+                        1.0
+                    )
             weightTag.Message(c4d.MSG_UPDATE)
 
         meshMaterial = mesh.Material()
@@ -278,6 +278,8 @@ def importModelNode(doc, node, model, path):
 
     if node[CAST_IMPORT_CONSTRAINTS]:
         importSkeletonConstraintNode(model.Skeleton(), boneIndexes)
+
+    # TODO: Does this do anything?
     c4d.EventAdd()
 
     return modelNull
@@ -294,7 +296,7 @@ def importSkeletonConstraintNode(skeleton, boneIndexes):
         type = constraint.ConstraintType()
 
         # C4D's constraint system is a bit worse than Blender's
-        constraintTag = c4d.BaseTag(CONSTRAINT_TAG)
+        constraintTag = c4d.BaseTag(c4d.Tcaconstraint)
         constraintBone.InsertTag(constraintTag)
         constraintTag[c4d.ID_CA_CONSTRAINT_TAG_PSR] = True
 
@@ -379,15 +381,17 @@ def importSkeletonIKNode(doc, modelNull, skeleton, boneIndexes):
         if poleVectorBone is not None:
             poleVector = boneIndexes[poleVectorBone.Hash()]
             ikTag[c4d.ID_CA_IK_TAG_POLE] = poleVector
-            ikTag[c4d.ID_CA_IK_TAG_POLE_AXIS] = POLE_AXIS_X
-            ikTag[c4d.ID_CA_IK_TAG_POLE_TWIST] = poleVector[c4d.ID_BASEOBJECT_REL_ROTATION,c4d.VECTOR_X]
+            ikTag[c4d.ID_CA_IK_TAG_POLE_AXIS] = c4d.ID_CA_IK_TAG_POLE_AXIS_X
+            ikTag[c4d.ID_CA_IK_TAG_POLE_TWIST] = poleVector[c4d.ID_BASEOBJECT_REL_ROTATION, c4d.VECTOR_X]
 
+        # TODO: This shouldn't need emulation.
         poleBone = handle.PoleBone()
         if poleBone is not None:
             # Warn until we figure out how to emulate this effectively.
-            gui.MessageDialog(text="Unable to setup %s fully due to Cinema 4D not supporting pole (twist) bones." % poleBone.Name(), type=c4d.GEMB_ICONEXCLAMATION)
+            gui.MessageDialog(text="Unable to setup %s fully due to Cinema 4D not supporting pole (twist) bones." %
+                              poleBone.Name(), type=c4d.GEMB_ICONEXCLAMATION)
         startBone.InsertTag(ikTag)
-  
+
 
 def importSkeletonNode(modelNull, skeleton):
     if skeleton is None:
@@ -427,11 +431,13 @@ def importSkeletonNode(modelNull, skeleton):
 
 
 def importAnimationNode():
-    gui.MessageDialog(text="Animations are currently not supported.", type=c4d.GEMB_ICONSTOP)
+    gui.MessageDialog(
+        text="Animations are currently not supported.", type=c4d.GEMB_ICONSTOP)
 
 
 def importInstanceNodes(doc, nodes, node, path):
-    rootPath = c4d.storage.LoadDialog(title='Select the root directory where instance scenes are located', flags=2)
+    rootPath = c4d.storage.LoadDialog(
+        title='Select the root directory where instance scenes are located', flags=2)
 
     if rootPath is None:
         return gui.MessageDialog(text="Unable to import instances without a root directory!", type=c4d.GEMB_ICONSTOP)
@@ -501,9 +507,9 @@ def importInstanceNodes(doc, nodes, node, path):
 
 
 if __name__ == '__main__':
-    reg=plugins.RegisterSceneLoaderPlugin(id=PLUGIN_ID,
-                                          str=__pluginname__,
-                                          info=0,
-                                          g=CastLoader,
-                                          description="fcastloader",
-                                          )
+    reg = plugins.RegisterSceneLoaderPlugin(id=PLUGIN_ID,
+                                            str=__pluginname__,
+                                            info=0,
+                                            g=CastLoader,
+                                            description="fcastloader",
+                                            )
