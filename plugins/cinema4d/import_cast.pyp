@@ -121,8 +121,7 @@ def importModelNode(doc, node, model, path):
     doc.InsertObject(modelNull)
 
     # Import skeleton for binds, materials for meshes
-    boneIndexes = importSkeletonNode(
-        modelNull, model.Skeleton())
+    bones = importSkeletonNode(modelNull, model.Skeleton())
     materialArray = {x.Name(): importMaterialNode(doc, path, x)
                      for x in model.Materials()}
 
@@ -205,20 +204,23 @@ def importModelNode(doc, node, model, path):
 
             newMesh.InsertTag(vnTag)
 
-        # Weight
-        if model.Skeleton() is not None and node[CAST_IMPORT_BIND_SKIN]:
+        if bones is not None and node[CAST_IMPORT_BIND_SKIN]:
             skinObj = BaseObject(c4d.Oskin)
+
             skinningMethod = mesh.SkinningMethod()
+
             if skinningMethod == "linear":
                 skinObj[c4d.ID_CA_SKIN_OBJECT_TYPE] = c4d.ID_CA_SKIN_OBJECT_TYPE_LINEAR
             elif skinningMethod == "quaternion":
                 skinObj[c4d.ID_CA_SKIN_OBJECT_TYPE] = c4d.ID_CA_SKIN_OBJECT_TYPE_QUAT
+
             doc.InsertObject(skinObj, parent=newMesh)
 
             weightTag = c4d.modules.character.CAWeightTag()
-            newMesh.InsertTag(weightTag)
-            for key, value in boneIndexes.items():
-                weightTag.AddJoint(value)
+
+            for bone in bones.values():
+                weightTag.AddJoint(bone)
+
             maximumInfluence = mesh.MaximumWeightInfluence()
             if maximumInfluence > 1:  # Slower path for complex weights
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
@@ -231,18 +233,14 @@ def importModelNode(doc, node, model, path):
                             weightBoneBuffer[weightIndex], x)
                         weightValue += weightValueBuffer[weightIndex]
                         weightTag.SetWeight(
-                            weightBoneBuffer[weightIndex],
-                            x,
-                            weightValue
-                        )
+                            weightBoneBuffer[weightIndex], x, weightValue)
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(vertexCount):
-                    weightTag.SetWeight(
-                        weightBoneBuffer[x],
-                        x,
-                        1.0
-                    )
+                    weightTag.SetWeight(weightBoneBuffer[x], x, 1.0)
+
+            newMesh.InsertTag(weightTag)
+
             weightTag.Message(c4d.MSG_UPDATE)
 
         meshMaterial = mesh.Material()
@@ -256,10 +254,10 @@ def importModelNode(doc, node, model, path):
         newMesh.Message(c4d.MSG_UPDATE)
 
     if node[CAST_IMPORT_IK_HANDLES]:
-        importSkeletonIKNode(doc, modelNull, model.Skeleton(), boneIndexes)
+        importSkeletonIKNode(doc, modelNull, model.Skeleton(), bones)
 
     if node[CAST_IMPORT_CONSTRAINTS]:
-        importSkeletonConstraintNode(model.Skeleton(), boneIndexes)
+        importSkeletonConstraintNode(model.Skeleton(), bones)
 
     # TODO: Does this do anything?
     c4d.EventAdd()
@@ -267,13 +265,13 @@ def importModelNode(doc, node, model, path):
     return modelNull
 
 
-def importSkeletonConstraintNode(skeleton, boneIndexes):
+def importSkeletonConstraintNode(skeleton, bones):
     if skeleton is None:
         return
 
     for constraint in skeleton.Constraints():
-        constraintBone = boneIndexes[constraint.ConstraintBone().Hash()]
-        targetBone = boneIndexes[constraint.TargetBone().Hash()]
+        constraintBone = bones[constraint.ConstraintBone().Hash()]
+        targetBone = bones[constraint.TargetBone().Hash()]
 
         type = constraint.ConstraintType()
 
@@ -337,7 +335,7 @@ def importSkeletonConstraintNode(skeleton, boneIndexes):
             constraintTag[c4d.ID_BASELIST_NAME] = constraint.Name()
 
 
-def importSkeletonIKNode(doc, modelNull, skeleton, boneIndexes):
+def importSkeletonIKNode(doc, modelNull, skeleton, bones):
     if skeleton is None or not skeleton.IKHandles():
         return
 
@@ -345,8 +343,8 @@ def importSkeletonIKNode(doc, modelNull, skeleton, boneIndexes):
     ikParentNull.SetName("IK_Handles")
     doc.InsertObject(ikParentNull, modelNull)
     for handle in skeleton.IKHandles():
-        startBone = boneIndexes[handle.StartBone().Hash()]
-        endBone = boneIndexes[handle.EndBone().Hash()]
+        startBone = bones[handle.StartBone().Hash()]
+        endBone = bones[handle.EndBone().Hash()]
 
         ikTargetNull = BaseObject(c4d.Onull)
         ikTargetNull.SetName(endBone.GetName() + "_IK")
@@ -361,7 +359,7 @@ def importSkeletonIKNode(doc, modelNull, skeleton, boneIndexes):
 
         poleVectorBone = handle.PoleVectorBone()
         if poleVectorBone is not None:
-            poleVector = boneIndexes[poleVectorBone.Hash()]
+            poleVector = bones[poleVectorBone.Hash()]
             ikTag[c4d.ID_CA_IK_TAG_POLE] = poleVector
             ikTag[c4d.ID_CA_IK_TAG_POLE_AXIS] = c4d.ID_CA_IK_TAG_POLE_AXIS_X
             ikTag[c4d.ID_CA_IK_TAG_POLE_TWIST] = poleVector[c4d.ID_BASEOBJECT_REL_ROTATION, c4d.VECTOR_X]
@@ -400,7 +398,7 @@ def importSkeletonNode(modelNull, skeleton):
         newBone.SetAbsScale(scale)
 
         handles[i] = newBone
-        boneIndexes[bone.Hash() or i] = newBone
+        boneIndexes[bone.Hash()] = newBone
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
