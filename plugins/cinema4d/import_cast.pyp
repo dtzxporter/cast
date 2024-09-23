@@ -89,20 +89,6 @@ def utilityAssignMaterialSlots(doc, material, slots, path):
             slot, utilityBuildPath(path, connection.Path()), material, switcher[slot])
 
 
-def utilityWriteNormalTag(tag, normalList):
-    # Retrieves the write buffer array
-    buffer = tag.GetLowlevelDataAddressW()
-    if buffer is None:
-        raise RuntimeError(
-            "Failed to retrieves internal write data for the normal tag.")
-
-    # Translates list of short int 16 to a BitSeq (string are byte in Python 2.7)
-    data = array.array('h')
-    data.fromlist(normalList)
-    data = data.tobytes()
-    buffer[:len(data)] = data
-
-
 def importMaterialNode(doc, path, material):
     materials = doc.GetMaterials()
 
@@ -201,26 +187,22 @@ def importModelNode(doc, node, model, path):
 
         vertexNormals = mesh.VertexNormalBuffer()
         if vertexNormals is not None:
-            vnTag = c4d.NormalTag(newMesh.GetPolygonCount())
+            vnTag = c4d.NormalTag(facesCount)
+            vnData = vnTag.GetDataAddressW()
 
-            normalListUnpacked = unpack_list(
-                [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces])
-            normalList = [Vector(normalListUnpacked[i], normalListUnpacked[i+1], -
-                                 normalListUnpacked[i+2]) for i in range(0, len(normalListUnpacked), 3)]
+            for i in range(0, faceIndicesCount, 3):
+                vnTag.Set(vnData, int(i / 3),
+                          Vector(vertexNormals[faces[i] * 3],
+                                 vertexNormals[(faces[i] * 3) + 1],
+                                 -vertexNormals[(faces[i] * 3) + 2]),
+                          Vector(vertexNormals[faces[i] * 3],
+                                 vertexNormals[(faces[i] * 3) + 1],
+                                 -vertexNormals[(faces[i] * 3) + 2]),
+                          Vector(vertexNormals[faces[i] * 3],
+                                 vertexNormals[(faces[i] * 3) + 1],
+                                 -vertexNormals[(faces[i] * 3) + 2]),
+                          Vector(0, 0, 0))
 
-            """
-            Raw data normal structure for one polygon is 12 int16 value (4 vectors 
-            for each vertex of a Cpolygon * 3 components for each vector), even if 
-            the Cpolygon is a triangle.
-            """
-            for i in range(len(normalList) // 3):
-                normalList.insert((i + 1) * 4 - 1, Vector(0, 0, 0))
-
-            # Maps data from float to int16 value
-            normalListToSet = [int(component * 32000.0)
-                               for n in normalList for component in (n.x, n.y, n.z)]
-
-            utilityWriteNormalTag(vnTag, normalListToSet)
             newMesh.InsertTag(vnTag)
 
         # Weight
@@ -408,11 +390,10 @@ def importSkeletonNode(modelNull, skeleton):
         tX, tY, tZ = bone.LocalPosition()
         translation = Vector(tX, tY, -tZ)
 
-        tempQuat = bone.LocalRotation()
-        rotation = utilityQuaternionToEuler(tempQuat)
+        rotation = utilityQuaternionToEuler(bone.LocalRotation())
 
-        scaleTuple = bone.Scale() or (1.0, 1.0, 1.0)
-        scale = Vector(scaleTuple[0], scaleTuple[1], scaleTuple[2])
+        scale = bone.Scale() or (1.0, 1.0, 1.0)
+        scale = Vector(scale[0], scale[1], scale[2])
 
         newBone.SetAbsPos(translation)
         newBone.SetAbsRot(rotation)
@@ -457,6 +438,7 @@ def importInstanceNodes(doc, nodes, node, path):
     # Create a collection for our objects
     rootNull = BaseObject(c4d.Onull)
     rootNull.SetName(name)
+
     doc.InsertObject(rootNull)
 
     instanceNull = BaseObject(c4d.Onull)
@@ -466,9 +448,10 @@ def importInstanceNodes(doc, nodes, node, path):
     sceneNull = BaseObject(c4d.Onull)
     sceneNull.SetName("%s_scenes" % name)
     sceneNull.InsertUnder(rootNull)
+
     # Disable source models visibility
-    sceneNull[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = 1
-    sceneNull[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = 1
+    sceneNull[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.OBJECT_OFF
+    sceneNull[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.OBJECT_OFF
 
     for instancePath, instances in uniqueInstances.items():
         instanceName = os.path.splitext(os.path.basename(instancePath))[0]
