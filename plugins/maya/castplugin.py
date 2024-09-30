@@ -26,6 +26,7 @@ sceneSettings = {
     "importReset": False,
     "importIK": True,
     "importConstraints": True,
+    "importMerge": False,
     "importAxis": True,
     "exportAnim": True,
     "exportModel": True,
@@ -35,7 +36,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.66"
+version = "1.67"
 
 
 def utilityAbout():
@@ -440,6 +441,9 @@ def utilityCreateMenu():
     cmds.menuItem("importConstraints", label="Import Constraints", annotation="Imports and configures constraints for the models skeleton",
                   checkBox=utilityQueryToggleItem("importConstraints"), command=lambda x: utilitySetToggleItem("importConstraints"))
 
+    cmds.menuItem("importMerge", label="Import Merge", annotation="Imports and merges models together with a skeleton in the scene",
+                  checkBox=utilityQueryToggleItem("importMerge"), command=lambda x: utilitySetToggleItem("importMerge"))
+
     cmds.menuItem(divider=True)
 
     cmds.menuItem("exportModel", label="Export Models", annotation="Include models when exporting",
@@ -538,6 +542,24 @@ def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMe
         cmds.setAttr("%s.skinningMethod" % cluster.name(), 1)
 
     return cluster
+
+
+def utilityGetSceneSkeleton():
+    joints = cmds.ls(type="joint", long=True)
+
+    if not joints:
+        return None
+
+    skeleton = {}
+
+    for joint in joints:
+        skeleton[joint.split("|")[-1]] = joint
+
+    # Grab the 'root' transform that cast creates for the new top level parent.
+    skeleton[None] = cmds.listRelatives(
+        joints[0], type="transform", parent=True, fullPath=True)[0]
+
+    return skeleton
 
 
 def utilityBuildPath(root, asset):
@@ -1059,6 +1081,114 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
                                  name=constraint.Name() or "CastScaleConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
 
 
+def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
+    # Find matching root bones in the selected object.
+    # If we had none by the end of the transaction, warn the user that the models aren't compatible.
+    foundMatchingRoot = False
+
+    missingBones = []
+    remappedBones = {}
+
+    bones = skeleton.Bones()
+
+    for i, bone in enumerate(bones):
+        if not bone.Name() in sceneSkeleton:
+            missingBones.append(i)
+            continue
+
+        # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
+        remappedBones[paths[i]] = sceneSkeleton[bone.Name()]
+
+        if bone.ParentIndex() > -1:
+            continue
+
+        foundMatchingRoot = True
+
+        worldMatrix = cmds.xform(
+            sceneSkeleton[bone.Name()], query=True, worldSpace=True, matrix=True)
+
+        # Move the models bone to the existing bone in the scene's position.
+        cmds.xform(paths[i], worldSpace=True, matrix=worldMatrix)
+
+    if not foundMatchingRoot:
+        cmds.warning(
+            "Could not find compatible root bones make sure the skeletons are compatible.")
+        return
+
+    # Create missing bones.
+    while missingBones:
+        for i in [x for x in missingBones]:
+            bone = bones[i]
+
+            if bone.ParentIndex() > -1 and not bones[bone.ParentIndex()].Name() in sceneSkeleton:
+                continue
+            elif bone.ParentIndex() > -1:
+                parent = bones[bone.ParentIndex()].Name()
+            else:
+                parent = None
+
+            newBone = OpenMayaAnim.MFnIkJoint()
+            newBone.create()
+            newBone.setName(bone.Name())
+
+            cmds.parent(newBone.fullPathName(), sceneSkeleton[parent])
+
+            worldMatrix = cmds.xform(
+                paths[i], query=True, worldSpace=True, matrix=True)
+
+            cmds.xform(newBone.fullPathName(),
+                       worldSpace=True, matrix=worldMatrix)
+
+            sceneSkeleton[bone.Name()] = newBone.fullPathName()
+
+            # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
+            remappedBones[paths[i]] = newBone.fullPathName()
+
+            handles[i] = newBone
+            paths[i] = newBone.fullPathName()
+
+            missingBones.remove(i)
+
+    for oldBone, newBone in remappedBones.items():
+        # Remap skinCluster connections.
+        for oldConnection in cmds.listConnections(oldBone, type="skinCluster", plugs=True) or []:
+            if ".matrix" in oldConnection:
+                cmds.connectAttr("%s.worldMatrix" %
+                                 newBone, oldConnection, force=True)
+            elif ".lockWeights" in oldConnection:
+                if not cmds.objExists("%s.lockInfluenceWeights" % newBone):
+                    cmds.addAttr(newBone,
+                                 shortName="liw", longName="lockInfluenceWeights", attributeType="bool")
+                cmds.connectAttr("%s.lockInfluenceWeights" %
+                                 newBone, oldConnection, force=True)
+            elif ".influenceColor" in oldConnection:
+                cmds.connectAttr("%s.objectColorRGB" %
+                                 newBone, oldConnection, force=True)
+        # Remap dagPose connections.
+        for oldConnection in cmds.listConnections(oldBone, type="dagPose", plugs=True) or []:
+            if ".members" in oldConnection:
+                cmds.connectAttr("%s.message" %
+                                 newBone, oldConnection, force=True)
+            elif ".worldMatrix" in oldConnection:
+                cmds.connectAttr("%s.bindPose" %
+                                 newBone, oldConnection, force=True)
+
+    # Remove the old transform node and set it to the new one.
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(jointTransform.fullPathName())
+    selectList.add(sceneSkeleton[None])
+
+    oldPath = OpenMaya.MDagPath()
+    newPath = OpenMaya.MDagPath()
+
+    selectList.getDagPath(0, oldPath)
+    selectList.getDagPath(1, newPath)
+
+    cmds.delete(oldPath.fullPathName())
+
+    jointTransform = OpenMaya.MFnTransform(newPath)
+
+
 def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
     if skeleton is None:
         return
@@ -1223,6 +1353,12 @@ def importMaterialNode(path, material):
 
 
 def importModelNode(model, path):
+    # If we want to merge this model, grab the 'existing' skeleton
+    sceneSkeleton = None
+
+    if sceneSettings["importMerge"]:
+        sceneSkeleton = utilityGetSceneSkeleton()
+
     # Import skeleton for binds, materials for meshes
     (handles, paths, indexes, jointTransform) = importSkeletonNode(model.Skeleton())
     materials = {x.Name(): importMaterialNode(path, x)
@@ -1501,6 +1637,15 @@ def importModelNode(model, path):
             utilitySetVisibility(blendTargetParent, False)
             utilityStepProgress(progress, "Importing shapes...")
     utilityEndProgress(progress)
+
+    # Merge with the existing skeleton here if one is selected and we have a skeleton.
+    if sceneSettings["importMerge"]:
+        if sceneSkeleton:
+            importMergeModel(sceneSkeleton, model.Skeleton(),
+                             handles, paths, jointTransform)
+        else:
+            cmds.warning(
+                "No skeleton exists to merge to in the current scene.")
 
     # Import any ik handles now that the meshes are bound because the constraints may
     # effect the bind pose of the joints causing the meshes to deform incorrectly.
