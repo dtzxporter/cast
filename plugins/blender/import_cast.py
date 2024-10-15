@@ -1126,6 +1126,11 @@ def importInstanceNodes(self, nodes, context, path):
                 {'WARNING'}, "Instance: %s failed to import or not found, skipping..." % instancePath)
             continue
 
+        if not bpy.context.view_layer.active_layer_collection.collection.children:
+            self.report(
+                {'WARNING'}, "Instance: %s did not import anything, skipping..." % instancePath)
+            continue
+
         base = bpy.context.view_layer.active_layer_collection.collection.children[-1]
         bpy.context.view_layer.active_layer_collection.collection.children.unlink(
             base)
