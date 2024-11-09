@@ -872,6 +872,27 @@ namespace Cast
         }
 
         /// <summary>
+        /// Gets the number of color layers in this mesh.
+        /// </summary>
+        /// <returns></returns>
+        public int ColorLayerCount()
+        {
+            if (Properties.TryGetValue("cl", out CastProperty Value))
+            {
+                return (int)Value.Values[0];
+            }
+
+            // Check for old cast vertex color format.
+            // If it exists, always return 1 layer.
+            if (Properties.ContainsKey("vc"))
+            {
+                return 1;
+            }
+
+            return 0;
+        }
+
+        /// <summary>
         /// The collection of faces for this mesh.
         /// </summary>
         /// <returns></returns>
@@ -932,18 +953,34 @@ namespace Cast
         }
 
         /// <summary>
-        /// The collection of vertex colors for this mesh.
+        /// The vertex color layer collection for the given layer index.
         /// </summary>
+        /// <param name="Index">The color layer index, starting from 0</param>
         /// <returns></returns>
-        public IEnumerable<uint> VertexColorBuffer()
+        public IEnumerable<uint> VertexColorBuffer(int index)
         {
-            if (Properties.TryGetValue("vc", out CastProperty Value))
+            if (Properties.TryGetValue("c" + index, out CastProperty Value))
             {
                 foreach (var Item in Value.Values)
                 {
                     yield return (uint)Item;
                 }
             }
+
+            // Support old cast vertex color specification.
+            // If the user asks for index[0], return the original vertex colors.
+            if (index == 0)
+            {
+                if (Properties.TryGetValue("vc", out CastProperty Value))
+                {
+                    foreach (var Item in Value.Values)
+                    {
+                        yield return (uint)Item;
+                    }
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

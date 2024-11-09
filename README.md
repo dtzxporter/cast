@@ -73,6 +73,7 @@ enum class CastId : uint32_t
 	Material = 0x6C74616D,
 	File = 0x656C6966,
 	Instance = 0x74736E69,
+	Metadata = 0x6174656D,
 };
 ```
 
@@ -205,7 +206,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Vertex Color Buffer (vc)</td>
+  		<td>Vertex Color Buffer (c%d)</td>
    		<td>Integer 32 (i)</td>
 		<td>True</td>
 		<td>False</td>
@@ -233,6 +234,12 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
    		<td>Integer 32 (i), Short (h), Byte (b)</td>
 		<td>True</td>
 		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Color Layer Count (cl)</td>
+   		<td>Integer 32 (i), Short (h), Byte (b)</td>
+		<td>False</td>
+		<td>True if has color layers else False</td>
  	</tr>
 	 <tr>
   		<td>UV Layer Count (ul)</td>
@@ -267,6 +274,9 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 - Each vertex descriptor buffer must contain the same number of elements ex: if you have 16 vertices, you must have 16 normals if they exist, 16 colors if the buffer exists. Otherwise it's assumed they are default / skipped.
 - Weights are additive which means having the same bone with `0.5` and `0.5` would end up making that bones influence `1.0` for example.
 - The default skinning method is `linear`. When set to `quaternion` dual quaternion skinning is used.
+- **NEW 8/18/2024**: The vertex color specification has **changed**, in order to support multiple color layers, a new `Color Layer Count (cl)` was added which mimics the `UV Layer Count (ul)` property.
+  - To be backwards compatible, cast processors should check for `cl`, and use that by default along with the new `c%d` layer properties.
+  - If the `cl` property does not exist, a processor should check for the legacy `vc` property which is the one and only color layer if it exists.
 
 ### Blend Shape:
 <table>
@@ -694,6 +704,12 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
 		<td>False</td>
  	</tr>
+	<tr>
+  		<td>Anisotropy File Hash (aniso)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
 	 <tr>
   		<td>Extra (x) File Hash (extra%d)</td>
    		<td>Integer 64 (l)</td>
@@ -1042,6 +1058,59 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>True</td>
 	</tr>
 </table>
+
+### Metadata:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Parent</td>
+   		<td>Root</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	<tr>
+  		<td>Author (a)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Software (s)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Up Axis (up)</td>
+   		<td>String (s) [x, y, z]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+**Notes:**
+- `Author` and `Software` are just for tagging cast files and have no use outside of metadata.
+- `Up Axis` can be used as a hint to software to adjust the scene to match a specific up axis.
+- A cast file can have any number of meta nodes but properties designed for hinting should only use the first metadata node instance.
 
 <br>
 

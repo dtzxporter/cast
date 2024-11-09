@@ -10,7 +10,7 @@ import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
 
 
-from cast import Cast, CastColor, Model, Animation, Instance, File
+from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File
 
 # Support Python 3.0+
 try:
@@ -26,18 +26,21 @@ sceneSettings = {
     "importReset": False,
     "importIK": True,
     "importConstraints": True,
+    "importMerge": False,
+    "importAxis": True,
     "exportAnim": True,
     "exportModel": True,
+    "exportAxis": True,
     "createStingrayMaterials": True,
     "createStandardMaterials": False,
 }
 
 # Shared version number
-version = "1.62"
+version = "1.68"
 
 
 def utilityAbout():
-    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version %s" % version,
+    cmds.confirmDialog(message="A Cast import and export plugin for Autodesk Maya. Cast is open-sourced model and animation container supported across various toolchains.\n\n- Developed by DTZxPorter\n- Version v%s" % version,
                        button=['OK'], defaultButton='OK', title="About Cast")
 
 
@@ -438,6 +441,9 @@ def utilityCreateMenu():
     cmds.menuItem("importConstraints", label="Import Constraints", annotation="Imports and configures constraints for the models skeleton",
                   checkBox=utilityQueryToggleItem("importConstraints"), command=lambda x: utilitySetToggleItem("importConstraints"))
 
+    cmds.menuItem("importMerge", label="Import Merge", annotation="Imports and merges models together with a skeleton in the scene",
+                  checkBox=utilityQueryToggleItem("importMerge"), command=lambda x: utilitySetToggleItem("importMerge"))
+
     cmds.menuItem(divider=True)
 
     cmds.menuItem("exportModel", label="Export Models", annotation="Include models when exporting",
@@ -453,6 +459,19 @@ def utilityCreateMenu():
 
     cmds.menuItem("createStandardMaterials", label="Create Standard Materials", annotation="Creates Standard compatible materials",
                   radioButton=utilityQueryToggleItem("createStandardMaterials"), command=lambda x: utilitySetRadioItem(["createStandardMaterials", "createStingrayMaterials"]))
+
+    cmds.setParent(animMenu, menu=True)
+    cmds.setParent(menu, menu=True)
+
+    cmds.menuItem(label="Scene", subMenu=True)
+
+    cmds.menuItem("importAxis", label="Import Up Axis", annotation="Imports and sets the up axis for the scene",
+                  checkBox=utilityQueryToggleItem("importAxis"), command=lambda x: utilitySetToggleItem("importAxis"))
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("exportAxis", label="Export Up Axis", annotation="Include up axis information when exporting",
+                  checkBox=utilityQueryToggleItem("exportAxis"), command=lambda x: utilitySetToggleItem("exportAxis"))
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
@@ -523,6 +542,24 @@ def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMe
         cmds.setAttr("%s.skinningMethod" % cluster.name(), 1)
 
     return cluster
+
+
+def utilityGetSceneSkeleton():
+    joints = cmds.ls(type="joint", long=True)
+
+    if not joints:
+        return None
+
+    skeleton = {}
+
+    for joint in joints:
+        skeleton[joint.split("|")[-1]] = joint
+
+    # Grab the 'root' transform that cast creates for the new top level parent.
+    skeleton[None] = cmds.listRelatives(
+        joints[0], type="transform", parent=True, fullPath=True)[0]
+
+    return skeleton
 
 
 def utilityBuildPath(root, asset):
@@ -683,7 +720,7 @@ def utilityGetRestData(restTransform, component):
         scale.createFromList([1.0, 1.0, 1.0], 3)
         scalePtr = scale.asDoublePtr()
 
-        restTransform.getScale(scalePtr)
+        restTransform.getScale(scalePtr, OpenMaya.MSpace.kTransform)
 
         return (OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 0), OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 1), OpenMaya.MScriptUtil.getDoubleArrayItem(scalePtr, 2))
     else:
@@ -804,6 +841,10 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
     valuesY = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
     valuesZ = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
 
+    trackXExists = tracks[0][0].numKeys() > 0
+    trackYExists = tracks[1][0].numKeys() > 0
+    trackZExists = tracks[2][0].numKeys() > 0
+
     for frame in frameBuffer:
         time = OpenMaya.MTime(frame, timeUnit) + frameStart
 
@@ -822,14 +863,26 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
             valuesY[slot] = euler.y
             valuesZ[slot] = euler.z
     elif mode == "additive":
+        rest = utilityGetRestData(
+            tracks[0][1], "rotation_quaternion").asEulerRotation()
+
         for i in xrange(0, len(valueBuffer), 4):
             slot = int(i / 4)
 
             frame = timeBuffer[slot]
 
-            sampleX = tracks[0][0].evaluate(frame)
-            sampleY = tracks[1][0].evaluate(frame)
-            sampleZ = tracks[2][0].evaluate(frame)
+            if trackXExists:
+                sampleX = tracks[0][0].evaluate(frame)
+            else:
+                sampleX = rest.x
+            if trackYExists:
+                sampleY = tracks[1][0].evaluate(frame)
+            else:
+                sampleY = rest.y
+            if trackZExists:
+                sampleZ = tracks[2][0].evaluate(frame)
+            else:
+                sampleZ = rest.z
 
             additiveQuat = OpenMaya.MEulerRotation(
                 sampleX, sampleY, sampleZ).asQuaternion()
@@ -850,7 +903,7 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
             frame = OpenMaya.MQuaternion(
                 valueBuffer[i], valueBuffer[i + 1], valueBuffer[i + 2], valueBuffer[i + 3])
 
-            euler = (rest * frame).asEulerRotation()
+            euler = (frame * rest).asEulerRotation()
 
             valuesX[slot] = euler.x
             valuesY[slot] = euler.y
@@ -934,6 +987,8 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         return (smallestFrame, largestFrame)
 
     track = tracks[0][0]
+    trackExists = track.numKeys() > 0
+
     restTransform = tracks[0][1]
 
     for frame in frameBuffer:
@@ -943,6 +998,20 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         largestFrame = max(time, largestFrame)
 
         timeBuffer.append(time)
+
+    restSwitcher = {
+        "tx": lambda: utilityGetRestData(restTransform, "translation")[0],
+        "ty": lambda: utilityGetRestData(restTransform, "translation")[1],
+        "tz": lambda: utilityGetRestData(restTransform, "translation")[2],
+        "sx": lambda: utilityGetRestData(restTransform, "scale")[0],
+        "sy": lambda: utilityGetRestData(restTransform, "scale")[1],
+        "sz": lambda: utilityGetRestData(restTransform, "scale")[2],
+    }
+
+    if property in restSwitcher:
+        rest = restSwitcher[property]()
+    else:
+        rest = 0.0
 
     # Default track mode is absolute meaning that the
     # values are what they should be in the curve already
@@ -957,7 +1026,10 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
         for i, value in enumerate(valueBuffer):
-            sample = track.evaluate(timeBuffer[i])
+            if trackExists:
+                sample = track.evaluate(timeBuffer[i])
+            else:
+                sample = rest
 
             curveValueBuffer[i] = utilityLerp(
                 sample, sample + value, blendWeight)
@@ -965,20 +1037,6 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     # we will add it to the rest position
     elif mode == "relative":
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
-
-        restSwitcher = {
-            "tx": lambda: utilityGetRestData(restTransform, "translation")[0],
-            "ty": lambda: utilityGetRestData(restTransform, "translation")[1],
-            "tz": lambda: utilityGetRestData(restTransform, "translation")[2],
-            "sx": lambda: utilityGetRestData(restTransform, "scale")[0],
-            "sy": lambda: utilityGetRestData(restTransform, "scale")[1],
-            "sz": lambda: utilityGetRestData(restTransform, "scale")[2],
-        }
-
-        if property in restSwitcher:
-            rest = restSwitcher[property]()
-        else:
-            rest = 0.0
 
         for i, value in enumerate(valueBuffer):
             curveValueBuffer[i] = rest + value
@@ -1021,6 +1079,114 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
         elif type == "sc":
             cmds.scaleConstraint(targetBone, constraintBone,
                                  name=constraint.Name() or "CastScaleConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
+
+
+def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
+    # Find matching root bones in the selected object.
+    # If we had none by the end of the transaction, warn the user that the models aren't compatible.
+    foundMatchingRoot = False
+
+    missingBones = []
+    remappedBones = {}
+
+    bones = skeleton.Bones()
+
+    for i, bone in enumerate(bones):
+        if not bone.Name() in sceneSkeleton:
+            missingBones.append(i)
+            continue
+
+        # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
+        remappedBones[paths[i]] = sceneSkeleton[bone.Name()]
+
+        if bone.ParentIndex() > -1:
+            continue
+
+        foundMatchingRoot = True
+
+        worldMatrix = cmds.xform(
+            sceneSkeleton[bone.Name()], query=True, worldSpace=True, matrix=True)
+
+        # Move the models bone to the existing bone in the scene's position.
+        cmds.xform(paths[i], worldSpace=True, matrix=worldMatrix)
+
+    if not foundMatchingRoot:
+        cmds.warning(
+            "Could not find compatible root bones make sure the skeletons are compatible.")
+        return
+
+    # Create missing bones.
+    while missingBones:
+        for i in [x for x in missingBones]:
+            bone = bones[i]
+
+            if bone.ParentIndex() > -1 and not bones[bone.ParentIndex()].Name() in sceneSkeleton:
+                continue
+            elif bone.ParentIndex() > -1:
+                parent = bones[bone.ParentIndex()].Name()
+            else:
+                parent = None
+
+            newBone = OpenMayaAnim.MFnIkJoint()
+            newBone.create()
+            newBone.setName(bone.Name())
+
+            cmds.parent(newBone.fullPathName(), sceneSkeleton[parent])
+
+            worldMatrix = cmds.xform(
+                paths[i], query=True, worldSpace=True, matrix=True)
+
+            cmds.xform(newBone.fullPathName(),
+                       worldSpace=True, matrix=worldMatrix)
+
+            sceneSkeleton[bone.Name()] = newBone.fullPathName()
+
+            # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
+            remappedBones[paths[i]] = newBone.fullPathName()
+
+            handles[i] = newBone
+            paths[i] = newBone.fullPathName()
+
+            missingBones.remove(i)
+
+    for oldBone, newBone in remappedBones.items():
+        # Remap skinCluster connections.
+        for oldConnection in cmds.listConnections(oldBone, type="skinCluster", plugs=True) or []:
+            if ".matrix" in oldConnection:
+                cmds.connectAttr("%s.worldMatrix" %
+                                 newBone, oldConnection, force=True)
+            elif ".lockWeights" in oldConnection:
+                if not cmds.objExists("%s.lockInfluenceWeights" % newBone):
+                    cmds.addAttr(newBone,
+                                 shortName="liw", longName="lockInfluenceWeights", attributeType="bool")
+                cmds.connectAttr("%s.lockInfluenceWeights" %
+                                 newBone, oldConnection, force=True)
+            elif ".influenceColor" in oldConnection:
+                cmds.connectAttr("%s.objectColorRGB" %
+                                 newBone, oldConnection, force=True)
+        # Remap dagPose connections.
+        for oldConnection in cmds.listConnections(oldBone, type="dagPose", plugs=True) or []:
+            if ".members" in oldConnection:
+                cmds.connectAttr("%s.message" %
+                                 newBone, oldConnection, force=True)
+            elif ".worldMatrix" in oldConnection:
+                cmds.connectAttr("%s.bindPose" %
+                                 newBone, oldConnection, force=True)
+
+    # Remove the old transform node and set it to the new one.
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(jointTransform.fullPathName())
+    selectList.add(sceneSkeleton[None])
+
+    oldPath = OpenMaya.MDagPath()
+    newPath = OpenMaya.MDagPath()
+
+    selectList.getDagPath(0, oldPath)
+    selectList.getDagPath(1, newPath)
+
+    cmds.delete(oldPath.fullPathName())
+
+    jointTransform = OpenMaya.MFnTransform(newPath)
 
 
 def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
@@ -1187,6 +1353,12 @@ def importMaterialNode(path, material):
 
 
 def importModelNode(model, path):
+    # If we want to merge this model, grab the 'existing' skeleton
+    sceneSkeleton = None
+
+    if sceneSettings["importMerge"]:
+        sceneSkeleton = utilityGetSceneSkeleton()
+
     # Import skeleton for binds, materials for meshes
     (handles, paths, indexes, jointTransform) = importSkeletonNode(model.Skeleton())
     materials = {x.Name(): importMaterialNode(path, x)
@@ -1280,15 +1452,19 @@ def importModelNode(model, path):
 
             newMesh.setVertexNormals(vertexNormalBuffer, vertexIndexBuffer)
 
-        vertexColors = mesh.VertexColorBuffer()
-        if vertexColors is not None:
+        colorLayerCount = mesh.ColorLayerCount()
+        for i in xrange(colorLayerCount):
+            colorLayer = mesh.VertexColorLayerBuffer(i)
             scriptUtil = OpenMaya.MScriptUtil()
             scriptUtil.createFromList(
-                [x for xs in [CastColor.fromInteger(x) for x in vertexColors] for x in xs], len(vertexColors) * 4)
+                [x for xs in [CastColor.fromInteger(x) for x in colorLayer] for x in xs], len(colorLayer) * 4)
 
             vertexColorBuffer = OpenMaya.MColorArray(
-                scriptUtil.asFloat4Ptr(), len(vertexColors))
+                scriptUtil.asFloat4Ptr(), len(colorLayer))
 
+            newColorName = newMesh.createColorSetWithName("color%d" % i)
+
+            newMesh.setCurrentColorSetName(newColorName)
             newMesh.setVertexColors(vertexColorBuffer, vertexIndexBuffer)
 
         uvLayerCount = mesh.UVLayerCount()
@@ -1329,7 +1505,7 @@ def importModelNode(model, path):
 
             if i > 0:
                 newUVName = newMesh.createUVSetWithName(
-                    ("map%d" % (i + 1)))
+                    "map%d" % (i + 1))
             else:
                 newUVName = newMesh.currentUVSetName()
 
@@ -1461,6 +1637,15 @@ def importModelNode(model, path):
             utilitySetVisibility(blendTargetParent, False)
             utilityStepProgress(progress, "Importing shapes...")
     utilityEndProgress(progress)
+
+    # Merge with the existing skeleton here if one is selected and we have a skeleton.
+    if sceneSettings["importMerge"]:
+        if sceneSkeleton:
+            importMergeModel(sceneSkeleton, model.Skeleton(),
+                             handles, paths, jointTransform)
+        else:
+            cmds.warning(
+                "No skeleton exists to merge to in the current scene.")
 
     # Import any ik handles now that the meshes are bound because the constraints may
     # effect the bind pose of the joints causing the meshes to deform incorrectly.
@@ -1756,10 +1941,24 @@ def importInstanceNodes(nodes, path):
     cmds.setAttr("%s.visibility" % baseGroup.fullPathName(), False)
 
 
+def importMetadata(meta):
+    if sceneSettings["importAxis"]:
+        axis = meta.UpAxis()
+
+        if axis == "y" or axis == "z":
+            currentAxis = cmds.upAxis(q=True, ax=True)
+
+            if currentAxis != axis:
+                cmds.upAxis(ax=axis, rv=True)
+        elif axis:
+            cmds.warning("Up axis '%s' not supported!" % axis)
+
+
 def importCast(path):
     cast = Cast.load(path)
 
     instances = []
+    meta = None
 
     for root in cast.Roots():
         for child in root.ChildrenOfType(Model):
@@ -1769,8 +1968,14 @@ def importCast(path):
         for child in root.ChildrenOfType(Instance):
             instances.append(child)
 
+        # Grab the first defined meta node, if there is one.
+        meta = meta or root.ChildOfType(Metadata)
+
     if len(instances) > 0:
         importInstanceNodes(instances, path)
+
+    if meta:
+        importMetadata(meta)
 
 
 def exportAnimation(root, objects):
@@ -1908,6 +2113,12 @@ def exportAnimation(root, objects):
 def exportCast(path, exportSelected):
     cast = Cast()
     root = cast.CreateRoot()
+
+    meta = root.CreateMetadata()
+    meta.SetSoftware("Cast v%s for %s" % (version, cmds.about(product=True)))
+
+    if sceneSettings["exportAxis"]:
+        meta.SetUpAxis(cmds.upAxis(query=True, ax=True))
 
     if sceneSettings["exportAnim"]:
         if exportSelected:

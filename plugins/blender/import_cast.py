@@ -117,11 +117,20 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], normalMap.outputs["Normal"])
         elif slot == "gloss":
+            if texture.image is not None:
+                texture.image.colorspace_settings.name = "Non-Color"
+
             invert = material.node_tree.nodes.new("ShaderNodeInvert")
             material.node_tree.links.new(
                 invert.inputs["Color"], texture.outputs["Color"])
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], invert.outputs["Color"])
+        elif slot == "roughness":
+            if texture.image is not None:
+                texture.image.colorspace_settings.name = "Non-Color"
+
+            material.node_tree.links.new(
+                shader.inputs[switcher[slot]], texture.outputs["Color"])
         else:
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], texture.outputs["Color"])
@@ -507,10 +516,10 @@ def importModelNode(self, model, path, selectedObject):
             newMesh.uv_layers[i].data.foreach_set("uv", unpack_list(
                 [(uvBuffer[x * 2], 1.0 - uvBuffer[(x * 2) + 1]) for x in faces]))
 
-        vertexColors = mesh.VertexColorBuffer()
-        if vertexColors is not None:
+        for i in range(mesh.ColorLayerCount()):
+            vertexColors = mesh.VertexColorLayerBuffer(i)
             newMesh.vertex_colors.new(do_init=False)
-            newMesh.vertex_colors[0].data.foreach_set(
+            newMesh.vertex_colors[i].data.foreach_set(
                 "color", unpack_list([CastColor.fromInteger(vertexColors[x]) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
@@ -728,15 +737,11 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
 
             for axis, track in enumerate(tracks):
                 utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
-        elif mode == "relative":
+        elif mode == "relative" or mode == "additive":
             rotation = rotations[i]
 
             for axis, track in enumerate(tracks):
                 utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
-        else:
-            # I need to get some samples of these before attempting this again.
-            raise Exception(
-                "Additive animations are currently not supported in blender.")
 
     for track in tracks:
         track.update()
@@ -843,13 +848,9 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
                          Matrix.LocRotScale(None, None, scale)).to_scale()
 
                 utilityAddKeyframe(tracks[axis], frame, value[axis], "LINEAR")
-            elif mode == "relative":
+            elif mode == "relative" or mode == "additive":
                 utilityAddKeyframe(
                     tracks[axis], frame, keyValueBuffer[i], "LINEAR")
-            else:
-                # I need to get some samples of these before attempting this again.
-                raise Exception(
-                    "Additive animations are currently not supported in blender.")
 
     # Reset temporary matrices used to calculate the keyframe locations.
     bone.matrix_basis.identity()
@@ -926,12 +927,8 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
                 bone.matrix.translation = bone.parent.matrix @ offset
             else:
                 bone.matrix.translation = offset
-        elif mode == "relative":
+        elif mode == "relative" or mode == "additive":
             bone.matrix_basis.translation = bone.bone.matrix.inverted() @ offset
-        else:
-            # I need to get some samples of these before attempting this again.
-            raise Exception(
-                "Additive animations are currently not supported in blender.")
 
         for axis, track in enumerate(tracks):
             utilityAddKeyframe(track, frame, bone.location[axis], "LINEAR")
@@ -1009,7 +1006,7 @@ def importAnimationNode(self, node, path, selectedObject):
     curves = node.Curves()
     curveModeOverrides = node.CurveModeOverrides()
 
-    # Create a list of pose bones that match the curves..
+    # Create a list of pose bones that match the curves.
     poseBones = {}
 
     for x in curves:
@@ -1028,9 +1025,13 @@ def importAnimationNode(self, node, path, selectedObject):
     locCurves = {}
     scaleCurves = {}
 
+    # Used to warn the user about the need to blend the additive animation.
+    hasAdditiveCurve = False
+
     for x in curves:
         nodeName = x.NodeName()
         property = x.KeyPropertyName()
+        hasAdditiveCurve = hasAdditiveCurve or x.Mode() == "additive"
 
         if property == "rq":
             (smallestFrame, largestFrame) = importRotCurveNode(
@@ -1073,7 +1074,12 @@ def importAnimationNode(self, node, path, selectedObject):
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
-    # Set the animation segment
+    # Tell the user that we had an additive animation if necessary.
+    if hasAdditiveCurve:
+        self.report(
+            {"WARNING"}, "Animation %s is additive and needs to be blended using the NLA editor." % animName)
+
+    # Set the animation segment.
     if wantedSmallestFrame == sys.maxsize:
         wantedSmallestFrame = 0
 
@@ -1082,7 +1088,9 @@ def importAnimationNode(self, node, path, selectedObject):
     scene.frame_current = wantedSmallestFrame
 
     bpy.context.evaluated_depsgraph_get().update()
-    bpy.ops.object.mode_set(mode='POSE')
+
+    bpy.context.view_layer.objects.active = selectedObject
+    bpy.ops.object.mode_set(mode='OBJECT')
 
 
 def importInstanceNodes(self, nodes, context, path):
@@ -1116,6 +1124,11 @@ def importInstanceNodes(self, nodes, context, path):
         except:
             self.report(
                 {'WARNING'}, "Instance: %s failed to import or not found, skipping..." % instancePath)
+            continue
+
+        if not bpy.context.view_layer.active_layer_collection.collection.children:
+            self.report(
+                {'WARNING'}, "Instance: %s did not import anything, skipping..." % instancePath)
             continue
 
         base = bpy.context.view_layer.active_layer_collection.collection.children[-1]

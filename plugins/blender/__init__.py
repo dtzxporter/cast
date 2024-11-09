@@ -11,7 +11,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 6, 2),
+    "version": (1, 6, 8),
     "blender": (3, 0, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -118,6 +118,7 @@ class ExportCast(bpy.types.Operator, ExportHelper):
     bl_label = "Export Cast"
     bl_description = "Export a Cast file"
     bl_options = {'PRESET'}
+    bl_version = bl_info["version"]
 
     filename_ext = ".cast"
     filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
@@ -142,6 +143,9 @@ class ExportCast(bpy.types.Operator, ExportHelper):
     scale: FloatProperty(
         name="Scale", description="Apply a scale modifier to any meshes, bones, or animation data", default=1.0)
 
+    up_axis: EnumProperty(
+        name="Up", description="Override the up axis for this scene", items=[("y", "Y Up", "The Y axis points up"), ("z", "Z Up", "The Z axis points up")], default="y")
+
     def draw(self, context):
         self.layout.prop(self, "export_selected")
         self.layout.prop(self, "incl_model")
@@ -149,6 +153,7 @@ class ExportCast(bpy.types.Operator, ExportHelper):
         self.layout.prop(self, "incl_notetracks")
         self.layout.prop(self, "is_looped")
         self.layout.prop(self, "scale")
+        self.layout.prop(self, "up_axis")
 
     def execute(self, context):
         from . import export_cast
