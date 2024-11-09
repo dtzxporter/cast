@@ -7,7 +7,9 @@ from c4d import plugins, Vector, Vector4d, CPolygon, gui, BaseObject
 
 PLUGIN_ID = 1062992
 PLUGIN_RES_DIR = os.path.join(os.path.dirname(__file__), "res")
+
 mxutils.ImportSymbols(PLUGIN_RES_DIR)
+
 with mxutils.LocalImportPath(PLUGIN_RES_DIR):
     from cast import Cast, CastColor, Model, Animation, Instance, File
 
