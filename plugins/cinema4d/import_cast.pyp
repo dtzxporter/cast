@@ -7,7 +7,7 @@ from c4d import plugins, Vector, Vector4d, CPolygon, gui, BaseObject
 
 PLUGIN_ID = 1062992
 PLUGIN_RES_DIR = os.path.join(os.path.dirname(__file__), "res")
-
+mxutils.ImportSymbols(PLUGIN_RES_DIR)
 with mxutils.LocalImportPath(PLUGIN_RES_DIR):
     from cast import Cast, CastColor, Model, Animation, Instance, File
 
@@ -190,17 +190,19 @@ def importModelNode(doc, node, model, path):
             vnData = vnTag.GetDataAddressW()
 
             for i in range(0, faceIndicesCount, 3):
-                vnTag.Set(vnData, int(i / 3),
-                          Vector(vertexNormals[faces[i] * 3],
-                                 vertexNormals[(faces[i] * 3) + 1],
-                                 -vertexNormals[(faces[i] * 3) + 2]),
-                          Vector(vertexNormals[faces[i] * 3],
-                                 vertexNormals[(faces[i] * 3) + 1],
-                                 -vertexNormals[(faces[i] * 3) + 2]),
-                          Vector(vertexNormals[faces[i] * 3],
-                                 vertexNormals[(faces[i] * 3) + 1],
-                                 -vertexNormals[(faces[i] * 3) + 2]),
-                          Vector(0, 0, 0))
+                vnTag.Set(vnData, int(i / 3), 
+                          {"a": Vector(vertexNormals[faces[i] * 3],
+                                       vertexNormals[(faces[i] * 3) + 1],
+                                       -vertexNormals[(faces[i] * 3) + 2]),
+                            "b": Vector(vertexNormals[faces[i + 1] * 3],
+                                        vertexNormals[(faces[i + 1] * 3) + 1],
+                                        -vertexNormals[(faces[i + 1] * 3) + 2]),
+                            "c": Vector(vertexNormals[faces[i + 2] * 3],
+                                        vertexNormals[(faces[i + 2] * 3) + 1],
+                                        -vertexNormals[(faces[i + 2] * 3) + 2]),
+                            "d": Vector(0, 0, 0)})
+
+
 
             newMesh.InsertTag(vnTag)
 
