@@ -221,6 +221,8 @@ def importModelNode(doc, node, model, path):
             doc.InsertObject(skinObj, parent=newMesh)
 
             weightTag = c4d.modules.character.CAWeightTag()
+            
+            newMesh.InsertTag(weightTag)
 
             for bone in bones.values():
                 weightTag.AddJoint(bone)
@@ -242,8 +244,6 @@ def importModelNode(doc, node, model, path):
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(vertexCount):
                     weightTag.SetWeight(weightBoneBuffer[x], x, 1.0)
-
-            newMesh.InsertTag(weightTag)
 
             weightTag.Message(c4d.MSG_UPDATE)
 
@@ -402,7 +402,7 @@ def importSkeletonNode(modelNull, skeleton):
         newBone.SetAbsScale(scale)
 
         handles[i] = newBone
-        boneIndexes[bone.Hash()] = newBone
+        boneIndexes[bone.Hash() or i] = newBone
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
