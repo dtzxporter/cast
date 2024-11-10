@@ -193,16 +193,16 @@ def importModelNode(doc, node, model, path):
 
             for i in range(0, faceIndicesCount, 3):
                 vnTag.Set(vnData, int(i / 3), 
-                          {"a": Vector(vertexNormals[faces[i] * 3],
+                         {"a": Vector(vertexNormals[faces[i] * 3],
                                        vertexNormals[(faces[i] * 3) + 1],
                                        -vertexNormals[(faces[i] * 3) + 2]),
-                            "b": Vector(vertexNormals[faces[i + 1] * 3],
+                          "b": Vector(vertexNormals[faces[i + 1] * 3],
                                         vertexNormals[(faces[i + 1] * 3) + 1],
                                         -vertexNormals[(faces[i + 1] * 3) + 2]),
-                            "c": Vector(vertexNormals[faces[i + 2] * 3],
+                          "c": Vector(vertexNormals[faces[i + 2] * 3],
                                         vertexNormals[(faces[i + 2] * 3) + 1],
                                         -vertexNormals[(faces[i + 2] * 3) + 2]),
-                            "d": Vector(0, 0, 0)})
+                          "d": Vector(0, 0, 0)})
 
 
 
