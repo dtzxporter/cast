@@ -146,7 +146,7 @@ def importModelNode(doc, node, model, path):
 
         newMesh.ResizeObject(vertexCount, facesCount)
 
-        for i in range(0, vertexCount, 3):
+        for i in range(0, len(vertexPositions), 3):
             newMesh.SetPoint(
                 int(i / 3), Vector(vertexPositions[i], vertexPositions[i + 1], -vertexPositions[i + 2]))
 
