@@ -158,21 +158,28 @@ def importModelNode(doc, node, model, path):
             newMesh.SetPolygon(
                 int(i / 3), CPolygon(faces[i], faces[i + 1], faces[i + 2]))
 
+        meshMaterial = mesh.Material()
+
         for i in range(mesh.UVLayerCount()):
             uvBuffer = mesh.VertexUVLayerBuffer(i)
             uvTag = c4d.UVWTag(facesCount)
 
-            for i in range(0, faceIndicesCount, 3):
-                uvTag.SetSlow(int(i / 3),
-                              Vector(uvBuffer[faces[i] * 2],
-                                     uvBuffer[(faces[i] * 2) + 1], 0),
-                              Vector(uvBuffer[faces[i + 1] * 2],
-                                     uvBuffer[(faces[i + 1] * 2) + 1], 0),
-                              Vector(uvBuffer[faces[i + 2] * 2],
-                                     uvBuffer[(faces[i + 2] * 2) + 1], 0),
+            for j in range(0, faceIndicesCount, 3):
+                uvTag.SetSlow(int(j / 3),
+                              Vector(uvBuffer[faces[j] * 2],
+                                     uvBuffer[(faces[j] * 2) + 1], 0),
+                              Vector(uvBuffer[faces[j + 1] * 2],
+                                     uvBuffer[(faces[j + 1] * 2) + 1], 0),
+                              Vector(uvBuffer[faces[j + 2] * 2],
+                                     uvBuffer[(faces[j + 2] * 2) + 1], 0),
                               Vector(0, 0, 0))
 
             newMesh.InsertTag(uvTag)
+
+            if meshMaterial is not None and i < 1:
+                material_tag = newMesh.MakeTag(c4d.Ttexture)
+                material_tag[c4d.TEXTURETAG_MATERIAL] = materialArray[meshMaterial.Name()]
+                material_tag[c4d.TEXTURETAG_PROJECTION] = c4d.TEXTURETAG_PROJECTION_UVW
 
         for i in range(mesh.ColorLayerCount()):
             vertexColors = mesh.VertexColorLayerBuffer(i)
@@ -246,13 +253,6 @@ def importModelNode(doc, node, model, path):
                     weightTag.SetWeight(weightBoneBuffer[x], x, 1.0)
 
             weightTag.Message(c4d.MSG_UPDATE)
-
-        meshMaterial = mesh.Material()
-        if meshMaterial is not None:
-            material = materialArray[meshMaterial.Name()]
-            material_tag = newMesh.MakeTag(c4d.Ttexture)
-            material_tag[c4d.TEXTURETAG_MATERIAL] = material
-            material_tag[c4d.TEXTURETAG_PROJECTION] = c4d.TEXTURETAG_PROJECTION_UVW
 
         doc.InsertObject(newMesh, parent=modelNull)
         newMesh.Message(c4d.MSG_UPDATE)
