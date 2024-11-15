@@ -274,8 +274,8 @@ def importSkeletonConstraintNode(skeleton, bones):
         return
 
     for constraint in skeleton.Constraints():
-        constraintBone = bones[constraint.ConstraintBone().Hash()]
-        targetBone = bones[constraint.TargetBone().Hash()]
+        constraintBone = bones[constraint.ConstraintBone().Name()]
+        targetBone = bones[constraint.TargetBone().Name()]
 
         type = constraint.ConstraintType()
 
@@ -347,8 +347,8 @@ def importSkeletonIKNode(doc, modelNull, skeleton, bones):
     ikParentNull.SetName("IK_Handles")
     doc.InsertObject(ikParentNull, modelNull)
     for handle in skeleton.IKHandles():
-        startBone = bones[handle.StartBone().Hash()]
-        endBone = bones[handle.EndBone().Hash()]
+        startBone = bones[handle.StartBone().Name()]
+        endBone = bones[handle.EndBone().Name()]
 
         ikTargetNull = BaseObject(c4d.Onull)
         ikTargetNull.SetName(endBone.GetName() + "_IK")
@@ -383,7 +383,7 @@ def importSkeletonNode(modelNull, skeleton):
 
     bones = skeleton.Bones()
     handles = [None] * len(bones)
-    boneIndexes = {}
+    boneNames = {}
 
     for i, bone in enumerate(bones):
         newBone = BaseObject(c4d.Ojoint)
@@ -402,7 +402,7 @@ def importSkeletonNode(modelNull, skeleton):
         newBone.SetAbsScale(scale)
 
         handles[i] = newBone
-        boneIndexes[bone.Hash() or i] = newBone
+        boneNames[bone.Name()] = newBone
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
@@ -410,7 +410,7 @@ def importSkeletonNode(modelNull, skeleton):
         else:
             handles[i].InsertUnder(modelNull)
 
-    return boneIndexes
+    return boneNames
 
 
 def importAnimationNode():
