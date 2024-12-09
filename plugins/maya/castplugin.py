@@ -441,7 +441,7 @@ def utilityCreateMenu():
 
     cmds.menuItem("importConstraints", label="Import Constraints", annotation="Imports and configures constraints for the models skeleton",
                   checkBox=utilityQueryToggleItem("importConstraints"), command=lambda x: utilitySetToggleItem("importConstraints"))
-    
+
     cmds.menuItem("importBlendShapes", label="Import Blend Shapes", annotation="Imports and configures blend shapes for a model",
                   checkBox=utilityQueryToggleItem("importBlendShapes"), command=lambda x: utilitySetToggleItem("importBlendShapes"))
 
@@ -1086,6 +1086,9 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
 
 
 def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
+    if skeleton is None:
+        return
+
     # Find matching root bones in the selected object.
     # If we had none by the end of the transaction, warn the user that the models aren't compatible.
     foundMatchingRoot = False
@@ -1577,13 +1580,15 @@ def importModelNode(model, path):
             else:
                 blendShapesByBaseShape[baseShapeHash].append(blendShape)
 
-        progress = utilityCreateProgress("Importing shapes...", len(blendShapes))
+        progress = utilityCreateProgress(
+            "Importing shapes...", len(blendShapes))
 
         # Iterate over blend shapes by base shapes.
         for blendShapes in blendShapesByBaseShape.values():
             baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
             baseShapeDagNode = OpenMaya.MFnDagNode(baseShape)
-            baseShapeTransform = OpenMaya.MFnDagNode(baseShapeDagNode.parent(0))
+            baseShapeTransform = OpenMaya.MFnDagNode(
+                baseShapeDagNode.parent(0))
 
             # Create the target shapes.
             targetShapes = [cmds.duplicate(
