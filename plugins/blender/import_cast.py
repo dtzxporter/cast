@@ -217,6 +217,9 @@ def importSkeletonConstraintNode(self, skeleton, poses):
 
 
 def importMergeModel(self, selectedObj, skeletonObj, poses):
+    if skeletonObj is None:
+        return
+
     # Find matching root bones in the selected object.
     # If we had none by the end of the transaction, warn the user that the models aren't compatible.
     foundMatchingRoot = False
