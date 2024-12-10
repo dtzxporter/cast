@@ -590,46 +590,48 @@ def importModelNode(self, model, path, selectedObject):
 
         collection.objects.link(meshObj)
 
-    blendShapes = model.BlendShapes()
-    blendShapesByBaseShape = {}
+    # Import blend shape controllers if necessary.
+    if self.import_blend_shapes:
+        blendShapes = model.BlendShapes()
+        blendShapesByBaseShape = {}
 
-    # Merge the blend shapes together by their base shapes, so we only create a basis once.
-    for blendShape in blendShapes:
-        baseShapeHash = blendShape.BaseShape().Hash()
-
-        if baseShapeHash not in meshHandles:
-            continue
-        if baseShapeHash not in blendShapesByBaseShape:
-            blendShapesByBaseShape[baseShapeHash] = [blendShape]
-        else:
-            blendShapesByBaseShape[baseShapeHash].append(blendShape)
-
-    # Iterate over the blend shapes by base shapes.
-    for blendShapes in blendShapesByBaseShape.values():
-        baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
-
-        # The basis will automatically load the base shape's vertex positions.
-        basis = baseShape[0].shape_key_add(name="Basis")
-        basis.interpolation = "KEY_LINEAR"
-
+        # Merge the blend shapes together by their base shapes, so we only create a basis once.
         for blendShape in blendShapes:
-            newShape = baseShape[0].shape_key_add(
-                name=blendShape.Name(), from_mix=False)
-            newShape.interpolation = "KEY_LINEAR"
-            newShape.slider_max = min(
-                10.0, blendShape.TargetWeightScale() or 1.0)
+            baseShapeHash = blendShape.BaseShape().Hash()
 
-            indices = blendShape.TargetShapeVertexIndices()
-            positions = blendShape.TargetShapeVertexPositions()
-
-            if not indices or not positions:
-                self.report(
-                    {'WARNING'}, "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
+            if baseShapeHash not in meshHandles:
                 continue
+            if baseShapeHash not in blendShapesByBaseShape:
+                blendShapesByBaseShape[baseShapeHash] = [blendShape]
+            else:
+                blendShapesByBaseShape[baseShapeHash].append(blendShape)
 
-            for i, vertexIndex in enumerate(indices):
-                newShape.data[vertexIndex].co = Vector(
-                    (positions[i * 3], positions[(i * 3) + 1], positions[(i * 3) + 2]))
+        # Iterate over the blend shapes by base shapes.
+        for blendShapes in blendShapesByBaseShape.values():
+            baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
+
+            # The basis will automatically load the base shape's vertex positions.
+            basis = baseShape[0].shape_key_add(name="Basis")
+            basis.interpolation = "KEY_LINEAR"
+
+            for blendShape in blendShapes:
+                newShape = baseShape[0].shape_key_add(
+                    name=blendShape.Name(), from_mix=False)
+                newShape.interpolation = "KEY_LINEAR"
+                newShape.slider_max = min(
+                    10.0, blendShape.TargetWeightScale() or 1.0)
+
+                indices = blendShape.TargetShapeVertexIndices()
+                positions = blendShape.TargetShapeVertexPositions()
+
+                if not indices or not positions:
+                    self.report(
+                        {'WARNING'}, "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
+                    continue
+
+                for i, vertexIndex in enumerate(indices):
+                    newShape.data[vertexIndex].co = Vector(
+                        (positions[i * 3], positions[(i * 3) + 1], positions[(i * 3) + 2]))
 
     # Relink the collection after the mesh is built.
     bpy.context.view_layer.active_layer_collection.collection.children.link(

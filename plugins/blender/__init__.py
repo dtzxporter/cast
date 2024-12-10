@@ -66,6 +66,9 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     import_constraints: BoolProperty(
         name="Import Constraints", description="Imports and configures constraints for the models skeleton", default=True)
 
+    import_blend_shapes: BoolProperty(
+        name="Import Blend Shapes", description="Imports and configures blend shapes for a model", default=True)
+
     import_merge: BoolProperty(
         name="Import Merge", description="Imports and merges models together with the selected armature")
 
@@ -75,6 +78,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
         self.layout.prop(self, "import_skin")
         self.layout.prop(self, "import_ik")
         self.layout.prop(self, "import_constraints")
+        self.layout.prop(self, "import_blend_shapes")
         self.layout.prop(self, "import_merge")
 
         self.layout.separator_spacer()
