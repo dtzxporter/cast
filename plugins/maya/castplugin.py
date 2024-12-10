@@ -1616,6 +1616,7 @@ def importModelNode(model, path):
                 targetShape = OpenMaya.MObject()
                 selectList.getDependNode(0, targetShape)
                 targetMesh = OpenMaya.MFnMesh(targetShape)
+                targetParent = OpenMaya.MFnDagNode(targetShape).parent(0)
 
                 # Rename the actual mesh to the key name.
                 cmds.rename(newShapeShapes[0], blendShape.Name())
@@ -1627,6 +1628,7 @@ def importModelNode(model, path):
                 if not indices or not positions:
                     cmds.warning(
                         "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShapeDagNode.name()))
+                    utilitySetVisibility(targetParent, False)
                     utilityStepProgress(progress, "Importing shapes...")
                     continue
 
@@ -1642,10 +1644,8 @@ def importModelNode(model, path):
 
                 blendDeformer.addTarget(baseShape, i, targetShape,
                                         max(0.0, blendShape.TargetWeightScale() or 1.0))
-                blendTargetParent = OpenMaya.MFnDagNode(targetShape).parent(0)
 
-                # Prevent rendering of the target mesh shapes.
-                utilitySetVisibility(blendTargetParent, False)
+                utilitySetVisibility(targetParent, False)
                 utilityStepProgress(progress, "Importing shapes...")
         utilityEndProgress(progress)
 
