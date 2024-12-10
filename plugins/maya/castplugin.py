@@ -1035,15 +1035,22 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
             else:
                 sample = rest
 
-            curveValueBuffer[i] = utilityLerp(
-                sample, sample + value, blendWeight)
+            if property in ["sx", "sy", "sz"]:
+                curveValueBuffer[i] = utilityLerp(
+                    sample, sample * value, blendWeight)
+            else:
+                curveValueBuffer[i] = utilityLerp(
+                    sample, sample + value, blendWeight)
     # Relative curves are applied against the resting position value in the scene
     # we will add it to the rest position
     elif mode == "relative":
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
         for i, value in enumerate(valueBuffer):
-            curveValueBuffer[i] = rest + value
+            if property in ["sx", "sy", "sz"]:
+                curveValueBuffer[i] = rest * value
+            else:
+                curveValueBuffer[i] = rest + value
 
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
