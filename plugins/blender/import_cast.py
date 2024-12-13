@@ -653,6 +653,12 @@ def importModelNode(self, model, path, selectedObject):
     if self.import_constraints:
         importSkeletonConstraintNode(self, model.Skeleton(), poses)
 
+    # If we merged this model, select the target armature again.
+    if self.import_merge:
+        if selectedObject and selectedObject.type == 'ARMATURE':
+            bpy.context.view_layer.objects.active = selectedObject
+            bpy.ops.object.mode_set(mode='OBJECT')
+
 
 def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
