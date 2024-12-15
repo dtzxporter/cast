@@ -1,0 +1,8 @@
+STRINGTABLE fcastloader
+{
+	fcastloader						"Cast Import";
+	CAST_IMPORT_GROUP				"Cast Import Settings";
+	CAST_IMPORT_BIND_SKIN			"Import Bind Skin";
+	CAST_IMPORT_IK_HANDLES			"Import IK Handles";
+	CAST_IMPORT_CONSTRAINTS			"Import Constraints";
+}
