@@ -426,6 +426,7 @@ def importInstanceNodes(doc, nodes, node, path):
         return gui.MessageDialog(text="Unable to import instances without a root directory!", type=c4d.GEMB_ICONSTOP)
 
     uniqueInstances = {}
+    instanceImportError = False
 
     for instance in nodes:
         refs = os.path.join(rootPath, instance.ReferenceFile().Path())
@@ -466,6 +467,7 @@ def importInstanceNodes(doc, nodes, node, path):
             modelNull.InsertUnder(sceneNull)
         except:
             print("Failed to import instance: %s" % instancePath)
+            instanceImportError = True
             continue
 
         for instance in instances:
@@ -489,6 +491,9 @@ def importInstanceNodes(doc, nodes, node, path):
             newInstance.SetAbsScale(scale)
 
             newInstance.SetReferenceObject(modelNull)
+
+    if instanceImportError:
+        gui.MessageDialog(text="Some instances failed to import.\nCheck the console for more details. ", type=c4d.GEMB_ICONEXCLAMATION)
 
 
 if __name__ == '__main__':
