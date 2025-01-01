@@ -1,6 +1,6 @@
 import c4d
 import os
-import array
+import math
 import mxutils
 
 from c4d import plugins, Vector, Vector4d, CPolygon, gui, BaseObject
@@ -54,11 +54,20 @@ def utilityBuildPath(root, asset):
 
 def utilityQuaternionToEuler(tempQuat):
     quaternion = c4d.Quaternion()
-    quaternion.w = tempQuat[3]
-    quaternion.v = Vector(tempQuat[0], tempQuat[1], -tempQuat[2])
 
+    w = tempQuat[3]
+    ww = 2 * math.acos(w)
+    sqrt = math.sqrt(1 - w * w)
+
+    if sqrt <= 1e-9:
+        x = y = z = 0
+    else:
+        x = tempQuat[0] / sqrt
+        y = tempQuat[1] / sqrt
+        z = tempQuat[2] / sqrt
+
+    quaternion.SetAxis(Vector(x, y, -z), ww)
     return c4d.utils.MatrixToHPB(quaternion.GetMatrix(), c4d.ROTATIONORDER_HPB)
-
 
 def utilityAddTextureMaterialSlots(slotName, texPath, mat, shaderType):
     shader = c4d.BaseList2D(c4d.Xbitmap)
@@ -480,8 +489,7 @@ def importInstanceNodes(doc, nodes, node, path):
             tX, tY, tZ = instance.Position()
             translation = Vector(tX, tY, -tZ)
 
-            tempQuat = instance.Rotation()
-            rotation = utilityQuaternionToEuler(tempQuat)
+            rotation = utilityQuaternionToEuler(instance.Rotation())
 
             scaleTuple = instance.Scale() or (1.0, 1.0, 1.0)
             scale = Vector(scaleTuple[0], scaleTuple[1], scaleTuple[2])
