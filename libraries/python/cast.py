@@ -267,10 +267,7 @@ class Model(CastNode):
 
     def Skeleton(self):
         """The skeleton embedded in this model."""
-        find = self.ChildrenOfType(Skeleton)
-        if len(find) > 0:
-            return find[0]
-        return None
+        return self.ChildOfType(Skeleton)
 
     def CreateSkeleton(self):
         """Creates a new skeleton in this model."""
@@ -320,10 +317,7 @@ class Animation(CastNode):
 
     def Skeleton(self):
         """The skeleton embedded in this animation."""
-        find = self.ChildrenOfType(Skeleton)
-        if len(find) > 0:
-            return find[0]
-        return None
+        return self.ChildOfType(Skeleton)
 
     def CreateSkeleton(self):
         """Creates a new skeleton in this animation."""
