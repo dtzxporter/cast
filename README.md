@@ -632,7 +632,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 </table>
 <table>
-<tr>
+	<tr>
 		<th>Property (id)</th>
 		<th>Type(s)</th>
 		<th>IsArray</th>
@@ -646,7 +646,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 	 <tr>
   		<td>Type (t)</td>
-   		<td>String (s)</td>
+   		<td>String (s) [pbr]</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
