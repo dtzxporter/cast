@@ -89,12 +89,19 @@ def utilityAssignMaterialSlots(material, slots, path):
             "emask": "Emission Strength",
         }
 
+    # Prevent duplicate connections if one or more conflict occurs.
+    used = []
+
     # Loop and connect the slots
     for slot in slots:
         connection = slots[slot]
 
         if not slot in switcher:
             continue
+        if switcher[slot] in used:
+            continue
+
+        used.append(switcher[slot])
 
         if connection.__class__ is File:
             node = material.node_tree.nodes.new("ShaderNodeTexImage")

@@ -72,6 +72,7 @@ enum class CastId : uint32_t
 	NotificationTrack = 0x6669746E,
 	Material = 0x6C74616D,
 	File = 0x656C6966,
+	Color = 0x726C6F63,
 	Instance = 0x74736E69,
 	Metadata = 0x6174656D,
 };
@@ -620,7 +621,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>File</td>
+   		<td>File, Color</td>
 		<td>True</td>
 		<td>False</td>
  	</tr>
@@ -651,78 +652,83 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>True</td>
  	</tr>
 	  <tr>
-  		<td>Albedo File Hash (albedo)</td>
+  		<td>Albedo Hash (albedo)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Diffuse File Hash (diffuse)</td>
+  		<td>Diffuse Hash (diffuse)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Normal File Hash (normal)</td>
+  		<td>Normal Hash (normal)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Specular File Hash (specular)</td>
+  		<td>Specular Hash (specular)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Gloss File Hash (gloss)</td>
+  		<td>Gloss Hash (gloss)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Roughness File Hash (roughness)</td>
+  		<td>Roughness Hash (roughness)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	<tr>
-  		<td>Emissive File Hash (emissive)</td>
+  		<td>Emissive Hash (emissive)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
 	</tr>
 	<tr>
-  		<td>Emissive Mask File Hash (emask)</td>
+  		<td>Emissive Mask Hash (emask)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
 	</tr>
 	 <tr>
-  		<td>Ambient Occlusion File Hash (ao)</td>
+  		<td>Ambient Occlusion Hash (ao)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Cavity File Hash (cavity)</td>
+  		<td>Cavity Hash (cavity)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	<tr>
-  		<td>Anisotropy File Hash (aniso)</td>
+  		<td>Anisotropy Hash (aniso)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Extra (x) File Hash (extra%d)</td>
+  		<td>Extra (x) Hash (extra%d)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
 </table>
+
+**Notes**:
+- The hash properties link to children of the material which can be:
+  - A `File` which points to a texture.
+  - A `Color` which has a single rgba value.
 
 ### File:
 <table>
@@ -755,6 +761,48 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	 <tr>
   		<td>Path (p)</td>
    		<td>String (s)</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+
+### Color:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>CastNode</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	 <tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Rgba Color (rgba)</td>
+   		<td>Vector 4 (v4)</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>

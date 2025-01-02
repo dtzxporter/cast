@@ -37,6 +37,8 @@ namespace Cast
                     return new Material();
                 case 0x656C6966:
                     return new File();
+                case 0x726C6F63:
+                    return new Color();
                 case 0x6D696E61:
                     return new Animation();
                 case 0x76727563:
@@ -1455,6 +1457,45 @@ namespace Cast
             if (Properties.TryGetValue("p", out CastProperty Value))
             {
                 return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// A rgba color value node.
+    /// </summary>
+    public class Color: CastNode
+    {
+        public Color()
+            : base(0x726C6F63)
+        {
+        }
+
+        /// <summary>
+        /// The name for this color value node.
+        /// </summary>
+        /// <returns></returns>
+        public string Name()
+        {
+            if (Properties.TryGetValue("n", out CastProperty Value))
+            {
+                return (string)Value.Values[0];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The name for this color value node.
+        /// </summary>
+        /// <returns></returns>
+        public Vector4 Rgba()
+        {
+            if (Properties.TryGetValue("rgba", out CastProperty Value))
+            {
+                return (Vector4)Value.Values[0];
             }
 
             return null;

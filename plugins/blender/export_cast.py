@@ -44,8 +44,10 @@ def utilityAssignMaterialSlots(material, matNode, filepath):
     slots = {
         "Base Color": "albedo",
         "Specular": "specular",
+        "Specular Tint": "specular",
         "Emissive Color": "emissive",
         "Emission": "emissive",
+        "Emission Strength": "emask",
         "Roughness": "roughness",
         "Ambient Occlusion": "ao",
         "Metallic": "metal",
