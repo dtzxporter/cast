@@ -770,7 +770,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>Skeleton, Curve, CurveModeOverride, NotificiationTrack</td>
+   		<td>Skeleton, Curve, CurveModeOverride, NotificationTrack</td>
 		<td>True</td>
 		<td>True</td>
  	</tr>

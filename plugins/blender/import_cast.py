@@ -5,7 +5,7 @@ import sys
 
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
-from .cast import Cast, CastColor, Model, Animation, Instance, File
+from .cast import Cast, CastColor, Model, Animation, Instance, File, Color
 
 
 def utilityBuildPath(root, asset):
@@ -92,49 +92,54 @@ def utilityAssignMaterialSlots(material, slots, path):
     # Loop and connect the slots
     for slot in slots:
         connection = slots[slot]
-        if not connection.__class__ is File:
-            continue
+
         if not slot in switcher:
             continue
 
-        texture = material.node_tree.nodes.new("ShaderNodeTexImage")
-        try:
-            texture.image = bpy.data.images.load(
-                utilityBuildPath(path, connection.Path()))
+        if connection.__class__ is File:
+            node = material.node_tree.nodes.new("ShaderNodeTexImage")
 
-            # This is a sane setting for most textures, as they will use the alpha channel separately.
-            # Blender also has broken straight/premultiplied modes.
-            texture.image.alpha_mode = "CHANNEL_PACKED"
-        except RuntimeError:
-            pass
+            try:
+                node.image = bpy.data.images.load(
+                    utilityBuildPath(path, connection.Path()))
+
+                # The following slots are non-color data.
+                if slot in ["normal", "gloss", "roughness"]:
+                    node.image.colorspace_settings.name = "Non-Color"
+
+                # This is a sane setting for most textures, as they will use the alpha channel separately.
+                # Blender also has broken straight/premultiplied modes.
+                node.image.alpha_mode = "CHANNEL_PACKED"
+            except RuntimeError:
+                # Occurs if texture was unsupported or failed to load.
+                pass
+        elif connection.__class__ is Color:
+            node = material.node_tree.nodes.new("ShaderNodeRGB")
+
+            if connection.Name() is not None:
+                node.label = connection.Name()
+
+            # Set the color value, even though we can't separate the alpha channel from this node.
+            # It becomes premultiplied alpha no matter what, which is a pain.
+            node.outputs["Color"].default_value = connection.Rgba()
+        else:
+            continue
 
         if slot == "normal":
-            if texture.image is not None:
-                texture.image.colorspace_settings.name = "Non-Color"
-
             normalMap = material.node_tree.nodes.new("ShaderNodeNormalMap")
             material.node_tree.links.new(
-                normalMap.inputs["Color"], texture.outputs["Color"])
+                normalMap.inputs["Color"], node.outputs["Color"])
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], normalMap.outputs["Normal"])
         elif slot == "gloss":
-            if texture.image is not None:
-                texture.image.colorspace_settings.name = "Non-Color"
-
             invert = material.node_tree.nodes.new("ShaderNodeInvert")
             material.node_tree.links.new(
-                invert.inputs["Color"], texture.outputs["Color"])
+                invert.inputs["Color"], node.outputs["Color"])
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], invert.outputs["Color"])
-        elif slot == "roughness":
-            if texture.image is not None:
-                texture.image.colorspace_settings.name = "Non-Color"
-
-            material.node_tree.links.new(
-                shader.inputs[switcher[slot]], texture.outputs["Color"])
         else:
             material.node_tree.links.new(
-                shader.inputs[switcher[slot]], texture.outputs["Color"])
+                shader.inputs[switcher[slot]], node.outputs["Color"])
 
 
 def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
