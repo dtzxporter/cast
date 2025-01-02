@@ -118,6 +118,8 @@ def utilityAssignMaterialSlots(material, slots, path):
 
             if connection.Name() is not None:
                 node.label = connection.Name()
+            else:
+                node.label = ("Color: %s" % switcher[slot])
 
             # Set the color value, even though we can't separate the alpha channel from this node.
             # It becomes premultiplied alpha no matter what, which is a pain.
