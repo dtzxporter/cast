@@ -55,11 +55,13 @@ def utilityFindShaderNode(material, bl_idname):
     return None
 
 
-def utilityAssignBSDFMaterialSlots(material, slots, path):
-    # We will two shaders, one for metalness and one for specular
-    if "metal" in slots:
-        # Principled is default shader node
-        shader = utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled")
+def utilityAssignMaterialSlots(material, slots, path):
+    # Find the principled shader.
+    shader = utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled")
+    # Determine workflow, metalness/roughness or specular/gloss
+    metalness = "metal" in slots
+
+    if metalness:
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
@@ -69,27 +71,22 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
             "gloss": "Roughness",
             "normal": "Normal",
             "emissive": "Emission Color" if utilityIsVersionAtLeast(4, 0) else "Emission",
+            "emask": "Emission Strength",
         }
     else:
-        # We need to create the specular node, removing principled first
-        material.node_tree.nodes.remove(
-            utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled"))
-        material_output = utilityFindShaderNode(
-            material, "ShaderNodeOutputMaterial")
-
-        shader = material.node_tree.nodes.new("ShaderNodeEeveeSpecular")
-
-        material.node_tree.links.new(
-            material_output.inputs[0], shader.outputs[0])
+        # Set reasonable defaults for specular/gloss workflow.
+        shader.inputs["Metallic"].default_value = 0.0
+        shader.inputs["IOR"].default_value = 4.0
 
         switcher = {
             "albedo": "Base Color",
             "diffuse": "Base Color",
-            "specular": "Specular",
+            "specular": "Specular Tint" if utilityIsVersionAtLeast(4, 0) else "Specular",
             "roughness": "Roughness",
             "gloss": "Roughness",
-            "emissive": "Emissive Color",
             "normal": "Normal",
+            "emissive": "Emission Color" if utilityIsVersionAtLeast(4, 0) else "Emission",
+            "emask": "Emission Strength",
         }
 
     # Loop and connect the slots
@@ -104,6 +101,10 @@ def utilityAssignBSDFMaterialSlots(material, slots, path):
         try:
             texture.image = bpy.data.images.load(
                 utilityBuildPath(path, connection.Path()))
+
+            # This is a sane setting for most textures, as they will use the alpha channel separately.
+            # Blender also has broken straight/premultiplied modes.
+            texture.image.alpha_mode = "CHANNEL_PACKED"
         except RuntimeError:
             pass
 
@@ -456,9 +457,7 @@ def importMaterialNode(path, material):
     materialNew = bpy.data.materials.new(name=material.Name())
     materialNew.use_nodes = True
 
-    # Blender really only wants a BSDF shader node
-    # so we're gonna give it one
-    utilityAssignBSDFMaterialSlots(materialNew, material.Slots(), path)
+    utilityAssignMaterialSlots(materialNew, material.Slots(), path)
 
     return material.Name(), materialNew
 

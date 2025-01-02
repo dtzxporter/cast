@@ -8,7 +8,7 @@ The goal of cast is to create an easy to use format for models, animations, mate
 
 ## 3D Engine Plugins:
 - Autodesk Maya (2012+): [Releases](https://github.com/dtzxporter/cast/releases)
-- Blender (3.0+): [Releases](https://github.com/dtzxporter/cast/releases)
+- Blender (3.6+): [Releases](https://github.com/dtzxporter/cast/releases)
 
 # Programming libraries:
 - .NET Framework (Reference): [Libraries/DotNet](https://github.com/dtzxporter/cast/tree/master/libraries/dotnet)
@@ -675,12 +675,6 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
  	</tr>
 	 <tr>
-  		<td>Emissive File Hash (emissive)</td>
-   		<td>Integer 64 (l)</td>
-		<td>False</td>
-		<td>False</td>
- 	</tr>
-	 <tr>
   		<td>Gloss File Hash (gloss)</td>
    		<td>Integer 64 (l)</td>
 		<td>False</td>
@@ -692,6 +686,18 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
 		<td>False</td>
  	</tr>
+	<tr>
+  		<td>Emissive File Hash (emissive)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+	</tr>
+	<tr>
+  		<td>Emissive Mask File Hash (emask)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+	</tr>
 	 <tr>
   		<td>Ambient Occlusion File Hash (ao)</td>
    		<td>Integer 64 (l)</td>
