@@ -1,6 +1,6 @@
 import c4d
 import os
-import array
+import math
 import mxutils
 
 from c4d import plugins, Vector, Vector4d, CPolygon, gui, BaseObject
@@ -54,11 +54,20 @@ def utilityBuildPath(root, asset):
 
 def utilityQuaternionToEuler(tempQuat):
     quaternion = c4d.Quaternion()
-    quaternion.w = tempQuat[3]
-    quaternion.v = Vector(tempQuat[0], tempQuat[1], -tempQuat[2])
 
+    w = tempQuat[3]
+    ww = 2 * math.acos(w)
+    sqrt = math.sqrt(1 - w * w)
+
+    if sqrt <= 1e-9:
+        x = y = z = 0
+    else:
+        x = tempQuat[0] / sqrt
+        y = tempQuat[1] / sqrt
+        z = tempQuat[2] / sqrt
+
+    quaternion.SetAxis(Vector(x, y, -z), ww)
     return c4d.utils.MatrixToHPB(quaternion.GetMatrix(), c4d.ROTATIONORDER_HPB)
-
 
 def utilityAddTextureMaterialSlots(slotName, texPath, mat, shaderType):
     shader = c4d.BaseList2D(c4d.Xbitmap)
@@ -146,7 +155,7 @@ def importModelNode(doc, node, model, path):
 
         newMesh.ResizeObject(vertexCount, facesCount)
 
-        for i in range(0, vertexCount, 3):
+        for i in range(0, len(vertexPositions), 3):
             newMesh.SetPoint(
                 int(i / 3), Vector(vertexPositions[i], vertexPositions[i + 1], -vertexPositions[i + 2]))
 
@@ -158,21 +167,28 @@ def importModelNode(doc, node, model, path):
             newMesh.SetPolygon(
                 int(i / 3), CPolygon(faces[i], faces[i + 1], faces[i + 2]))
 
+        meshMaterial = mesh.Material()
+
         for i in range(mesh.UVLayerCount()):
             uvBuffer = mesh.VertexUVLayerBuffer(i)
             uvTag = c4d.UVWTag(facesCount)
 
-            for i in range(0, faceIndicesCount, 3):
-                uvTag.SetSlow(int(i / 3),
-                              Vector(uvBuffer[faces[i] * 2],
-                                     uvBuffer[(faces[i] * 2) + 1], 0),
-                              Vector(uvBuffer[faces[i + 1] * 2],
-                                     uvBuffer[(faces[i + 1] * 2) + 1], 0),
-                              Vector(uvBuffer[faces[i + 2] * 2],
-                                     uvBuffer[(faces[i + 2] * 2) + 1], 0),
+            for j in range(0, faceIndicesCount, 3):
+                uvTag.SetSlow(int(j / 3),
+                              Vector(uvBuffer[faces[j] * 2],
+                                     uvBuffer[(faces[j] * 2) + 1], 0),
+                              Vector(uvBuffer[faces[j + 1] * 2],
+                                     uvBuffer[(faces[j + 1] * 2) + 1], 0),
+                              Vector(uvBuffer[faces[j + 2] * 2],
+                                     uvBuffer[(faces[j + 2] * 2) + 1], 0),
                               Vector(0, 0, 0))
 
             newMesh.InsertTag(uvTag)
+
+            if meshMaterial is not None and i < 1:
+                material_tag = newMesh.MakeTag(c4d.Ttexture)
+                material_tag[c4d.TEXTURETAG_MATERIAL] = materialArray[meshMaterial.Name()]
+                material_tag[c4d.TEXTURETAG_PROJECTION] = c4d.TEXTURETAG_PROJECTION_UVW
 
         for i in range(mesh.ColorLayerCount()):
             vertexColors = mesh.VertexColorLayerBuffer(i)
@@ -193,16 +209,16 @@ def importModelNode(doc, node, model, path):
 
             for i in range(0, faceIndicesCount, 3):
                 vnTag.Set(vnData, int(i / 3), 
-                          {"a": Vector(vertexNormals[faces[i] * 3],
+                         {"a": Vector(vertexNormals[faces[i] * 3],
                                        vertexNormals[(faces[i] * 3) + 1],
                                        -vertexNormals[(faces[i] * 3) + 2]),
-                            "b": Vector(vertexNormals[faces[i + 1] * 3],
+                          "b": Vector(vertexNormals[faces[i + 1] * 3],
                                         vertexNormals[(faces[i + 1] * 3) + 1],
                                         -vertexNormals[(faces[i + 1] * 3) + 2]),
-                            "c": Vector(vertexNormals[faces[i + 2] * 3],
+                          "c": Vector(vertexNormals[faces[i + 2] * 3],
                                         vertexNormals[(faces[i + 2] * 3) + 1],
                                         -vertexNormals[(faces[i + 2] * 3) + 2]),
-                            "d": Vector(0, 0, 0)})
+                          "d": Vector(0, 0, 0)})
 
 
 
@@ -221,6 +237,8 @@ def importModelNode(doc, node, model, path):
             doc.InsertObject(skinObj, parent=newMesh)
 
             weightTag = c4d.modules.character.CAWeightTag()
+            
+            newMesh.InsertTag(weightTag)
 
             for bone in bones.values():
                 weightTag.AddJoint(bone)
@@ -243,16 +261,7 @@ def importModelNode(doc, node, model, path):
                 for x in range(vertexCount):
                     weightTag.SetWeight(weightBoneBuffer[x], x, 1.0)
 
-            newMesh.InsertTag(weightTag)
-
             weightTag.Message(c4d.MSG_UPDATE)
-
-        meshMaterial = mesh.Material()
-        if meshMaterial is not None:
-            material = materialArray[meshMaterial.Name()]
-            material_tag = newMesh.MakeTag(c4d.Ttexture)
-            material_tag[c4d.TEXTURETAG_MATERIAL] = material
-            material_tag[c4d.TEXTURETAG_PROJECTION] = c4d.TEXTURETAG_PROJECTION_UVW
 
         doc.InsertObject(newMesh, parent=modelNull)
         newMesh.Message(c4d.MSG_UPDATE)
@@ -274,8 +283,8 @@ def importSkeletonConstraintNode(skeleton, bones):
         return
 
     for constraint in skeleton.Constraints():
-        constraintBone = bones[constraint.ConstraintBone().Hash()]
-        targetBone = bones[constraint.TargetBone().Hash()]
+        constraintBone = bones[constraint.ConstraintBone().Name()]
+        targetBone = bones[constraint.TargetBone().Name()]
 
         type = constraint.ConstraintType()
 
@@ -347,8 +356,8 @@ def importSkeletonIKNode(doc, modelNull, skeleton, bones):
     ikParentNull.SetName("IK_Handles")
     doc.InsertObject(ikParentNull, modelNull)
     for handle in skeleton.IKHandles():
-        startBone = bones[handle.StartBone().Hash()]
-        endBone = bones[handle.EndBone().Hash()]
+        startBone = bones[handle.StartBone().Name()]
+        endBone = bones[handle.EndBone().Name()]
 
         ikTargetNull = BaseObject(c4d.Onull)
         ikTargetNull.SetName(endBone.GetName() + "_IK")
@@ -383,7 +392,7 @@ def importSkeletonNode(modelNull, skeleton):
 
     bones = skeleton.Bones()
     handles = [None] * len(bones)
-    boneIndexes = {}
+    boneNames = {}
 
     for i, bone in enumerate(bones):
         newBone = BaseObject(c4d.Ojoint)
@@ -402,7 +411,7 @@ def importSkeletonNode(modelNull, skeleton):
         newBone.SetAbsScale(scale)
 
         handles[i] = newBone
-        boneIndexes[bone.Hash()] = newBone
+        boneNames[bone.Name()] = newBone
 
     for i, bone in enumerate(bones):
         if bone.ParentIndex() > -1:
@@ -410,7 +419,7 @@ def importSkeletonNode(modelNull, skeleton):
         else:
             handles[i].InsertUnder(modelNull)
 
-    return boneIndexes
+    return boneNames
 
 
 def importAnimationNode():
@@ -426,6 +435,7 @@ def importInstanceNodes(doc, nodes, node, path):
         return gui.MessageDialog(text="Unable to import instances without a root directory!", type=c4d.GEMB_ICONSTOP)
 
     uniqueInstances = {}
+    instanceImportError = False
 
     for instance in nodes:
         refs = os.path.join(rootPath, instance.ReferenceFile().Path())
@@ -466,6 +476,7 @@ def importInstanceNodes(doc, nodes, node, path):
             modelNull.InsertUnder(sceneNull)
         except:
             print("Failed to import instance: %s" % instancePath)
+            instanceImportError = True
             continue
 
         for instance in instances:
@@ -478,8 +489,7 @@ def importInstanceNodes(doc, nodes, node, path):
             tX, tY, tZ = instance.Position()
             translation = Vector(tX, tY, -tZ)
 
-            tempQuat = instance.Rotation()
-            rotation = utilityQuaternionToEuler(tempQuat)
+            rotation = utilityQuaternionToEuler(instance.Rotation())
 
             scaleTuple = instance.Scale() or (1.0, 1.0, 1.0)
             scale = Vector(scaleTuple[0], scaleTuple[1], scaleTuple[2])
@@ -489,6 +499,9 @@ def importInstanceNodes(doc, nodes, node, path):
             newInstance.SetAbsScale(scale)
 
             newInstance.SetReferenceObject(modelNull)
+
+    if instanceImportError:
+        gui.MessageDialog(text="Some instances failed to import.\nCheck the console for more details. ", type=c4d.GEMB_ICONEXCLAMATION)
 
 
 if __name__ == '__main__':
