@@ -111,7 +111,8 @@ def utilityAssignMaterialSlots(material, slots, path):
                     utilityBuildPath(path, connection.Path()))
 
                 # The following slots are non-color data.
-                if slot in ["normal", "gloss", "roughness"]:
+                if slot in ["metal", "normal", "gloss", "roughness"] \
+                        or (metalness and slot == "specular"):
                     node.image.colorspace_settings.name = "Non-Color"
 
                 # This is a sane setting for most textures, as they will use the alpha channel separately.
