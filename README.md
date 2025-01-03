@@ -7,7 +7,7 @@ The goal of cast is to create an easy to use format for models, animations, mate
 </p>
 
 ## 3D Engine Plugins:
-- Autodesk Maya (2012+): [Releases](https://github.com/dtzxporter/cast/releases)
+- Autodesk Maya (2016+): [Releases](https://github.com/dtzxporter/cast/releases)
 - Blender (3.6+): [Releases](https://github.com/dtzxporter/cast/releases)
 
 # Programming libraries:
