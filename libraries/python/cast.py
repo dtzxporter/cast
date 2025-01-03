@@ -1200,6 +1200,35 @@ class File(CastNode):
         self.CreateProperty("p", "s").values = [path]
 
 
+class Color(CastNode):
+    """A rgba color value node."""
+
+    def __init__(self):
+        super(Color, self).__init__(0x726C6F63)
+
+    def Name(self):
+        """The name for this color value node."""
+        name = self.properties.get("n")
+        if name is not None:
+            return name.values[0]
+        return None
+
+    def SetName(self, name):
+        """Sets the name for this color value node."""
+        self.CreateProperty("n", "s").values = [name]
+
+    def Rgba(self):
+        """The rgba color values for this color value node."""
+        rgba = self.properties.get("rgba")
+        if rgba is not None:
+            return rgba.values
+        return None
+
+    def SetRgba(self, rgba):
+        """Sets the rgba color values of this color value node."""
+        self.CreateProperty("rgba", "4v").values = list(rgba)
+
+
 class Instance(CastNode):
     """An instance of a cast scene."""
 
@@ -1341,6 +1370,7 @@ typeSwitcher = {
     0x74736E63: Constraint,
     0x6C74616D: Material,
     0x656C6966: File,
+    0x726C6F63: Color,
     0x74736E69: Instance,
     0x6174656D: Metadata,
 }

@@ -10,7 +10,7 @@ import maya.OpenMayaAnim as OpenMayaAnim
 import maya.OpenMayaMPx as OpenMayaMPx
 
 
-from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File
+from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File, Color
 
 # Support Python 3.0+
 try:
@@ -32,12 +32,12 @@ sceneSettings = {
     "exportAnim": True,
     "exportModel": True,
     "exportAxis": True,
-    "createStingrayMaterials": True,
-    "createStandardMaterials": False,
+    "createMinMaterials": False,
+    "createFullMaterials": True,
 }
 
 # Shared version number
-version = "1.70"
+version = "1.71"
 
 
 def utilityAbout():
@@ -458,11 +458,11 @@ def utilityCreateMenu():
 
     cmds.menuItem(label="Material", subMenu=True)
 
-    cmds.menuItem("createStingrayMaterials", label="Create Stingray Materials", annotation="Creates Stingray compatible materials",
-                  radioButton=utilityQueryToggleItem("createStingrayMaterials"), command=lambda x: utilitySetRadioItem(["createStingrayMaterials", "createStandardMaterials"]))
+    cmds.menuItem("createMinMaterials", label="Create Basic Materials", annotation="Creates basic materials with minimal configuration",
+                  radioButton=utilityQueryToggleItem("createMinMaterials"), command=lambda x: utilitySetRadioItem(["createMinMaterials", "createFullMaterials"]))
 
-    cmds.menuItem("createStandardMaterials", label="Create Standard Materials", annotation="Creates Standard compatible materials",
-                  radioButton=utilityQueryToggleItem("createStandardMaterials"), command=lambda x: utilitySetRadioItem(["createStandardMaterials", "createStingrayMaterials"]))
+    cmds.menuItem("createFullMaterials", label="Create Standard Materials", annotation="Creates standard materials with full configuration",
+                  radioButton=utilityQueryToggleItem("createFullMaterials"), command=lambda x: utilitySetRadioItem(["createFullMaterials", "createMinMaterials"]))
 
     cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
@@ -588,105 +588,140 @@ def utilityGetCurveInterpolation(curvePath):
         return "none"
 
 
-def utilityAssignStingrayPBSSlots(materialInstance, slots, path):
-    switcher = {
-        "albedo": "TEX_color_map",
-        "diffuse": "TEX_color_map",
-        "normal": "TEX_normal_map",
-        "metal": "TEX_metallic_map",
-        "roughness": "TEX_roughness_map",
-        "gloss": "TEX_roughness_map",
-        "emissive": "TEX_emissive_map",
-        "ao": "TEX_ao_map"
-    }
-    booleans = {
-        "albedo": "use_color_map",
-        "diffuse": "use_color_map",
-        "normal": "use_normal_map",
-        "metal": "use_metallic_map",
-        "roughness": "use_roughness_map",
-        "gloss": "use_roughness_map",
-        "emissive": "use_emissive_map",
-        "ao": "use_ao_map"
-    }
+def utilityAssignMaterialSlots(shader, slots, basic, path):
+    # Determine workflow, metalness/roughness or specular/gloss
+    metalness = ("metal" in slots and not basic)
+
+    if basic:
+        switcher = {
+            "albedo": "color",
+            "diffuse": "color",
+            "specular": "ambientColor",
+            "normal": "normalCamera",
+        }
+    elif metalness:
+        switcher = {
+            "albedo": "baseColor",
+            "diffuse": "baseColor",
+            "specular": "specular",
+            "normal": "normalCamera",
+            "metal": "metalness",
+            "roughness": "specularRoughness",
+            "gloss": "specularRoughness",
+            "emissive": "emissionColor",
+            "emask": "emission",
+            "aniso": "specularAnisotropy",
+        }
+    else:
+        # Set reasonable defaults for specular/gloss workflow.
+        cmds.setAttr("%s.metalness" % shader, 0.0)
+        cmds.setAttr("%s.specularIOR" % shader, 4.0)
+
+        switcher = {
+            "albedo": "baseColor",
+            "diffuse": "baseColor",
+            "specular": "specularColor",
+            "normal": "normalCamera",
+            "roughness": "specularRoughness",
+            "gloss": "specularRoughness",
+            "emissive": "emissionColor",
+            "emask": "emission",
+            "aniso": "specularAnisotropy",
+        }
+
+    # Prevent duplicate connections if one or more conflict occurs.
+    used = []
 
     for slot in slots:
         connection = slots[slot]
-        if not connection.__class__ is File:
+
+        if not slot in switcher:
+            continue
+        if switcher[slot] in used:
             continue
 
-        # Import the file by creating the node
-        fileNode = cmds.shadingNode("file", name=(
-            "%s_%s" % (materialInstance, slot)), asTexture=True)
-        cmds.setAttr(("%s.fileTextureName" % fileNode), utilityBuildPath(
-            path, connection.Path()), type="string")
+        used.append(switcher[slot])
 
-        texture2dNode = cmds.shadingNode("place2dTexture", name=(
-            "place2dTexture_%s_%s" % (materialInstance, slot)), asUtility=True)
-        cmds.connectAttr(("%s.outUV" % texture2dNode),
-                         ("%s.uvCoord" % fileNode))
+        if connection.__class__ is File:
+            node = cmds.shadingNode("file", name=("%s_%s" % (shader, slot)),
+                                    isColorManaged=True, asTexture=True)
 
-        mel.eval("shaderfx -sfxnode %s -update" % materialInstance)
+            # This prevents scene color space rules from overriding our file ones.
+            cmds.setAttr("%s.ignoreColorSpaceFileRules" % node, 1)
 
-        # If we don't have a map for this material, skip to next one
+            # The following slots are raw data.
+            if slot in ["metal", "normal", "gloss", "roughness", "aniso"] \
+                    or (metalness and slot == "specular"):
+                cmds.setAttr("%s.colorSpace" % node, "Raw", type="string")
+            else:
+                cmds.setAttr("%s.colorSpace" % node, "sRGB", type="string")
+
+            cmds.setAttr("%s.fileTextureName" % node,
+                         utilityBuildPath(path, connection.Path()), type="string")
+
+            texture2dNode = cmds.shadingNode("place2dTexture",
+                                             name=("place2dTexture_%s_%s" % (shader, slot)), asUtility=True)
+            cmds.connectAttr(("%s.outUV" % texture2dNode),
+                             ("%s.uvCoord" % node))
+        elif connection.__class__ is Color:
+            node = cmds.shadingNode("colorConstant", name=(
+                "color_%s" % slot), asUtility=True)
+
+            rgba = connection.Rgba()
+
+            cmds.setAttr("%s.inColor" % node, rgba[0], rgba[1], rgba[2])
+            cmds.setAttr("%s.inAlpha" % node, rgba[3])
+        else:
+            continue
+
+        # Update the shader node.
+        mel.eval("shaderfx -sfxnode %s -update" % shader)
+
+        # If we don't have a map for this material, skip to next one.
         if not slot in switcher:
             continue
 
-        # We have a slot, lets connect it
-        cmds.connectAttr(("%s.outColor" % fileNode), ("%s.%s" %
-                                                      (materialInstance, switcher[slot])), force=True)
-        cmds.setAttr("%s.%s" % (materialInstance, booleans[slot]), 1)
+        if slot == "normal":
+            normaMap = cmds.shadingNode("bump2d", asUtility=True)
 
+            # Tangent space normal map.
+            cmds.setAttr("%s.bumpInterp" % normaMap, 1)
 
-def utilityAssignGenericSlots(materialInstance, slots, path):
-    switcher = {
-        "albedo": "color",
-        "diffuse": "color",
-        "normal": "normalCamera",
-    }
+            cmds.connectAttr(("%s.outAlpha" % node),
+                             ("%s.bumpValue" % normaMap), force=True)
+            cmds.connectAttr(("%s.outNormal" % normaMap), ("%s.%s" %
+                             (shader, switcher[slot])), force=True)
+        elif slot == "gloss":
+            invert = cmds.shadingNode("reverse", asUtility=True)
 
-    for slot in slots:
-        connection = slots[slot]
-        if not connection.__class__ is File:
-            continue
-
-        # Import the file by creating the node
-        fileNode = cmds.shadingNode("file", name=(
-            "%s_%s" % (materialInstance, slot)), asTexture=True)
-        cmds.setAttr(("%s.fileTextureName" % fileNode), utilityBuildPath(
-            path, connection.Path()), type="string")
-
-        texture2dNode = cmds.shadingNode("place2dTexture", name=(
-            "place2dTexture_%s_%s" % (materialInstance, slot)), asUtility=True)
-        cmds.connectAttr(("%s.outUV" % texture2dNode),
-                         ("%s.uvCoord" % fileNode))
-
-        # If we don't have a map for this material, skip to next one
-        if not slot in switcher:
-            continue
-
-        # We have a slot, lets connect it
-        cmds.connectAttr(("%s.outColor" % fileNode), ("%s.%s" %
-                                                      (materialInstance, switcher[slot])), force=True)
+            cmds.connectAttr(("%s.outColor" % node),
+                             ("%s.input" % invert), force=True)
+            cmds.connectAttr(("%s.outputX" % invert), ("%s.%s" %
+                             (shader, switcher[slot])), force=True)
+        elif slot in ["metal", "roughness", "emask", "aniso"] \
+                or (metalness and slot == "specular"):
+            cmds.connectAttr(("%s.outColorR" % node), ("%s.%s" % (
+                shader, switcher[slot])), force=True)
+        else:
+            cmds.connectAttr(("%s.outColor" % node), ("%s.%s" % (
+                shader, switcher[slot])), force=True)
 
 
 def utilityCreateMaterial(name, type, slots={}, path=""):
     switcher = {
         None: "lambert",
         "lambert": "lambert",
-        "phong": "phong",
-        "pbr": "StingrayPBS"
+        "pbr": "standardSurface"
     }
 
-    # For now until we work out an importer for 'standard' materials.
-    if sceneSettings["createStandardMaterials"]:
+    modes = {
+        "lambert": True,
+        "standardSurface": False,
+    }
+
+    # If the user wants a minimal material, force them to use lambert.
+    if sceneSettings["createMinMaterials"]:
         switcher["pbr"] = "lambert"
-
-    loader = {
-        "lambert": utilityAssignGenericSlots,
-        "phong": utilityAssignGenericSlots,
-        "StingrayPBS": utilityAssignStingrayPBSSlots
-    }
 
     if not type in switcher:
         type = None
@@ -698,7 +733,8 @@ def utilityCreateMaterial(name, type, slots={}, path=""):
     materialInstance = cmds.shadingNode(
         mayaShaderType, asShader=True, name=name)
 
-    loader[mayaShaderType](materialInstance, slots, path)
+    utilityAssignMaterialSlots(
+        materialInstance, slots, modes[mayaShaderType], path)
 
     return materialInstance
 
