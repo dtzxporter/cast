@@ -76,7 +76,7 @@ def utilityAssignMaterialSlots(material, slots, path):
     else:
         # Set reasonable defaults for specular/gloss workflow.
         shader.inputs["Metallic"].default_value = 0.0
-        shader.inputs["IOR"].default_value = 4.0
+        shader.inputs["IOR"].default_value = 1.5
 
         switcher = {
             "albedo": "Base Color",
