@@ -1145,7 +1145,7 @@ def importInstanceNodes(self, nodes, context, path):
         instanceName = os.path.splitext(os.path.basename(instancePath))[0]
 
         try:
-            bpy.ops.import_scene.cast(filepath=instancePath)
+            importCast(self, context, instancePath)
         except:
             self.report(
                 {'WARNING'}, "Instance: %s failed to import or not found, skipping..." % instancePath)
