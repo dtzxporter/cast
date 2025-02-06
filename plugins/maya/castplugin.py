@@ -37,7 +37,40 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.73"
+version = "1.74"
+
+# Time unit to framerate map
+framerateMap = {
+    OpenMaya.MTime.k2FPS: 2,
+    OpenMaya.MTime.k3FPS: 3,
+    OpenMaya.MTime.k4FPS: 4,
+    OpenMaya.MTime.k5FPS: 5,
+    OpenMaya.MTime.k6FPS: 6,
+    OpenMaya.MTime.k8FPS: 8,
+    OpenMaya.MTime.k10FPS: 10,
+    OpenMaya.MTime.k12FPS: 12,
+    OpenMaya.MTime.kGames: 15,
+    OpenMaya.MTime.k16FPS: 16,
+    OpenMaya.MTime.k20FPS: 20,
+    OpenMaya.MTime.kFilm: 24,
+    OpenMaya.MTime.kPALFrame: 25,
+    OpenMaya.MTime.kNTSCFrame: 30,
+    OpenMaya.MTime.k40FPS: 40,
+    OpenMaya.MTime.kShowScan: 48,
+    OpenMaya.MTime.kPALField: 50,
+    OpenMaya.MTime.kNTSCField: 60,
+    OpenMaya.MTime.k75FPS: 75,
+    OpenMaya.MTime.k80FPS: 80,
+    OpenMaya.MTime.k100FPS: 100,
+    OpenMaya.MTime.k120FPS: 120,
+    OpenMaya.MTime.k125FPS: 125,
+    OpenMaya.MTime.k150FPS: 150,
+    OpenMaya.MTime.k200FPS: 200,
+    OpenMaya.MTime.k240FPS: 240,
+    OpenMaya.MTime.k250FPS: 250,
+    OpenMaya.MTime.k300FPS: 300,
+    OpenMaya.MTime.k375FPS: 375,
+}
 
 
 def utilityAbout():
@@ -222,6 +255,26 @@ def utilityEditNotetracks():
                     ])
 
     cmds.showWindow(window)
+
+
+def utilityFramerateToUnit(framerate):
+    framerates = list(framerateMap.items())
+    (unit, unitFramerate) = min(framerates,
+                                key=lambda x: abs(x[1] - framerate))
+
+    if unitFramerate != framerate:
+        cmds.warning(
+            "Using closest matching framerate units %f (wanted) %f (chosen)" % (framerate, unitFramerate))
+
+    return unit
+
+
+def utilityUnitToFramerate(unit):
+    if unit in framerateMap:
+        return framerateMap[unit]
+    else:
+        cmds.warning("Time unit wasn't in framerate map, defaulting to 30fps")
+        return framerateMap[OpenMaya.MTime.kNTSCFrame]
 
 
 def utilityRemoveNamespaces():
@@ -1828,21 +1881,11 @@ def importAnimationNode(node, path):
 
     sceneAnimationController.setPlaybackMode(switcherLoop[node.Looping()])
 
-    switcherFps = {
-        None: OpenMaya.MTime.kFilm,
-        2: OpenMaya.MTime.k2FPS,
-        3: OpenMaya.MTime.k3FPS,
-        24: OpenMaya.MTime.kFilm,
-        30: OpenMaya.MTime.kNTSCFrame,
-        60: OpenMaya.MTime.kNTSCField,
-        100: OpenMaya.MTime.k100FPS,
-        120: OpenMaya.MTime.k120FPS,
-    }
+    # Pick the closest supported framerate.
+    wantedFps = utilityFramerateToUnit(node.Framerate())
 
-    if int(node.Framerate()) in switcherFps:
-        wantedFps = switcherFps[int(node.Framerate())]
-    else:
-        wantedFps = switcherFps[None]
+    # Configure the scene framerate.
+    OpenMaya.MTime.setUIUnit(wantedFps)
 
     # If the user toggles this setting, we need to shift incoming frames
     # by the current time
@@ -2034,7 +2077,7 @@ def importCast(path):
 
 def exportAnimation(root, objects):
     animation = root.CreateAnimation()
-    animation.SetFramerate(cmds.playbackOptions(query=True, fps=True))
+    animation.SetFramerate(utilityUnitToFramerate(OpenMaya.MTime.uiUnit()))
     animation.SetLooping(cmds.playbackOptions(
         query=True, loop=True) == "continuous")
 
