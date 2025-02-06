@@ -1015,7 +1015,8 @@ def importAnimationNode(self, node, path, selectedObject):
     selectedObject.animation_data.action.use_fake_user = True
 
     scene = bpy.context.scene
-    scene.render.fps = int(node.Framerate())
+    scene.render.fps = round(node.Framerate())
+    scene.render.fps_base = scene.render.fps / node.Framerate()
 
     # We need to determine the proper time to import the curves, for example
     # the user may want to import at the current scene time, and that would require

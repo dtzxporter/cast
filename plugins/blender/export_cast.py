@@ -346,7 +346,11 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
 def exportAction(self, context, root, objects, action):
     animation = root.CreateAnimation()
     animation.SetName(action.name)
-    animation.SetFramerate(30.0)
+
+    scene = bpy.context.scene
+    sceneFps = scene.render.fps / scene.render.fps_base
+
+    animation.SetFramerate(sceneFps)
     animation.SetLooping(self.is_looped)
 
     curves = {}
@@ -416,6 +420,7 @@ def exportAction(self, context, root, objects, action):
                 keyvalues = []
 
                 for keyframe in keyframes:
+                    context.scene.frame_set(keyframe)
                     quat = utilityGetQuatKeyValue(target)
                     keyvalues.append((quat.x, quat.y, quat.z, quat.w))
 
