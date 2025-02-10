@@ -32,12 +32,13 @@ sceneSettings = {
     "exportAnim": True,
     "exportModel": True,
     "exportAxis": True,
+    "bakeKeyframes": False,
     "createMinMaterials": False,
     "createFullMaterials": True,
 }
 
 # Shared version number
-version = "1.74"
+version = "1.75"
 
 # Time unit to framerate map
 framerateMap = {
@@ -475,6 +476,11 @@ def utilityCreateMenu():
 
     cmds.menuItem("exportAnim", label="Export Animations", annotation="Include animations when exporting",
                   checkBox=utilityQueryToggleItem("exportAnim"), command=lambda x: utilitySetToggleItem("exportAnim"))
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("bakeKeyframes", label="Bake Keyframes", annotation="Bake a keyframe for all frames of an animation",
+                  checkBox=utilityQueryToggleItem("bakeKeyframes"), command=lambda x: utilitySetToggleItem("bakeKeyframes"))
 
     cmds.menuItem(divider=True)
 
@@ -2113,6 +2119,17 @@ def exportAnimation(root, objects):
 
     # For each object, we want to query animatable properties, and which keyframes appear where.
     for object in objects:
+        # Check if we're baking every keyframe.
+        if sceneSettings["bakeKeyframes"]:
+            keyframes = list(xrange(startFrame, endFrame + 1))
+
+            for property in simpleProperties:
+                exportable.append(
+                    [object, property[0], property[1], keyframes])
+
+            exportable.append([object, "rotate", "rq", keyframes])
+            continue
+
         # Check simple properties
         for property in simpleProperties:
             keyframes = cmds.keyframe(

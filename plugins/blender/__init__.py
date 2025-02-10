@@ -11,7 +11,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 7, 4),
+    "version": (1, 7, 5),
     "blender": (3, 6, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
