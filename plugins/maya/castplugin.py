@@ -38,7 +38,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.75"
+version = "1.76"
 
 # Time unit to framerate map
 framerateMap = {
@@ -428,17 +428,6 @@ def utilityCreateProgress(status="", maximum=0):
     cmds.progressBar(instance, edit=True, beginProgress=True,
                      isInterruptable=False, status=status, maxValue=max(1, maximum))
     return instance
-
-
-def utilitySetVisibility(object, visible):
-    dag = OpenMaya.MFnDagNode(object)
-    while not cmds.attributeQuery("visibility", node=dag.fullPathName(), exists=True):
-        try:
-            parent = dag.parent(0)
-            dag = OpenMaya.MFnDagNode(parent)
-        except RuntimeError:
-            return
-    cmds.setAttr("%s.visibility" % dag.fullPathName(), visible)
 
 
 def utilityStepProgress(instance, status=""):
@@ -1689,26 +1678,20 @@ def importModelNode(model, path):
         for blendShapes in blendShapesByBaseShape.values():
             baseShape = meshHandles[blendShapes[0].BaseShape().Hash()]
             baseShapeDagNode = OpenMaya.MFnDagNode(baseShape)
-            baseShapeTransform = OpenMaya.MFnDagNode(
-                baseShapeDagNode.parent(0))
-
-            # Create the target shapes.
-            targetShapes = [cmds.duplicate(
-                baseShapeDagNode.fullPathName(), ic=True) for _ in blendShapes]
 
             # Create the deformer on the abse shape.
             blendDeformer = OpenMayaAnim.MFnBlendShapeDeformer()
             blendDeformer.create(baseShape)
 
             # Create the targets in the deformer and set the new vertex data.
-            for i, (targetShape, blendShape) in enumerate(zip(targetShapes, blendShapes)):
-                # Place the new shape key under the base shape so that the key name will be unique to that mesh.
-                cmds.parent(targetShape[0], baseShapeTransform.fullPathName())
-                newShape = cmds.rename(targetShape[0], blendShape.Name())
+            for i, blendShape in enumerate(blendShapes):
+                # Clone the base shape to add as a target.
+                tempShape = cmds.duplicate(
+                    baseShapeDagNode.fullPathName(), ic=True)
 
                 # Get the actual mesh name.
                 newShapeShapes = cmds.listRelatives(
-                    newShape, shapes=True, fullPath=True)
+                    tempShape, shapes=True, fullPath=True)
 
                 # Grab a handle to the new shape, which will be our target mesh.
                 selectList = OpenMaya.MSelectionList()
@@ -1718,7 +1701,6 @@ def importModelNode(model, path):
                 targetShape = OpenMaya.MObject()
                 selectList.getDependNode(0, targetShape)
                 targetMesh = OpenMaya.MFnMesh(targetShape)
-                targetParent = OpenMaya.MFnDagNode(targetShape).parent(0)
 
                 # Rename the actual mesh to the key name.
                 cmds.rename(newShapeShapes[0], blendShape.Name())
@@ -1730,7 +1712,7 @@ def importModelNode(model, path):
                 if not indices or not positions:
                     cmds.warning(
                         "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShapeDagNode.name()))
-                    utilitySetVisibility(targetParent, False)
+                    cmds.delete(tempShape)
                     utilityStepProgress(progress, "Importing shapes...")
                     continue
 
@@ -1747,7 +1729,9 @@ def importModelNode(model, path):
                 blendDeformer.addTarget(baseShape, i, targetShape,
                                         max(0.0, blendShape.TargetWeightScale() or 1.0))
 
-                utilitySetVisibility(targetParent, False)
+                # Delete the cloned shape now that the target was added.
+                cmds.delete(tempShape)
+
                 utilityStepProgress(progress, "Importing shapes...")
         utilityEndProgress(progress)
 
