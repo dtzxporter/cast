@@ -1094,6 +1094,33 @@ class Constraint(CastNode):
         else:
             self.CreateProperty("mo", "b").values = [0]
 
+    def CustomOffset(self):
+        """A custom offset for the constraint."""
+        co = self.properties.get("co")
+        if co is not None:
+            return co.values
+        return None
+
+    def SetCustomOffset(self, offset):
+        """Sets a custom offset for the constraint."""
+        length = len(offset)
+
+        if length == 3:
+            self.CreateProperty("co", "3v").values = list(offset)
+        elif length == 4:
+            self.CreateProperty("co", "4v").values = list(offset)
+
+    def Weight(self):
+        """Gets the weight of influence this constraint has."""
+        wt = self.properties.get("wt")
+        if wt is not None:
+            return wt.values[0]
+        return 1.0
+
+    def SetWeight(self, weight):
+        """Sets the weight of influence this constraint has."""
+        self.CreateProperty("wt", "f").values = [weight]
+
     def SkipX(self):
         """Whether or not to skip the x axis when constraining."""
         sx = self.properties.get("sx")

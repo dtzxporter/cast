@@ -584,6 +584,18 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
  	</tr>
 	<tr>
+  		<td>Custom Offset (co)</td>
+   		<td>Vector3, Vector 4 (v3, v4)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Weight (wt)</td>
+   		<td>Float (f)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
   		<td>Skip X (sx)</td>
    		<td>Byte (b) [True, False]</td>
 		<td>False</td>
@@ -609,6 +621,10 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   - `or` Orient Constraint, which applies to rotations.
   - `sc` Scale Constraint, which applies to scales.
 - Maintain offset should default to `False` when not specified.
+- Custom offset should match the following for the constraint types:
+  - `pt`: Vector 3, default: `[0.0, 0.0, 0.0]`.
+  - `or`: Vector 4, default: `[0.0, 0.0, 0.0, 1.0]`.
+  - `sc`: Vector 3, default: `[1.0, 1.0, 1.0]`.
 - Skip X, Skip Y, and Skip Z should default to `False` when not specified and refer to ignoring that axis in the constraint.
 
 ### Material:

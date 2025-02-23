@@ -1156,6 +1156,8 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
         constraintBone = paths[indexes[constraint.ConstraintBone().Hash()]]
 
         type = constraint.ConstraintType()
+        customOffset = constraint.CustomOffset()
+
         skip = []
 
         if constraint.SkipX():
@@ -1166,14 +1168,43 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
             skip.append("z")
 
         if type == "pt":
+            if customOffset:
+                offset = [customOffset[0], customOffset[1], customOffset[2]]
+            else:
+                offset = [0.0, 0.0, 0.0]
+
             cmds.pointConstraint(targetBone, constraintBone,
-                                 name=constraint.Name() or "CastPointConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
+                                 name=constraint.Name() or "CastPointConstraint",
+                                 maintainOffset=constraint.MaintainOffset(),
+                                 offset=offset,
+                                 weight=constraint.Weight(), skip=skip)
         elif type == "or":
+            if customOffset:
+                rotation = OpenMaya.MQuaternion(
+                    customOffset[0], customOffset[1], customOffset[2], customOffset[3])
+                rotationEuler = rotation.asEulerRotation()
+
+                offset = [rotationEuler.x, rotationEuler.y, rotationEuler.z]
+            else:
+                offset = [0.0, 0.0, 0.0]
+
             cmds.orientConstraint(targetBone, constraintBone,
-                                  name=constraint.Name() or "CastOrientConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
+                                  name=constraint.Name() or "CastOrientConstraint",
+                                  maintainOffset=constraint.MaintainOffset(),
+                                  offset=offset,
+                                  weight=constraint.Weight(), skip=skip)
         elif type == "sc":
+            if customOffset:
+                offset = [customOffset[0], customOffset[1], customOffset[2]]
+            else:
+                offset = [1.0, 1.0, 1.0]
+
             cmds.scaleConstraint(targetBone, constraintBone,
-                                 name=constraint.Name() or "CastScaleConstraint", maintainOffset=constraint.MaintainOffset(), skip=skip)
+                                 name=constraint.Name() or "CastScaleConstraint",
+                                 maintainOffset=constraint.MaintainOffset(),
+                                 offset=offset,
+                                 weight=constraint.Weight(),
+                                 skip=skip)
 
 
 def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):

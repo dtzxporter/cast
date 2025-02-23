@@ -713,6 +713,34 @@ namespace Cast
         }
 
         /// <summary>
+        /// A custom offset for the constraint.
+        /// </summary>
+        /// <typeparam name="T">Either Vector3 or Vector4.</typeparam>
+        /// <returns></returns>
+        public T CustomOffset<T>()
+        {
+            if (Properties.TryGetValue("co", out CastProperty Value))
+            {
+                return (T)Value.Values[0];
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the weight of influence this constraint has.
+        /// </summary>
+        /// <returns></returns>
+        public float Weight()
+        {
+            if (Properties.TryGetValue("wt", out CastProperty Value))
+            {
+                return (float)Value.Values[0];
+            }
+
+            return 1.0;
+        }
+
+        /// <summary>
         /// Whether or not to skip the x axis when constraining.
         /// </summary>
         /// <returns></returns>
@@ -1466,7 +1494,7 @@ namespace Cast
     /// <summary>
     /// A rgba color value node.
     /// </summary>
-    public class Color: CastNode
+    public class Color : CastNode
     {
         public Color()
             : base(0x726C6F63)

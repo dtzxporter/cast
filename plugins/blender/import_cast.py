@@ -219,6 +219,8 @@ def importSkeletonConstraintNode(self, skeleton, poses):
         if constraint.Name() is not None:
             ct.name = constraint.Name()
 
+        ct.influence = constraint.Weight()
+
         ct.use_x = not constraint.SkipX()
         ct.use_y = not constraint.SkipY()
         ct.use_z = not constraint.SkipZ()
@@ -227,7 +229,7 @@ def importSkeletonConstraintNode(self, skeleton, poses):
         ct.subtarget = targetBone.name
 
         # We have to configure this after setting a target because the enum
-        # option isn't available unless orient is supportd by the target itself.
+        # option isn't available unless orient is supported by the target itself.
         if type == "or":
             ct.target_space = 'LOCAL_OWNER_ORIENT'
 
