@@ -1186,6 +1186,7 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
 
     missingBones = []
     remappedBones = {}
+    existingBones = {}
 
     bones = skeleton.Bones()
 
@@ -1196,6 +1197,16 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
 
         # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
         remappedBones[paths[i]] = sceneSkeleton[bone.Name()]
+
+        selectList = OpenMaya.MSelectionList()
+        selectList.add(sceneSkeleton[bone.Name()])
+
+        existingPath = OpenMaya.MDagPath()
+        selectList.getDagPath(0, existingPath)
+
+        # Store remapped connections for later, after bind pose remap.
+        existingBones[i] = (existingPath.fullPathName(),
+                            OpenMayaAnim.MFnIkJoint(existingPath))
 
         if bone.ParentIndex() > -1:
             continue
@@ -1270,6 +1281,11 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
             elif ".worldMatrix" in oldConnection:
                 cmds.connectAttr("%s.bindPose" %
                                  newBone, oldConnection, force=True)
+
+    for i, (path, handle) in existingBones.items():
+        # Ensure existing bones now point to the correct path/handle in the scene.
+        paths[i] = path
+        handles[i] = handle
 
     # Remove the old transform node and set it to the new one.
     selectList = OpenMaya.MSelectionList()
