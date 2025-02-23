@@ -1331,6 +1331,16 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
 
     cmds.delete(oldPath.fullPathName())
 
+    # Trigger a skin update by adjusting the position of the root transform.
+    # This only works if the scene can redraw at least once, before resetting it.
+    original = cmds.getAttr("%s.tx" % newPath.fullPathName())
+
+    cmds.setAttr("%s.tx" % newPath.fullPathName(), original + 1.0)
+    cmds.refresh()
+
+    # Set it back before finishing merge.
+    cmds.setAttr("%s.tx" % newPath.fullPathName(), original)
+
     jointTransform = OpenMaya.MFnTransform(newPath)
 
 
