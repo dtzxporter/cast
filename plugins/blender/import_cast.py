@@ -199,17 +199,41 @@ def importSkeletonConstraintNode(self, skeleton, poses):
         targetBone = poses[constraint.TargetBone().Name()]
 
         type = constraint.ConstraintType()
+        customOffset = constraint.CustomOffset()
+        maintainOffset = constraint.MaintainOffset()
 
         if type == "pt":
+            if customOffset:
+                constraintBone.location = Vector(customOffset)
+
             ct = constraintBone.constraints.new("COPY_LOCATION")
-            ct.use_offset = constraint.MaintainOffset()
+
+            if maintainOffset or customOffset:
+                ct.use_offset = True
+            else:
+                ct.use_offset = False
         elif type == "or":
+            if customOffset:
+                constraintBone.rotation_mode = 'QUATERNION'
+                constraintBone.rotation_quaternion = Quaternion(
+                    (customOffset[3], customOffset[0], customOffset[1], customOffset[2]))
+
             ct = constraintBone.constraints.new("COPY_ROTATION")
-            if constraint.MaintainOffset():
+
+            if maintainOffset or customOffset:
                 ct.mix_mode = 'OFFSET'
+            else:
+                ct.mix_mode = 'REPLACE'
         elif type == "sc":
+            if customOffset:
+                constraintBone.scale = Vector(customOffset)
+
             ct = constraintBone.constraints.new("COPY_SCALE")
-            ct.use_offset = constraint.MaintainOffset()
+
+            if maintainOffset or customOffset:
+                ct.use_offset = True
+            else:
+                ct.use_offset = False
         else:
             continue
 
