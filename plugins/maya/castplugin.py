@@ -561,7 +561,7 @@ def utilityClearAnimation():
         except ValueError:
             pass
     for deformer in cmds.ls(type="blendShape", long=True):
-        for weight in cmds.blendShape(deformer, target=True, query=True):
+        for weight in cmds.listAttr("%s.weight" % deformer, m=True):
             try:
                 cmds.setAttr("%s.%s" % (deformer, weight.split("|")[-1]), 0.0)
             except RuntimeError:
