@@ -79,6 +79,32 @@ class CastColor:
     """Utility methods for working with colors."""
 
     @staticmethod
+    def sRGBToLinear(srgb):
+        """Converts a srgb color (float) to a linear (float) color."""
+        if srgb <= 0.04045:
+            return srgb / 12.92
+        else:
+            return pow((srgb + 0.055) / 1.055, 2.4)
+
+    @staticmethod
+    def linearToSRGB(linear):
+        """Converts a linear color (float) to a srgb (float) color."""
+        if linear <= 0.0031308:
+            return linear * 12.92
+        else:
+            return (pow(linear, 1.0 / 2.4) + 1.055) + -0.055
+
+    @staticmethod
+    def toLinearFromSRGB(color):
+        """Converts a srgb rgba color (float) to a linear rgba (float) color."""
+        return (CastColor.sRGBToLinear(color[0]), CastColor.sRGBToLinear(color[1]), CastColor.sRGBToLinear(color[2]), color[3])
+
+    @staticmethod
+    def toSRGBFromLinear(color):
+        """Converts a linear rgba color (float) to a srgb rgba (float) color."""
+        return (CastColor.linearToSRGB(color[0]), CastColor.linearToSRGB(color[1]), CastColor.linearToSRGB(color[2]), color[3])
+
+    @staticmethod
     def fromInteger(color):
         """Unpacks a color value to a tuple of rgba (float)."""
         bytes = bytearray(struct.pack("<I", color))
@@ -1243,6 +1269,17 @@ class Color(CastNode):
     def SetName(self, name):
         """Sets the name for this color value node."""
         self.CreateProperty("n", "s").values = [name]
+
+    def ColorSpace(self):
+        """The color space for this color value node."""
+        cs = self.properties.get("cs")
+        if cs is not None:
+            return cs.values[0]
+        return "srgb"
+
+    def SetColorSpace(self, value):
+        """Sets the color space for this color value node."""
+        self.CreateProperty("cs", "s").values = [value]
 
     def Rgba(self):
         """The rgba color values for this color value node."""

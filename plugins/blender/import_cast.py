@@ -129,9 +129,15 @@ def utilityAssignMaterialSlots(material, slots, path):
             else:
                 node.label = ("Color: %s" % switcher[slot])
 
-            # Set the color value, even though we can't separate the alpha channel from this node.
-            # It becomes premultiplied alpha no matter what, which is a pain.
-            node.outputs["Color"].default_value = connection.Rgba()
+            # Handle color conversion if necessary, blender color node is linear.
+            if connection.ColorSpace() == "srgb":
+                # Set the color value, converted to linear, see below for more info.
+                node.outputs["Color"].default_value = \
+                    CastColor.toLinearFromSRGB(connection.Rgba())
+            else:
+                # Set the color value, even though we can't separate the alpha channel from this node.
+                # It becomes premultiplied alpha no matter what, which is a pain.
+                node.outputs["Color"].default_value = connection.Rgba()
         else:
             continue
 

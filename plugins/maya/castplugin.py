@@ -38,7 +38,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.76"
+version = "1.77"
 
 # Time unit to framerate map
 framerateMap = {

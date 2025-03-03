@@ -817,12 +817,21 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
  	</tr>
 	<tr>
+  		<td>ColorSpace (cs)</td>
+   		<td>String (s) [srgb, linear]</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
   		<td>Rgba Color (rgba)</td>
    		<td>Vector 4 (v4)</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
 </table>
+
+**Notes**:
+- The `ColorSpace` property should default to `srgb` when not specified.
 
 ### Animation:
 <table>
