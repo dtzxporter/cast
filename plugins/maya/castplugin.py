@@ -715,7 +715,11 @@ def utilityAssignMaterialSlots(shader, slots, basic, path):
             node = cmds.shadingNode("colorConstant", name=(
                 "color_%s" % slot), asUtility=True)
 
-            rgba = connection.Rgba()
+            # Handle color conversion if necessary, maya color node is linear.
+            if connection.ColorSpace() == "srgb":
+                rgba = CastColor.toLinearFromSRGB(connection.Rgba())
+            else:
+                rgba = connection.Rgba()
 
             cmds.setAttr("%s.inColor" % node, rgba[0], rgba[1], rgba[2])
             cmds.setAttr("%s.inAlpha" % node, rgba[3])
