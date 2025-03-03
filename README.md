@@ -817,7 +817,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
  	</tr>
 	<tr>
-  		<td>ColorSpace (cs)</td>
+  		<td>Color Space (cs)</td>
    		<td>String (s) [srgb, linear]</td>
 		<td>False</td>
 		<td>False</td>
@@ -831,7 +831,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 </table>
 
 **Notes**:
-- The `ColorSpace` property should default to `srgb` when not specified.
+- The `Color Space` property should default to `srgb` when not specified.
 
 ### Animation:
 <table>
