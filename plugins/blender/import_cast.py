@@ -169,6 +169,22 @@ def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
                                                                               (bone.name, curve[0]), index=curve[1], action_group=bone.name)
 
 
+def utilityGetOrCreateSlot(action):
+    slot = None
+
+    for existingSlot in action.slots:
+        if existingSlot.target_id_type == "OBJECT" and existingSlot.name_display == "cast":
+            slot = existingSlot
+            break
+
+    if slot is None:
+        slot = action.slots.new(id_type="OBJECT", name="cast")
+
+    action.slots.active = slot
+
+    return slot
+
+
 def utilityResolveCurveModeOverride(bone, mode, overrides, isTranslate=False, isRotate=False, isScale=False):
     if not overrides:
         return mode
@@ -836,6 +852,10 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
         mesh.animation_data.action = action
         mesh.animation_data.action.use_fake_user = True
 
+        if utilityIsVersionAtLeast(4, 4):
+            mesh.animation_data.action_slot = \
+                utilityGetOrCreateSlot(action)
+
         curve = action.fcurves.find(data_path="shape_keys.key_blocks[\"%s\"].value" %
                                     nodeName, index=0) or action.fcurves.new(data_path="shape_keys.key_blocks[\"%s\"].value" %
                                                                              nodeName, index=0, action_group=nodeName)
@@ -1045,6 +1065,10 @@ def importAnimationNode(self, node, path, selectedObject):
 
     selectedObject.animation_data.action = action
     selectedObject.animation_data.action.use_fake_user = True
+
+    if utilityIsVersionAtLeast(4, 4):
+        selectedObject.animation_data.action_slot = \
+            utilityGetOrCreateSlot(action)
 
     scene = bpy.context.scene
     scene.render.fps = round(node.Framerate())

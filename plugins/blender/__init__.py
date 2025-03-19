@@ -11,7 +11,7 @@ from bpy.utils import unregister_class
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 7, 7),
+    "version": (1, 7, 8),
     "blender": (3, 6, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -55,7 +55,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
         name="Import At Scene Time", description="Import animations starting at the current scene time", default=False)
 
     import_reset: BoolProperty(
-        name="Import Resets Scene", description="Importing animations clears all existing animations in the scene", default=False)
+        name="Import Resets Scene", description="Imported animations will create new actions instead of blending", default=True)
 
     import_skin: BoolProperty(
         name="Import Bind Skin", description="Imports and binds a model to it's smooth skin", default=True)
