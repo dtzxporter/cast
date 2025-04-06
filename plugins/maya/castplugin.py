@@ -29,12 +29,16 @@ sceneSettings = {
     "importBlendShapes": True,
     "importMerge": False,
     "importAxis": True,
+    "importHair": True,
     "exportAnim": True,
     "exportModel": True,
     "exportAxis": True,
     "bakeKeyframes": False,
     "createMinMaterials": False,
     "createFullMaterials": True,
+    "createCurveHairs": True,
+    "createMeshHairs": False,
+    "setupArnoldHair": True,
 }
 
 # Shared version number
@@ -453,7 +457,7 @@ def utilityCreateMenu():
     cmds.setParent(mel.eval("$tmp = $gMainWindow"))
     menu = cmds.menu("CastMenu", label="Cast", tearOff=True)
 
-    animMenu = cmds.menuItem(label="Animation", subMenu=True)
+    cmds.menuItem(label="Animation", subMenu=True)
 
     cmds.menuItem("importAtTime", label="Import At Scene Time", annotation="Import animations starting at the current scene time",
                   checkBox=utilityQueryToggleItem("importAtTime"), command=lambda x: utilitySetToggleItem("importAtTime"))
@@ -476,7 +480,6 @@ def utilityCreateMenu():
     cmds.menuItem("editNotetracks", label="Edit Notifications",
                   annotation="Edit the animations notifications", command=lambda x: utilityEditNotetracks())
 
-    cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
 
     cmds.menuItem(label="Model", subMenu=True)
@@ -493,6 +496,9 @@ def utilityCreateMenu():
     cmds.menuItem("importBlendShapes", label="Import Blend Shapes", annotation="Imports and configures blend shapes for a model",
                   checkBox=utilityQueryToggleItem("importBlendShapes"), command=lambda x: utilitySetToggleItem("importBlendShapes"))
 
+    cmds.menuItem("importHair", label="Import Hair", annotation="Imports hair definitions for models",
+                  checkBox=utilityQueryToggleItem("importHair"), command=lambda x: utilitySetToggleItem("importHair"))
+
     cmds.menuItem("importMerge", label="Import Merge", annotation="Imports and merges models together with a skeleton in the scene",
                   checkBox=utilityQueryToggleItem("importMerge"), command=lambda x: utilitySetToggleItem("importMerge"))
 
@@ -501,10 +507,11 @@ def utilityCreateMenu():
     cmds.menuItem("exportModel", label="Export Models", annotation="Include models when exporting",
                   checkBox=utilityQueryToggleItem("exportModel"), command=lambda x: utilitySetToggleItem("exportModel"))
 
-    cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
 
     cmds.menuItem(label="Material", subMenu=True)
+
+    cmds.radioMenuItemCollection()
 
     cmds.menuItem("createMinMaterials", label="Create Basic Materials", annotation="Creates basic materials with minimal configuration",
                   radioButton=utilityQueryToggleItem("createMinMaterials"), command=lambda x: utilitySetRadioItem(["createMinMaterials", "createFullMaterials"]))
@@ -512,7 +519,23 @@ def utilityCreateMenu():
     cmds.menuItem("createFullMaterials", label="Create Standard Materials", annotation="Creates standard materials with full configuration",
                   radioButton=utilityQueryToggleItem("createFullMaterials"), command=lambda x: utilitySetRadioItem(["createFullMaterials", "createMinMaterials"]))
 
-    cmds.setParent(animMenu, menu=True)
+    cmds.setParent(menu, menu=True)
+
+    cmds.menuItem(label="Hair", subMenu=True)
+
+    cmds.radioMenuItemCollection()
+
+    cmds.menuItem("createCurveHairs", label="Create Curve Hairs", annotation="Creates hairs as curves",
+                  radioButton=utilityQueryToggleItem("createCurveHairs"), command=lambda x: utilitySetRadioItem(["createCurveHairs", "createMeshHairs"]))
+
+    cmds.menuItem("createMeshHairs", label="Create Mesh Hairs", annotation="Creates hairs as simple meshes",
+                  radioButton=utilityQueryToggleItem("createMeshHairs"), command=lambda x: utilitySetRadioItem(["createMeshHairs", "createCurveHairs"]))
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("setupArnoldHair", label="Setup Arnold Hair", annotation="Configures Arnold rendering for each hair curve",
+                  checkBox=utilityQueryToggleItem("setupArnoldHair"), command=lambda x: utilitySetToggleItem("setupArnoldHair"))
+
     cmds.setParent(menu, menu=True)
 
     cmds.menuItem(label="Scene", subMenu=True)
@@ -525,7 +548,6 @@ def utilityCreateMenu():
     cmds.menuItem("exportAxis", label="Export Up Axis", annotation="Include up axis information when exporting",
                   checkBox=utilityQueryToggleItem("exportAxis"), command=lambda x: utilitySetToggleItem("exportAxis"))
 
-    cmds.setParent(animMenu, menu=True)
     cmds.setParent(menu, menu=True)
 
     cmds.menuItem(divider=True)
@@ -1657,7 +1679,7 @@ def importModelNode(model, path):
         faceIndexBuffer = OpenMaya.MIntArray(
             scriptUtil.asIntPtr(), len(faces))
 
-        # Set a material, or default
+        # Set a material, or default.
         meshMaterial = mesh.Material()
         try:
             if meshMaterial is not None:
@@ -1738,6 +1760,68 @@ def importModelNode(model, path):
         utilityStepProgress(
             progress, "Importing mesh [%d] of [%d]..." % (m + 1, len(meshes)))
     utilityEndProgress(progress)
+
+    # Import the hairs if necessary.
+    if sceneSettings["importHair"]:
+        hairs = model.Hairs()
+
+        for h, hair in enumerate(hairs):
+            segmentsBuffer = hair.SegmentsBuffer()
+            particleBuffer = hair.ParticleBuffer()
+            particleOffset = 0
+
+            strandCount = hair.StrandCount()
+
+            hairTransform = OpenMaya.MFnTransform()
+            hairTransformNode = hairTransform.create(meshNode)
+            hairTransform.setName(hair.Name() or "CastHair")
+
+            status = "Importing hair [%d] of [%d]..." % (h + 1, len(hairs))
+            progress = utilityCreateProgress(status, strandCount)
+
+            for s in xrange(strandCount):
+                segment = segmentsBuffer[s]
+                points = OpenMaya.MPointArray(segment + 1)
+
+                for pt in xrange(segment + 1):
+                    points.set(pt, particleBuffer[particleOffset * 3],
+                               particleBuffer[particleOffset * 3 + 1],
+                               particleBuffer[particleOffset * 3 + 2], 1.0)
+                    particleOffset += 1
+
+                curveTransform = OpenMaya.MFnTransform()
+                curveTransformNode = curveTransform.create(hairTransformNode)
+                curveTransform.setName("CastStrand")
+
+                curve = OpenMaya.MFnNurbsCurve()
+                curve.createWithEditPoints(
+                    # Always use the default degree 3 curve unless we don't have enough points.
+                    points, 3 if segment >= 3 else 1, OpenMaya.MFnNurbsCurve.kOpen, False, False, False, curveTransformNode)
+
+                path = curveTransform.fullPathName()
+
+                # Maya becomes unusable if the curves are allowed to be viewed in the outliner.
+                # This will hide them and only show the hair transform, with no children.
+                cmds.setAttr("%s.hiddenInOutliner" % path, True)
+
+                # Setup Arnold rendering for curves, this is a light weight system
+                # That can be used to produce good results without nHair.
+                if sceneSettings["setupArnoldHair"] and cmds.objExists("%s.aiRenderCurve" % path):
+                    cmds.setAttr("%s.aiRenderCurve" % path, True)
+                    cmds.setAttr("%s.aiMode" % path, 1)
+
+                    # Set a material, or default.
+                    try:
+                        hairMaterial = hair.Material()
+
+                        if hairMaterial is not None:
+                            cmds.connectAttr("%s.outColor" % materials[hairMaterial.Name()],
+                                             "%s.aiCurveShader" % path, force=True)
+                    except RuntimeError:
+                        pass
+
+                utilityStepProgress(progress, status)
+            utilityEndProgress(progress)
 
     # Import blend shape controllers if necessary.
     if sceneSettings["importBlendShapes"]:

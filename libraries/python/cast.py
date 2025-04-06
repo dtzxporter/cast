@@ -307,6 +307,14 @@ class Model(CastNode):
         """Creates a new mesh in this model."""
         return self.CreateChild(Mesh())
 
+    def Hairs(self):
+        """A collection of hairs for this model."""
+        return self.ChildrenOfType(Hair)
+
+    def CreateHair(self):
+        """Creates a new hair in this model."""
+        return self.CreateChild(Hair())
+
     def Materials(self):
         """A colection of materials for this model."""
         return self.ChildrenOfType(Material)
@@ -767,6 +775,64 @@ class Mesh(CastNode):
 
     def SetMaterial(self, hash):
         """Sets the material hash for this mesh."""
+        self.CreateProperty("m", "l").values = [hash]
+
+
+class Hair(CastNode):
+    """A 3d hair definition for a model."""
+
+    def __init__(self):
+        super(Hair, self).__init__(0x72696168)
+
+    def Name(self):
+        """The name of this hair."""
+        n = self.properties.get("n")
+        if n is not None:
+            return n.values[0]
+        return None
+
+    def SetName(self, name):
+        """Sets the name of this hair."""
+        self.CreateProperty("n", "s").values = [name]
+
+    def StrandCount(self):
+        """Gets the number of strands in this hair."""
+        se = self.properties.get("se")
+        if se is not None:
+            return len(se.values)
+
+    def SegmentsBuffer(self):
+        """The number of segments for each strand in this hair."""
+        se = self.properties.get("se")
+        if se is not None:
+            return se.values
+        return None
+
+    def SetSegmentBuffer(self, values):
+        """Sets the number of segments for each strand in this hair."""
+        self.CreateProperty("se", castTypeForMaximum(
+            values)).values = list(values)
+
+    def ParticleBuffer(self):
+        """The collection of particles for this hair."""
+        pt = self.properties.get("pt")
+        if pt is not None:
+            return pt.values
+        return None
+
+    def SetParticleBuffer(self, values):
+        """Sets the collection of particles for this hair."""
+        self.CreateProperty("pt", "3v").values = list(sum(values, ()))
+
+    def Material(self):
+        """Gets the material used for this hair."""
+        m = self.properties.get("m")
+        if m is not None:
+            return self.parentNode.ChildByHash(m.values[0])
+        return None
+
+    def SetMaterial(self, hash):
+        """Sets the material hash for this hair."""
         self.CreateProperty("m", "l").values = [hash]
 
 
@@ -1423,6 +1489,7 @@ typeSwitcher = {
     0x746F6F72: Root,
     0x6C646F6D: Model,
     0x6873656D: Mesh,
+    0x72696168: Hair,
     0x68736C62: BlendShape,
     0x6C656B73: Skeleton,
     0x6D696E61: Animation,
