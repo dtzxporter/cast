@@ -1622,11 +1622,11 @@ def importModelNode(model, path):
 
         vertexPositions = mesh.VertexPositionBuffer()
         scriptUtil = OpenMaya.MScriptUtil()
-        scriptUtil.createFromList([x for y in (vertexPositions[i:i + 3] + tuple([1.0]) * (i < len(
-            vertexPositions) - 2) for i in xrange(0, len(vertexPositions), 3)) for x in y], vertexCount)
+        scriptUtil.createFromList([x for y in (vertexPositions[i:i + 3] + tuple([1.0]) *
+                                               (i < len(vertexPositions) - 2) for i in xrange(0, len(vertexPositions), 3)) for x in y], vertexCount)
 
-        vertexPositionBuffer = OpenMaya.MFloatPointArray(
-            scriptUtil.asFloat4Ptr(), vertexCount)
+        vertexPositionBuffer = \
+            OpenMaya.MFloatPointArray(scriptUtil.asFloat4Ptr(), vertexCount)
 
         newMesh = OpenMaya.MFnMesh()
         # Store the mesh for reference in other nodes later
@@ -1779,48 +1779,131 @@ def importModelNode(model, path):
             status = "Importing hair [%d] of [%d]..." % (h + 1, len(hairs))
             progress = utilityCreateProgress(status, strandCount)
 
-            for s in xrange(strandCount):
-                segment = segmentsBuffer[s]
-                points = OpenMaya.MPointArray(segment + 1)
+            # Curve hair is the best option for accuracy
+            # Mesh hair can be used as a light weight fallback method.
+            if sceneSettings["createCurveHairs"]:
+                for s in xrange(strandCount):
+                    segment = segmentsBuffer[s]
+                    points = OpenMaya.MPointArray(segment + 1)
 
-                for pt in xrange(segment + 1):
-                    points.set(pt, particleBuffer[particleOffset * 3],
-                               particleBuffer[particleOffset * 3 + 1],
-                               particleBuffer[particleOffset * 3 + 2], 1.0)
-                    particleOffset += 1
+                    for pt in xrange(segment + 1):
+                        points.set(pt, particleBuffer[particleOffset * 3],
+                                   particleBuffer[particleOffset * 3 + 1],
+                                   particleBuffer[particleOffset * 3 + 2], 1.0)
+                        particleOffset += 1
 
-                curveTransform = OpenMaya.MFnTransform()
-                curveTransformNode = curveTransform.create(hairTransformNode)
-                curveTransform.setName("CastStrand")
+                    curveTransform = OpenMaya.MFnTransform()
+                    curveTransformNode = \
+                        curveTransform.create(hairTransformNode)
+                    curveTransform.setName("CastStrand")
 
-                curve = OpenMaya.MFnNurbsCurve()
-                curve.createWithEditPoints(
-                    # Always use the default degree 3 curve unless we don't have enough points.
-                    points, 3 if segment >= 3 else 1, OpenMaya.MFnNurbsCurve.kOpen, False, False, False, curveTransformNode)
+                    curve = OpenMaya.MFnNurbsCurve()
+                    curve.createWithEditPoints(
+                        # Always use the default degree 3 curve unless we don't have enough points.
+                        points, 3 if segment >= 3 else 1, OpenMaya.MFnNurbsCurve.kOpen, False, False, False, curveTransformNode)
 
-                path = curveTransform.fullPathName()
+                    path = curveTransform.fullPathName()
 
-                # Maya becomes unusable if the curves are allowed to be viewed in the outliner.
-                # This will hide them and only show the hair transform, with no children.
-                cmds.setAttr("%s.hiddenInOutliner" % path, True)
+                    # Maya becomes unusable if the curves are allowed to be viewed in the outliner.
+                    # This will hide them and only show the hair transform, with no children.
+                    cmds.setAttr("%s.hiddenInOutliner" % path, True)
 
-                # Setup Arnold rendering for curves, this is a light weight system
-                # That can be used to produce good results without nHair.
-                if sceneSettings["setupArnoldHair"] and cmds.objExists("%s.aiRenderCurve" % path):
-                    cmds.setAttr("%s.aiRenderCurve" % path, True)
-                    cmds.setAttr("%s.aiMode" % path, 1)
+                    # Setup Arnold rendering for curves, this is a light weight system
+                    # That can be used to produce good results without nHair.
+                    if sceneSettings["setupArnoldHair"] and cmds.objExists("%s.aiRenderCurve" % path):
+                        cmds.setAttr("%s.aiRenderCurve" % path, True)
+                        cmds.setAttr("%s.aiMode" % path, 1)
 
-                    # Set a material, or default.
-                    try:
+                        # Set a material, or default.
                         hairMaterial = hair.Material()
+                        try:
+                            if hairMaterial is not None:
+                                cmds.connectAttr("%s.outColor" % materials[hairMaterial.Name()],
+                                                 "%s.aiCurveShader" % path, force=True)
+                        except RuntimeError:
+                            pass
 
-                        if hairMaterial is not None:
-                            cmds.connectAttr("%s.outColor" % materials[hairMaterial.Name()],
-                                             "%s.aiCurveShader" % path, force=True)
-                    except RuntimeError:
-                        pass
+                    utilityStepProgress(progress, status)
+            elif sceneSettings["createMeshHairs"]:
+                vertexBuffer = OpenMaya.MFloatPointArray()
+                normalBuffer = OpenMaya.MVectorArray()
+                normalIndices = OpenMaya.MIntArray()
+                faceBuffer = OpenMaya.MIntArray()
 
-                utilityStepProgress(progress, status)
+                def createNormal(v1, v2, v3):
+                    return ((v3 - v1) ^ (v2 - v1).normal()).normal()
+
+                def createVertex(position, normal):
+                    index = vertexBuffer.length()
+
+                    vertexBuffer.append(position)
+
+                    normalBuffer.append(OpenMaya.MVector(normal))
+                    normalIndices.append(index)
+                    return index
+
+                particleExtrusion = OpenMaya.MFloatVector(0.0, 0.0, 0.010)
+                particleOffset = 0
+
+                for s in xrange(strandCount):
+                    segment = segmentsBuffer[s]
+
+                    for i in xrange(segment):
+                        a = OpenMaya.MFloatPoint(particleBuffer[particleOffset * 3],
+                                                 particleBuffer[particleOffset * 3 + 1],
+                                                 particleBuffer[particleOffset * 3 + 2], 1.0)
+                        particleOffset += 1
+                        b = OpenMaya.MFloatPoint(particleBuffer[particleOffset * 3],
+                                                 particleBuffer[particleOffset * 3 + 1],
+                                                 particleBuffer[particleOffset * 3 + 2], 1.0)
+
+                        aUp = a + particleExtrusion
+                        bUp = b + particleExtrusion
+
+                        normal1 = createNormal(a, b, aUp)
+                        normal2 = createNormal(a, b, bUp)
+
+                        a1 = createVertex(a, normal1)
+                        b1 = createVertex(b, normal1)
+                        aUp1 = createVertex(aUp, normal1)
+
+                        a2 = createVertex(a, normal2)
+                        b2 = createVertex(b, normal2)
+                        bUp2 = createVertex(bUp, normal2)
+
+                        faceBuffer.append(a1)
+                        faceBuffer.append(b1)
+                        faceBuffer.append(aUp1)
+
+                        faceBuffer.append(a2)
+                        faceBuffer.append(b2)
+                        faceBuffer.append(bUp2)
+
+                    particleOffset += 1
+                    utilityStepProgress(progress, status)
+
+                vertexCount = int(vertexBuffer.length())
+                faceCount = int(faceBuffer.length() / 3)
+                faceCountBuffer = OpenMaya.MIntArray(faceCount, 3)
+
+                newMesh = OpenMaya.MFnMesh()
+                newMesh.create(vertexCount, faceCount,
+                               vertexBuffer, faceCountBuffer, faceBuffer, hairTransformNode)
+
+                newMesh.setVertexNormals(normalBuffer, normalIndices)
+
+                # Set a material, or default.
+                hairMaterial = hair.Material()
+                try:
+                    if hairMaterial is not None:
+                        cmds.sets(newMesh.fullPathName(), forceElement=(
+                            "%sSG" % materials[hairMaterial.Name()]))
+                    else:
+                        cmds.sets(newMesh.fullPathName(),
+                                  forceElement="initialShadingGroup")
+                except RuntimeError:
+                    pass
+
             utilityEndProgress(progress)
 
     # Import blend shape controllers if necessary.
