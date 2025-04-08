@@ -663,9 +663,11 @@ def importModelNode(self, model, path, selectedObject):
 
             # Curve hair is the best option for accuracy
             # Mesh hair can be used as a light weight fallback method.
-            if self.create_hair_type == "curve":
+            if self.create_hair_type == "curve" and \
+                    self.create_hair_subtype == "bevel":
                 hairData = bpy.data.curves.new(name="curve", type="CURVE")
                 hairData.dimensions = '3D'
+                hairData.resolution_u = 3
 
                 hairObj = \
                     bpy.data.objects.new(hair.Name() or "CastHair", hairData)
@@ -682,6 +684,15 @@ def importModelNode(self, model, path, selectedObject):
                             particleBuffer[particleOffset * 3 + 1],
                             particleBuffer[particleOffset * 3 + 2], 1.0)
                         particleOffset += 1
+
+                # Setup curve rendering because we don't want the particle system.
+                # Curves don't render by default, so we need to enable them to.
+                hairData.use_fill_caps = True
+                hairData.bevel_depth = 0.001
+
+                hairMaterial = hair.Material()
+                if hairMaterial is not None:
+                    hairData.materials.append(materialArray[hairMaterial.Name()])
 
                 collection.objects.link(hairObj)
             elif self.create_hair_type == "mesh":
