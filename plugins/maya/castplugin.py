@@ -1871,13 +1871,8 @@ def importModelNode(model, path):
                         b2 = createVertex(b, normal2)
                         bUp2 = createVertex(bUp, normal2)
 
-                        faceBuffer.append(a1)
-                        faceBuffer.append(b1)
-                        faceBuffer.append(aUp1)
-
-                        faceBuffer.append(a2)
-                        faceBuffer.append(b2)
-                        faceBuffer.append(bUp2)
+                        faceBuffer.extend([a1, b1, aUp1])
+                        faceBuffer.extend([a2, b2, bUp2])
 
                     particleOffset += 1
                     utilityStepProgress(progress, status)
