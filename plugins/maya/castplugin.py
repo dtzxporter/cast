@@ -533,7 +533,7 @@ def utilityCreateMenu():
 
     cmds.menuItem(divider=True)
 
-    cmds.menuItem("setupArnoldHair", label="Setup Arnold Hair", annotation="Configures Arnold rendering for each hair curve",
+    cmds.menuItem("setupArnoldHair", label="Setup Arnold Curves", annotation="Configures Arnold rendering for each hair curve",
                   checkBox=utilityQueryToggleItem("setupArnoldHair"), command=lambda x: utilitySetToggleItem("setupArnoldHair"))
 
     cmds.setParent(menu, menu=True)
