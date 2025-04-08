@@ -69,17 +69,41 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     import_blend_shapes: BoolProperty(
         name="Import Blend Shapes", description="Imports and configures blend shapes for a model", default=True)
 
+    import_hair: BoolProperty(
+        name="Import Hair", description="Imports hair definitions for models", default=True)
+
     import_merge: BoolProperty(
         name="Import Merge", description="Imports and merges models together with the selected armature")
 
+    create_hair_type: EnumProperty(name="HairType", description="Change the way hair definitions are imported",
+                                   items=[("curve", "Create Curve Hairs", "Creates hairs as curves"),
+                                          ("mesh", "Create Mesh Hairs", "Creates hairs as simple meshes")], default="curve")
+
+    create_hair_subtype: EnumProperty(name="HairSubtype", description="Change how hair will render",
+                                      items=[("bevel", "Curve Rendering", "Curves will render naturally"),
+                                             ("particles", "Particle Rendering", "Curves will use the particle system")], default="bevel")
+
     def draw(self, context):
+        self.layout.label(text="Import Settings")
         self.layout.prop(self, "import_time")
         self.layout.prop(self, "import_reset")
         self.layout.prop(self, "import_skin")
         self.layout.prop(self, "import_ik")
         self.layout.prop(self, "import_constraints")
         self.layout.prop(self, "import_blend_shapes")
+        self.layout.prop(self, "import_hair")
         self.layout.prop(self, "import_merge")
+
+        self.layout.separator_spacer()
+
+        row = self.layout.column(align=False)
+        row.label(text="Hair Settings")
+        row.prop(self, "create_hair_type", expand=True)
+
+        row = row.column(align=False)
+        row.enabled = self.create_hair_type == "curve"
+        row.label(text="Curve Rendering")
+        row.prop(self, "create_hair_subtype", expand=True)
 
         self.layout.separator_spacer()
 
@@ -109,6 +133,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
             self.report({'INFO'}, 'Cast has been loaded')
             return {'FINISHED'}
         except Exception as e:
+            raise e
             self.report({'ERROR'}, str(e))
             return {'FINISHED'}
 
@@ -151,6 +176,7 @@ class ExportCast(bpy.types.Operator, ExportHelper):
         name="Up", description="Override the up axis for this scene", items=[("y", "Y Up", "The Y axis points up"), ("z", "Z Up", "The Z axis points up")], default="y")
 
     def draw(self, context):
+        self.layout.label(text="Export Settings")
         self.layout.prop(self, "export_selected")
         self.layout.prop(self, "incl_model")
         self.layout.prop(self, "incl_animation")

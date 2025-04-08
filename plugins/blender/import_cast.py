@@ -652,6 +652,63 @@ def importModelNode(self, model, path, selectedObject):
 
         collection.objects.link(meshObj)
 
+    # Import hairs if necessary.
+    if self.import_hair:
+        hairs = model.Hairs()
+
+        for hair in hairs:
+            segmentsBuffer = hair.SegmentsBuffer()
+            particleBuffer = hair.ParticleBuffer()
+            particleOffset = 0
+
+            strandCount = hair.StrandCount()
+
+            # Curve hair is the best option for accuracy
+            # Mesh hair can be used as a light weight fallback method.
+            if self.create_hair_type == "curve":
+                hairData = bpy.data.curves.new(name="curve", type="CURVE")
+                hairData.dimensions = '3D'
+
+                hairObj = \
+                    bpy.data.objects.new(hair.Name() or "CastHair", hairData)
+
+                for s in range(strandCount):
+                    segment = segmentsBuffer[s]
+
+                    strand = hairData.splines.new(type="NURBS")
+                    strand.points.add(segment)
+
+                    for pt in range(segment + 1):
+                        strand.points[pt].co = (
+                            particleBuffer[particleOffset * 3],
+                            particleBuffer[particleOffset * 3 + 1],
+                            particleBuffer[particleOffset * 3 + 2], 1.0)
+                        particleOffset += 1
+
+                collection.objects.link(hairObj)
+            elif self.create_hair_type == "mesh":
+                vertexBuffer = []
+                normalBuffer = []
+                faceBuffer = []
+
+                def createNormal(v1, v2, v3):
+                    return (v3 - v1).cross((v2 - v1).normalized()).normalized()
+                
+                def createVertex(position, normal):
+                    index = len(vertexBuffer)
+
+                    vertexBuffer.append(position)
+                    normalBuffer.append(normal)
+
+                    return index
+                
+                particleExtrusion = Vector((0.0, 0.0, 0.010))
+                particleOffset = 0
+
+                for s in range(strandCount):
+                    segment = segmentsBuffer[s]
+                    print(segment)
+
     # Import blend shape controllers if necessary.
     if self.import_blend_shapes:
         blendShapes = model.BlendShapes()
