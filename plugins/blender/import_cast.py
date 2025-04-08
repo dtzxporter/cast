@@ -558,22 +558,20 @@ def importModelNode(self, model, path, selectedObject):
 
         faces = mesh.FaceBuffer()
         faceIndicesCount = len(faces)
-        facesCount = faceIndicesCount / 3
+        facesCount = int(faceIndicesCount / 3)
 
         # Remap face indices to match blender's winding order
         faces = unpack_list([(faces[x + 1], faces[x + 2], faces[x + 0])
                              for x in range(0, faceIndicesCount, 3)])
 
         newMesh.loops.add(faceIndicesCount)
-        newMesh.polygons.add(int(facesCount))
+        newMesh.polygons.add(facesCount)
 
         newMesh.loops.foreach_set("vertex_index", faces)
         newMesh.polygons.foreach_set(
             "loop_start", [x for x in range(0, faceIndicesCount, 3)])
-        newMesh.polygons.foreach_set(
-            "loop_total", [3 for _ in range(0, faceIndicesCount, 3)])
-        newMesh.polygons.foreach_set(
-            "material_index", [0 for _ in range(0, faceIndicesCount, 3)])
+        newMesh.polygons.foreach_set("loop_total", [3] * facesCount)
+        newMesh.polygons.foreach_set("material_index", [0] * facesCount)
 
         for i in range(mesh.UVLayerCount()):
             uvBuffer = mesh.VertexUVLayerBuffer(i)
@@ -693,7 +691,7 @@ def importModelNode(self, model, path, selectedObject):
 
                 def createNormal(v1, v2, v3):
                     return (v3 - v1).cross((v2 - v1).normalized()).normalized()
-                
+
                 def createVertex(position, normal):
                     index = len(vertexBuffer)
 
@@ -701,7 +699,7 @@ def importModelNode(self, model, path, selectedObject):
                     normalBuffer.append(normal)
 
                     return index
-                
+
                 particleExtrusion = Vector((0.0, 0.0, 0.010))
                 particleOffset = 0
 
