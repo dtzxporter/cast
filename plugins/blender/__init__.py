@@ -2,11 +2,8 @@ import bpy
 import bpy_extras.io_utils
 import os
 
-from bpy.types import Operator, AddonPreferences
 from bpy.props import *
 from bpy_extras.io_utils import ExportHelper, ImportHelper
-from bpy.utils import register_class
-from bpy.utils import unregister_class
 
 bl_info = {
     "name": "Cast Support",
