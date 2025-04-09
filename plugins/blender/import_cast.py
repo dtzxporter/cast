@@ -692,9 +692,8 @@ def importModelNode(self, model, path, selectedObject):
 
                 hairMaterial = hair.Material()
                 if hairMaterial is not None:
-                    hairData.materials.append(materialArray[hairMaterial.Name()])
-
-                collection.objects.link(hairObj)
+                    hairData.materials.append(
+                        materialArray[hairMaterial.Name()])
             elif self.create_hair_type == "mesh":
                 vertexBuffer = []
                 normalBuffer = []
@@ -706,8 +705,8 @@ def importModelNode(self, model, path, selectedObject):
                 def createVertex(position, normal):
                     index = len(vertexBuffer)
 
-                    vertexBuffer.append(position)
-                    normalBuffer.append(normal)
+                    vertexBuffer.extend([position.x, position.y, position.z])
+                    normalBuffer.extend([normal.x, normal.y, normal.z])
 
                     return index
 
@@ -716,7 +715,43 @@ def importModelNode(self, model, path, selectedObject):
 
                 for s in range(strandCount):
                     segment = segmentsBuffer[s]
-                    print(segment)
+
+                    for i in range(segment):
+                        a = Vector((particleBuffer[particleOffset * 3],
+                                    particleBuffer[particleOffset * 3 + 1],
+                                    particleBuffer[particleOffset * 3 + 2]))
+                        particleOffset += 1
+                        b = Vector((particleBuffer[particleOffset * 3],
+                                    particleBuffer[particleOffset * 3 + 1],
+                                    particleBuffer[particleOffset * 3 + 2]))
+
+                        aUp = a + particleExtrusion
+                        bUp = b + particleExtrusion
+
+                        normal1 = createNormal(a, b, aUp)
+                        normal2 = createNormal(a, b, bUp)
+
+                        a1 = createVertex(a, normal1)
+                        b1 = createVertex(b, normal1)
+                        aUp1 = createVertex(aUp, normal1)
+
+                        a2 = createVertex(a, normal2)
+                        b2 = createVertex(b, normal2)
+                        bUp2 = createVertex(bUp, normal2)
+
+                        faceBuffer.extend([a1, b1, aUp1])
+                        faceBuffer.extend([a2, b2, bUp2])
+
+                    particleOffset += 1
+
+                vertexCount = int(len(vertexBuffer) / 3)
+                faceCount = int(len(faceBuffer) / 3)
+
+            # Parent hair to skeleton if necessary:
+            if skeletonObj is not None and self.import_skin:
+                hairObj.parent = skeletonObj
+
+            collection.objects.link(hairObj)
 
     # Import blend shape controllers if necessary.
     if self.import_blend_shapes:
