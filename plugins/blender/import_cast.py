@@ -158,6 +158,31 @@ def utilityAssignMaterialSlots(material, slots, path):
                 shader.inputs[switcher[slot]], node.outputs["Color"])
 
 
+def utilitySetVertexNormals(mesh, vertexNormals, faces):
+    if not vertexNormals:
+        return mesh.validate(clean_customdata=False)
+
+    if utilityIsVersionAtLeast(4, 1):
+        mesh.validate(clean_customdata=False)
+        mesh.normals_split_custom_set_from_vertices(
+            tuple(zip(*(iter(vertexNormals),) * 3)))
+    else:
+        mesh.create_normals_split()
+        mesh.loops.foreach_set("normal", unpack_list(
+            [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
+
+        mesh.validate(clean_customdata=False)
+        clnors = array.array('f', [0.0] * (len(mesh.loops) * 3))
+        mesh.loops.foreach_get("normal", clnors)
+
+        mesh.polygons.foreach_set(
+            "use_smooth", [True] * len(mesh.polygons))
+
+        mesh.normals_split_custom_set(
+            tuple(zip(*(iter(clnors),) * 3)))
+        mesh.use_auto_smooth = True
+
+
 def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
     if not name in poseBones:
         return None
@@ -586,29 +611,7 @@ def importModelNode(self, model, path, selectedObject):
                 "color", unpack_list([CastColor.fromInteger(vertexColors[x]) for x in faces]))
 
         vertexNormals = mesh.VertexNormalBuffer()
-        if vertexNormals is not None:
-            if utilityIsVersionAtLeast(4, 1):
-                newMesh.validate(clean_customdata=False)
-
-                newMesh.normals_split_custom_set_from_vertices(
-                    tuple(zip(*(iter(vertexNormals),) * 3)))
-            else:
-                newMesh.create_normals_split()
-                newMesh.loops.foreach_set("normal", unpack_list(
-                    [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
-
-                newMesh.validate(clean_customdata=False)
-                clnors = array.array('f', [0.0] * (len(newMesh.loops) * 3))
-                newMesh.loops.foreach_get("normal", clnors)
-
-                newMesh.polygons.foreach_set(
-                    "use_smooth", [True] * len(newMesh.polygons))
-
-                newMesh.normals_split_custom_set(
-                    tuple(zip(*(iter(clnors),) * 3)))
-                newMesh.use_auto_smooth = True
-        else:
-            newMesh.validate(clean_customdata=False)
+        utilitySetVertexNormals(newMesh, vertexNormals, faces)
 
         meshMaterial = mesh.Material()
         if meshMaterial is not None:
@@ -703,7 +706,7 @@ def importModelNode(self, model, path, selectedObject):
                     return (v3 - v1).cross((v2 - v1).normalized()).normalized()
 
                 def createVertex(position, normal):
-                    index = len(vertexBuffer)
+                    index = int(len(vertexBuffer) / 3)
 
                     vertexBuffer.extend([position.x, position.y, position.z])
                     normalBuffer.extend([normal.x, normal.y, normal.z])
@@ -739,13 +742,38 @@ def importModelNode(self, model, path, selectedObject):
                         b2 = createVertex(b, normal2)
                         bUp2 = createVertex(bUp, normal2)
 
-                        faceBuffer.extend([a1, b1, aUp1])
-                        faceBuffer.extend([a2, b2, bUp2])
+                        faceBuffer.extend([b1, aUp1, a1])
+                        faceBuffer.extend([b2, bUp2, a2])
 
                     particleOffset += 1
 
                 vertexCount = int(len(vertexBuffer) / 3)
-                faceCount = int(len(faceBuffer) / 3)
+                faceIndicesCount = len(faceBuffer)
+                facesCount = int(faceIndicesCount / 3)
+
+                hairMesh = bpy.data.meshes.new("polySurfaceMesh")
+                hairObj = bpy.data.objects.new(
+                    hair.Name() or "CastHair", hairMesh)
+
+                hairMesh.vertices.add(vertexCount)
+                hairMesh.vertices.foreach_set("co", vertexBuffer)
+
+                hairMesh.loops.add(faceIndicesCount)
+                hairMesh.polygons.add(facesCount)
+
+                hairMesh.loops.foreach_set("vertex_index", faceBuffer)
+                hairMesh.polygons.foreach_set(
+                    "loop_start", [x for x in range(0, faceIndicesCount, 3)])
+                hairMesh.polygons.foreach_set("loop_total", [3] * facesCount)
+                hairMesh.polygons.foreach_set(
+                    "material_index", [0] * facesCount)
+
+                utilitySetVertexNormals(hairMesh, normalBuffer, faceBuffer)
+
+                hairMaterial = hair.Material()
+                if hairMaterial is not None:
+                    hairMesh.materials.append(
+                        materialArray[hairMaterial.Name()])
 
             # Parent hair to skeleton if necessary:
             if skeletonObj is not None and self.import_skin:
