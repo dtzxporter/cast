@@ -691,7 +691,7 @@ def importModelNode(self, model, path, selectedObject):
                 # Setup curve rendering because we don't want the particle system.
                 # Curves don't render by default, so we need to enable them to.
                 hairData.use_fill_caps = True
-                hairData.bevel_depth = 0.001
+                hairData.bevel_depth = 0.0025
 
                 hairMaterial = hair.Material()
                 if hairMaterial is not None:
