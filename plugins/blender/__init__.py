@@ -72,13 +72,13 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     import_merge: BoolProperty(
         name="Import Merge", description="Imports and merges models together with the selected armature")
 
-    create_hair_type: EnumProperty(name="HairType", description="Change the way hair definitions are imported",
+    create_hair_type: EnumProperty(name="Type", description="Change the way hair definitions are imported",
                                    items=[("curve", "Create Curve Hairs", "Creates hairs as curves"),
                                           ("mesh", "Create Mesh Hairs", "Creates hairs as simple meshes")], default="curve")
 
-    create_hair_subtype: EnumProperty(name="HairSubtype", description="Change how hair will render",
-                                      items=[("bevel", "Curve Rendering", "Curves will render naturally"),
-                                             ("particles", "Particle Rendering", "Curves will use the particle system")], default="bevel")
+    create_hair_subtype: EnumProperty(name="Mode", description="Change how hair will render",
+                                      items=[("bevel", "Curves", "Curves will render naturally"),
+                                             ("particles", "Particle System", "Curves will use the particle system")], default="bevel")
 
     def draw(self, context):
         self.layout.label(text="Import Settings")
@@ -93,14 +93,20 @@ class ImportCast(bpy.types.Operator, ImportHelper):
 
         self.layout.separator_spacer()
 
-        row = self.layout.column(align=False)
-        row.label(text="Hair Settings")
-        row.prop(self, "create_hair_type", expand=True)
+        (header, body) = self.layout.panel("Hair Settings")
 
-        row = row.column(align=False)
-        row.enabled = self.create_hair_type == "curve"
-        row.label(text="Curve Rendering")
-        row.prop(self, "create_hair_subtype", expand=True)
+        header.enabled = self.import_hair
+        header.label(text="Hair Settings")
+
+        if body:
+            body.enabled = self.import_hair
+
+            row = body.column(align=False)
+            row.prop(self, "create_hair_type")
+
+            row = row.column(align=False)
+            row.enabled = self.create_hair_type == "curve"
+            row.prop(self, "create_hair_subtype")
 
         self.layout.separator_spacer()
 
