@@ -725,11 +725,19 @@ def importModelNode(self, model, path, selectedObject):
                     selectedObject.evaluated_get(
                         bpy.context.evaluated_depsgraph_get())
 
-                # TODO: Make sure it's the same modifier.
-                evaulatedModifier = evaluatedObject.modifiers[1]
+                evaulatedModifier = None
 
-                # TODO: Make sure it's the same system.
-                particleSystem = evaluatedObject.particle_systems[0]
+                for modifier in evaluatedObject.modifiers:
+                    if modifier.name == particleSystemModifier.name:
+                        evaulatedModifier = modifier
+                        break
+
+                if evaulatedModifier is None:
+                    self.report(
+                        {'WARNING'}, "Failed to find evaulated modifier for particle hair system.")
+                    continue
+
+                particleSystem = evaulatedModifier.particle_system
 
                 for index, particle in enumerate(particleSystem.particles):
                     segment = segmentsBuffer[index]
