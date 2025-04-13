@@ -699,6 +699,8 @@ def importModelNode(self, model, path, selectedObject):
                         materialArray[hairMaterial.Name()])
             elif self.create_hair_type == "curve" \
                     and self.create_hair_subtype == "particle":
+                # We need to have a selected target mesh to apply the new hair particle system to.
+                # The particle system will also inherit blend shape data and weights from the root faces.
                 if not selectedObject or selectedObject.type != 'MESH':
                     self.report(
                         {'WARNING'}, "You must select a mesh to use with particle hair.")
@@ -729,29 +731,31 @@ def importModelNode(self, model, path, selectedObject):
                 # TODO: Make sure it's the same system.
                 particleSystem = evaluatedObject.particle_systems[0]
 
-                # Each strand.
                 for index, particle in enumerate(particleSystem.particles):
-                    # Each segment
                     segment = segmentsBuffer[index]
-                    particle.location = (particleBuffer[particleOffset * 3],
-                                         particleBuffer[particleOffset * 3 + 1],
-                                         particleBuffer[particleOffset * 3 + 2])
-                    for hindex, hair_key in enumerate(particle.hair_keys):
-                        # Clamp it so we don't over read particles.
-                        hindex = min(hindex, segment)
 
-                        print(hair_key.co_object(
-                            evaluatedObject, evaulatedModifier, particle))
-                        hair_key.co_object_set(
-                            evaluatedObject, evaulatedModifier, particle, (particleBuffer[(particleOffset + hindex) * 3],
-                                                                           particleBuffer[(
-                                                                               particleOffset + hindex) * 3 + 1],
-                                                                           particleBuffer[(particleOffset + hindex) * 3 + 2]))
+                    for index, hair_key in enumerate(particle.hair_keys):
+                        index = min(index, segment)
+
+                        position = (particleBuffer[(particleOffset + index) * 3],
+                                    particleBuffer[(
+                                        particleOffset + index) * 3 + 1],
+                                    particleBuffer[(particleOffset + index) * 3 + 2])
+
+                        hair_key.co_object_set(evaluatedObject,
+                                               evaulatedModifier,
+                                               particle,
+                                               position)
+
                     particleOffset += segment + 1
 
                 # Toggle particle mode, so updates are visible.
                 bpy.ops.object.mode_set(mode='PARTICLE_EDIT')
                 bpy.ops.object.mode_set(mode='OBJECT')
+
+                # For whatever reason, we need to disconnect and reconnect for blend shapes to work properly.
+                bpy.ops.particle.disconnect_hair()
+                bpy.ops.particle.connect_hair()
 
                 # We have no 'hairObj' to assign to a collection so skip that step.
                 continue
