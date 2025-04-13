@@ -765,6 +765,21 @@ def importModelNode(self, model, path, selectedObject):
                 bpy.ops.particle.disconnect_hair()
                 bpy.ops.particle.connect_hair()
 
+                hairMaterial = hair.Material()
+                if hairMaterial is not None:
+                    hairMaterial = materialArray[hairMaterial.Name()]
+                    found = False
+
+                    for material in selectedObject.data.materials:
+                        if material.name == hairMaterial.name:
+                            found = True
+                            break
+
+                    if not found:
+                        selectedObject.data.materials.append(hairMaterial)
+
+                    particleSettings.material_slot = hairMaterial.name
+
                 # We have no 'hairObj' to assign to a collection so skip that step.
                 continue
             elif self.create_hair_type == "mesh":
