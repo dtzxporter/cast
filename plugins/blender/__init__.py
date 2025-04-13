@@ -136,7 +136,6 @@ class ImportCast(bpy.types.Operator, ImportHelper):
             self.report({'INFO'}, 'Cast has been loaded')
             return {'FINISHED'}
         except Exception as e:
-            raise e
             self.report({'ERROR'}, str(e))
             return {'FINISHED'}
 
