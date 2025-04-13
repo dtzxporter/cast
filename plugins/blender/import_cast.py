@@ -697,6 +697,64 @@ def importModelNode(self, model, path, selectedObject):
                 if hairMaterial is not None:
                     hairData.materials.append(
                         materialArray[hairMaterial.Name()])
+            elif self.create_hair_type == "curve" \
+                    and self.create_hair_subtype == "particle":
+                if not selectedObject or selectedObject.type != 'MESH':
+                    self.report(
+                        {'WARNING'}, "You must select a mesh to use with particle hair.")
+                    continue
+
+                particleSystemModifier = \
+                    selectedObject.modifiers.new(hair.Name() or "CastHair",
+                                                 type="PARTICLE_SYSTEM")
+                particleSettings = \
+                    bpy.data.particles.new(name="CastHairSettings")
+
+                particleSystemModifier.particle_system.settings = particleSettings
+
+                particleSettings.type = 'HAIR'
+                particleSettings.count = strandCount
+                particleSettings.emit_from = 'FACE'
+                particleSettings.use_emit_random = False
+                particleSettings.hair_step = max(segmentsBuffer)
+
+                # Evaulate the object, this is the only way to read/edit particle data.
+                evaluatedObject = \
+                    selectedObject.evaluated_get(
+                        bpy.context.evaluated_depsgraph_get())
+
+                # TODO: Make sure it's the same modifier.
+                evaulatedModifier = evaluatedObject.modifiers[1]
+
+                # TODO: Make sure it's the same system.
+                particleSystem = evaluatedObject.particle_systems[0]
+
+                # Each strand.
+                for index, particle in enumerate(particleSystem.particles):
+                    # Each segment
+                    segment = segmentsBuffer[index]
+                    particle.location = (particleBuffer[particleOffset * 3],
+                                         particleBuffer[particleOffset * 3 + 1],
+                                         particleBuffer[particleOffset * 3 + 2])
+                    for hindex, hair_key in enumerate(particle.hair_keys):
+                        # Clamp it so we don't over read particles.
+                        hindex = min(hindex, segment)
+
+                        print(hair_key.co_object(
+                            evaluatedObject, evaulatedModifier, particle))
+                        hair_key.co_object_set(
+                            evaluatedObject, evaulatedModifier, particle, (particleBuffer[(particleOffset + hindex) * 3],
+                                                                           particleBuffer[(
+                                                                               particleOffset + hindex) * 3 + 1],
+                                                                           particleBuffer[(particleOffset + hindex) * 3 + 2]))
+                    particleOffset += segment + 1
+
+                # Toggle particle mode, so updates are visible.
+                bpy.ops.object.mode_set(mode='PARTICLE_EDIT')
+                bpy.ops.object.mode_set(mode='OBJECT')
+
+                # We have no 'hairObj' to assign to a collection so skip that step.
+                continue
             elif self.create_hair_type == "mesh":
                 vertexBuffer = []
                 normalBuffer = []

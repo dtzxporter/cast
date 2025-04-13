@@ -78,7 +78,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
 
     create_hair_subtype: EnumProperty(name="Mode", description="Change how hair will render",
                                       items=[("bevel", "Curves", "Curves will render naturally"),
-                                             ("particles", "Particle System", "Curves will use the particle system")], default="bevel")
+                                             ("particle", "Particle System", "Curves will use the particle system")], default="bevel")
 
     def draw(self, context):
         self.layout.label(text="Import Settings")
