@@ -61,6 +61,7 @@ enum class CastId : uint32_t
 	Root = 0x746F6F72,
 	Model = 0x6C646F6D,
 	Mesh = 0x6873656D,
+	Hair = 0x72696168,
 	BlendShape = 0x68736C62,
 	Skeleton = 0x6C656B73,
 	Bone = 0x656E6F62,
@@ -128,7 +129,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>Skeleton, Mesh, Material</td>
+   		<td>Skeleton, Mesh, Hair, Blend Shape, Material</td>
 		<td>True</td>
 		<td>False</td>
  	</tr>
@@ -278,6 +279,66 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 - **NEW 8/18/2024**: The vertex color specification has **changed**, in order to support multiple color layers, a new `Color Layer Count (cl)` was added which mimics the `UV Layer Count (ul)` property.
   - To be backwards compatible, cast processors should check for `cl`, and use that by default along with the new `c%d` layer properties.
   - If the `cl` property does not exist, a processor should check for the legacy `vc` property which is the one and only color layer if it exists.
+
+### Hair:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>None</td>
+		<td>True</td>
+		<td>False</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>Model</td>
+		<td>False</td>
+		<td>True</td>
+ 	</tr>
+</table>
+<table>
+	<tr>
+		<th>Property (id)</th>
+		<th>Type(s)</th>
+		<th>IsArray</th>
+		<th>Required</th>
+ 	</tr>
+	<tr>
+  		<td>Name (n)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Segments Buffer (se)</td>
+   		<td>Integer 32 (i), Short (h), Byte (b)</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Particle Buffer (pt)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>True</td>
+		<td>True</td>
+ 	</tr>
+	<tr>
+  		<td>Material (Hash of CastNode:Material) (m)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+</table>
+
+**Notes**:
+- The `Particle Buffer` stores the particles in order by each strand.
+- For each strand, there is a count in `Segments Buffer`, there is `count + 1` particles for each strand.
+  - A segment is the connection between two particles.
+  - The sequence `1 -> 2 -> 3` is two segments `1 -> 2, 2 -> 3`.
 
 ### Blend Shape:
 <table>
