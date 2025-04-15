@@ -335,7 +335,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 </table>
 
 **Notes**:
-- The `Particle Buffer` stores the particles in order by each strand.
+- The `Particle Buffer` stores the particles in order by each strand, in world space.
 - For each strand, there is a count in `Segments Buffer`, there is `count + 1` particles for each strand.
   - A segment is the connection between two particles.
   - The sequence `1 -> 2 -> 3` is two segments `1 -> 2, 2 -> 3`.
