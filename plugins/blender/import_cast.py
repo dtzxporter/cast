@@ -606,9 +606,19 @@ def importModelNode(self, model, path, selectedObject):
 
         for i in range(mesh.ColorLayerCount()):
             vertexColors = mesh.VertexColorLayerBuffer(i)
+            vertexColorsPacked = mesh.VertexColorLayerBufferPacked(i)
+
+            if vertexColorsPacked:
+                colors = unpack_list(
+                    [CastColor.fromInteger(vertexColors[x]) for x in faces])
+            else:
+                colors = unpack_list([(vertexColors[x * 4],
+                                      vertexColors[(x * 4) + 1],
+                                      vertexColors[(x * 4) + 2],
+                                      vertexColors[(x * 4) + 3]) for x in faces])
+
             newMesh.vertex_colors.new(do_init=False)
-            newMesh.vertex_colors[i].data.foreach_set(
-                "color", unpack_list([CastColor.fromInteger(vertexColors[x]) for x in faces]))
+            newMesh.vertex_colors[i].data.foreach_set("color", colors)
 
         vertexNormals = mesh.VertexNormalBuffer()
         utilitySetVertexNormals(newMesh, vertexNormals, faces)

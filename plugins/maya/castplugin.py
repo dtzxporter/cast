@@ -42,7 +42,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.79"
+version = "1.80"
 
 # Time unit to framerate map
 framerateMap = {
@@ -1659,12 +1659,20 @@ def importModelNode(model, path):
         colorLayerCount = mesh.ColorLayerCount()
         for i in xrange(colorLayerCount):
             colorLayer = mesh.VertexColorLayerBuffer(i)
+            colorLayerPacked = mesh.VertexColorLayerBufferPacked(i)
+
             scriptUtil = OpenMaya.MScriptUtil()
-            scriptUtil.createFromList(
-                [x for xs in [CastColor.fromInteger(x) for x in colorLayer] for x in xs], len(colorLayer) * 4)
+
+            if colorLayerPacked:
+                colors = len(colorLayer)
+                scriptUtil.createFromList(
+                    [x for xs in [CastColor.fromInteger(x) for x in colorLayer] for x in xs], colors * 4)
+            else:
+                colors = int(len(colorLayer) / 4)
+                scriptUtil.createFromList(colorLayer, colors * 4)
 
             vertexColorBuffer = OpenMaya.MColorArray(
-                scriptUtil.asFloat4Ptr(), len(colorLayer))
+                scriptUtil.asFloat4Ptr(), colors)
 
             newColorName = newMesh.createColorSetWithName("color%d" % i)
 

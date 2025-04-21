@@ -730,7 +730,19 @@ class Mesh(CastNode):
 
     def SetVertexColorBuffer(self, index, values):
         """Sets the vertex color layer collection for the given layer index."""
-        self.CreateProperty("c%d" % index, "i").values = list(values)
+        if values and isinstance(values[0], int):
+            self.CreateProperty("c%d" % index, "i").values = list(values)
+        else:
+            self.CreateProperty(
+                "c%d" % index, "4v").values = list(sum(values, ()))
+            
+    def VertexColorLayerBufferPacked(self, index):
+        """Whether or not the vertex color layer is in packed integer format (CastColor) or floating point format."""
+        buffer = self.VertexColorLayerBuffer(index)
+
+        if buffer and isinstance(buffer[0], int):
+            return True
+        return False
 
     def VertexUVLayerBuffer(self, index):
         """The uv layer collection for the given layer index."""

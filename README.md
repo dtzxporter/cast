@@ -11,9 +11,8 @@ The goal of cast is to create an easy to use format for models, animations, mate
 - Blender (3.6+): [Releases](https://github.com/dtzxporter/cast/releases)
 
 # Programming libraries:
-- .NET Framework (Reference): [Libraries/DotNet](https://github.com/dtzxporter/cast/tree/master/libraries/dotnet)
-- .NET Framework (by Scobalula): [Cast.NET](https://github.com/Scobalula/Cast.NET)
 - Python: [Libraries/Python](https://github.com/dtzxporter/cast/tree/master/libraries/python)
+- .NET Framework (by Scobalula): [Cast.NET](https://github.com/Scobalula/Cast.NET)
 
 # Viewers:
 - CastModelViewer (By echo000): [Github](https://github.com/echo000/CastModelViewer)
@@ -209,7 +208,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 	 <tr>
   		<td>Vertex Color Buffer (c%d)</td>
-   		<td>Integer 32 (i)</td>
+   		<td>Integer 32 (i), Vector 4 (v4)</td>
 		<td>True</td>
 		<td>False</td>
  	</tr>
@@ -279,6 +278,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 - **NEW 8/18/2024**: The vertex color specification has **changed**, in order to support multiple color layers, a new `Color Layer Count (cl)` was added which mimics the `UV Layer Count (ul)` property.
   - To be backwards compatible, cast processors should check for `cl`, and use that by default along with the new `c%d` layer properties.
   - If the `cl` property does not exist, a processor should check for the legacy `vc` property which is the one and only color layer if it exists.
+- **NEW 4/21/2025**: The vertex color buffer specification now allows supplying unpacked floating point rgba colors.
 
 ### Hair:
 <table>

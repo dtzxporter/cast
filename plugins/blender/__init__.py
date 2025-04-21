@@ -8,7 +8,7 @@ from bpy_extras.io_utils import ExportHelper, ImportHelper
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 7, 9),
+    "version": (1, 8, 0),
     "blender": (3, 6, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
