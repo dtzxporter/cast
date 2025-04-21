@@ -181,6 +181,10 @@ class CastProperty(object):
 
         return result
 
+    def isType(self, identifier):
+        """Returns true if the type identifier for this cast property matches."""
+        return self.type.identifier == identifier
+
 
 class CastNode(object):
     """A single generic cast node."""
@@ -735,14 +739,16 @@ class Mesh(CastNode):
         else:
             self.CreateProperty(
                 "c%d" % index, "4v").values = list(sum(values, ()))
-            
+
     def VertexColorLayerBufferPacked(self, index):
         """Whether or not the vertex color layer is in packed integer format (CastColor) or floating point format."""
-        buffer = self.VertexColorLayerBuffer(index)
+        cl = self.properties.get("c%d" % index)
+        if cl is not None:
+            return cl.isType("i")
 
-        if buffer and isinstance(buffer[0], int):
-            return True
-        return False
+        # If the buffer doesn't exist, or we're the old vertex color specification
+        # It did not support unpacked vertex colors, so the buffer is always packed.
+        return True
 
     def VertexUVLayerBuffer(self, index):
         """The uv layer collection for the given layer index."""
