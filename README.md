@@ -823,7 +823,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 	 <tr>
   		<td>Parent</td>
-   		<td>CastNode</td>
+   		<td>Material, Instance</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
@@ -859,7 +859,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 	 <tr>
   		<td>Parent</td>
-   		<td>CastNode</td>
+   		<td>Material</td>
 		<td>False</td>
 		<td>True</td>
  	</tr>
