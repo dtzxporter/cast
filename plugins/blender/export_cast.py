@@ -1,7 +1,6 @@
 import bpy
 import bpy_types
 import bmesh
-import math
 import os
 
 from bpy_extras.wm_utils.progress_report import ProgressReport

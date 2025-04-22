@@ -6,6 +6,7 @@ import sys
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
 from .cast import Cast, CastColor, Model, Animation, Instance, File, Color
+from .shared_cast import utilityIsVersionAtLeast
 
 
 def utilityBuildPath(root, asset):
@@ -23,14 +24,6 @@ def utilityStashCurveComponent(component, curve, name, index):
         value = [None] * 3
         value[index] = curve
         component[name] = value
-
-
-def utilityIsVersionAtLeast(major, minor):
-    if bpy.app.version[0] > major:
-        return True
-    elif bpy.app.version[0] == major and bpy.app.version[1] >= minor:
-        return True
-    return False
 
 
 def utilityClearKeyframePoints(fcurve):

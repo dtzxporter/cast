@@ -1,14 +1,15 @@
 import bpy
-import bpy_extras.io_utils
 import os
 
 from bpy.props import *
 from bpy_extras.io_utils import ExportHelper, ImportHelper
 
+from .shared_cast import utilityIsVersionAtLeast
+
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 8, 0),
+    "version": (1, 8, 1),
     "blender": (3, 6, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -93,10 +94,15 @@ class ImportCast(bpy.types.Operator, ImportHelper):
 
         self.layout.separator_spacer()
 
-        (header, body) = self.layout.panel("Hair Settings")
+        if utilityIsVersionAtLeast(4, 1):
+            (header, body) = self.layout.panel("Hair Settings")
 
-        header.enabled = self.import_hair
-        header.label(text="Hair Settings")
+            header.enabled = self.import_hair
+            header.label(text="Hair Settings")
+        else:
+            self.layout.label(text="Hair Settings")
+
+            body = self.layout.column(align=False)
 
         if body:
             body.enabled = self.import_hair
