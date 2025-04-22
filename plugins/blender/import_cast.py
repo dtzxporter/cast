@@ -617,8 +617,8 @@ def importModelNode(self, model, path, selectedObject):
                                       vertexColors[(x * 4) + 2],
                                       vertexColors[(x * 4) + 3]) for x in faces])
 
-            newMesh.vertex_colors.new(do_init=False)
-            newMesh.vertex_colors[i].data.foreach_set("color", colors)
+            newMesh.color_attributes.new("Color", "FLOAT_COLOR", "CORNER")
+            newMesh.color_attributes[i].data.foreach_set("color", colors)
 
         vertexNormals = mesh.VertexNormalBuffer()
         utilitySetVertexNormals(newMesh, vertexNormals, faces)
