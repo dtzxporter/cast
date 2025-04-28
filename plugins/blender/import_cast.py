@@ -49,8 +49,27 @@ def utilityFindShaderNode(material, bl_idname):
 
 
 def utilityAssignMaterialSlots(material, slots, path):
-    # Find the principled shader.
+    # Find the principled shader and output nodes.
     shader = utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled")
+    output = utilityFindShaderNode(material, "ShaderNodeOutputMaterial")
+
+    shader.location = (10, 300)
+    output.location = (300, 300)
+
+    spots = {
+        "albedo": (-500, 600),
+        "diffuse": (-500, 600),
+        "specular": (-400, -100),
+        "metal": (-800, 600),
+        "roughness": (-700, 250),
+        "gloss": (-700, 250),
+        "gloss|invert": (-400, 250),
+        "normal": (-700, -50),
+        "normal|convert": (-400, 100),
+        "emissive": (-400, -400),
+        "emask": (-400, -700),
+    }
+
     # Determine workflow, metalness/roughness or specular/gloss
     metalness = "metal" in slots
 
@@ -69,7 +88,7 @@ def utilityAssignMaterialSlots(material, slots, path):
     else:
         # Set reasonable defaults for specular/gloss workflow.
         shader.inputs["Metallic"].default_value = 0.0
-        shader.inputs["IOR"].default_value = 1.5
+        shader.inputs["IOR"].default_value = 1000 if "specular" in slots else 1.5
 
         switcher = {
             "albedo": "Base Color",
@@ -134,14 +153,21 @@ def utilityAssignMaterialSlots(material, slots, path):
         else:
             continue
 
+        if slot in spots:
+            node.location = spots[slot]
+
         if slot == "normal":
             normalMap = material.node_tree.nodes.new("ShaderNodeNormalMap")
+            normalMap.location = spots["normal|convert"]
+
             material.node_tree.links.new(
                 normalMap.inputs["Color"], node.outputs["Color"])
             material.node_tree.links.new(
                 shader.inputs[switcher[slot]], normalMap.outputs["Normal"])
         elif slot == "gloss":
             invert = material.node_tree.nodes.new("ShaderNodeInvert")
+            invert.location = spots["gloss|invert"]
+
             material.node_tree.links.new(
                 invert.inputs["Color"], node.outputs["Color"])
             material.node_tree.links.new(
