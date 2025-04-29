@@ -1486,21 +1486,20 @@ def importSkeletonNode(skeleton):
     jointNode = jointTransform.create()
     jointTransform.setName("Joints")
 
-    progress = utilityCreateProgress("Importing skeleton...", len(bones) * 3)
+    progress = utilityCreateProgress("Importing skeleton...", len(bones) * 2)
 
-    for i, bone in enumerate(bones):
+    for i, bone in sorted(enumerate(bones),
+                          key=lambda boneWithIndex: boneWithIndex[1].ParentIndex()):
         newBone = OpenMayaAnim.MFnIkJoint()
-        newBone.create(jointNode)
+
+        if bone.ParentIndex() > -1:
+            newBone.create(handles[bone.ParentIndex()])
+        else:
+            newBone.create(jointNode)
+
         newBone.setName(bone.Name())
         handles[i] = newBone
         indexes[bone.Hash()] = i
-
-        utilityStepProgress(progress, "Importing skeleton...")
-
-    for i, bone in enumerate(bones):
-        if bone.ParentIndex() > -1:
-            cmds.parent(handles[i].fullPathName(),
-                        handles[bone.ParentIndex()].fullPathName())
 
         utilityStepProgress(progress, "Importing skeleton...")
 
