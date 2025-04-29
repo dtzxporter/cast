@@ -523,6 +523,13 @@ def importSkeletonNode(name, skeleton, collection):
         newBone = armature.edit_bones.new(bone.Name())
         newBone.tail = 0, 0.0025, 0  # I am sorry but blender sucks
 
+        segmentScaleCompensate = bone.SegmentScaleCompensate()
+
+        if segmentScaleCompensate == True:
+            newBone.inherit_scale = 'NONE'
+        elif segmentScaleCompensate == False:
+            newBone.inherit_scale = 'FULL'
+
         tempQuat = bone.LocalRotation()  # Also sucks, WXYZ? => XYZW master race
         rotation = Quaternion(
             (tempQuat[3], tempQuat[0], tempQuat[1], tempQuat[2]))
