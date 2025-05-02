@@ -389,7 +389,7 @@ def importMergeModel(self, selectedObj, skeletonObj, poses):
 
     # Make sure that any bone in poses update for ik/constraints later.
     for bone in poses.keys():
-        poses[bone] = skeletonObj.pose.bones[bone]
+        poses[bone] = selectedObj.pose.bones[bone]
 
     bpy.context.view_layer.objects.active = skeletonObj
     bpy.ops.object.mode_set(mode='OBJECT')
