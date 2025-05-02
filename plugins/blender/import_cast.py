@@ -48,6 +48,17 @@ def utilityFindShaderNode(material, bl_idname):
     return None
 
 
+def utilityGetOrCreateConstraint(constraintBone, type, targetBone):
+    for constraint in constraintBone.constraints:
+        if constraint.type != type:
+            continue
+        if constraint.target == targetBone.id_data and \
+                constraint.subtarget == targetBone.name:
+            return constraint
+
+    return constraintBone.constraints.new(type)
+
+
 def utilityAssignMaterialSlots(material, slots, path):
     # Find the principled shader and output nodes.
     shader = utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled")
@@ -272,7 +283,8 @@ def importSkeletonConstraintNode(self, skeleton, poses):
             if customOffset:
                 constraintBone.location = Vector(customOffset)
 
-            ct = constraintBone.constraints.new("COPY_LOCATION")
+            ct = utilityGetOrCreateConstraint(
+                constraintBone, "COPY_LOCATION", targetBone)
 
             if maintainOffset or customOffset:
                 ct.use_offset = True
@@ -284,7 +296,8 @@ def importSkeletonConstraintNode(self, skeleton, poses):
                 constraintBone.rotation_quaternion = Quaternion(
                     (customOffset[3], customOffset[0], customOffset[1], customOffset[2]))
 
-            ct = constraintBone.constraints.new("COPY_ROTATION")
+            ct = utilityGetOrCreateConstraint(
+                constraintBone, "COPY_ROTATION", targetBone)
 
             if maintainOffset or customOffset:
                 ct.mix_mode = 'OFFSET'
@@ -294,7 +307,8 @@ def importSkeletonConstraintNode(self, skeleton, poses):
             if customOffset:
                 constraintBone.scale = Vector(customOffset)
 
-            ct = constraintBone.constraints.new("COPY_SCALE")
+            ct = utilityGetOrCreateConstraint(
+                constraintBone, "COPY_SCALE", targetBone)
 
             if maintainOffset or customOffset:
                 ct.use_offset = True
