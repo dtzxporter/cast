@@ -116,27 +116,42 @@ To read a cast file, you just need to traverse the root nodes and their children
 
 Cast ids are stored as integers to make it faster to serialize and deserialize.
 
-## Cast processors:
+## Cast nodes:
+
+### Root:
+<table>
+	<tr>
+		<th>Field</th>
+		<th>Type(s)</th>
+ 	</tr>
+ 	<tr>
+  		<td>Children</td>
+   		<td>Model, Animation, Instance, Metadata</td>
+ 	</tr>
+	 <tr>
+  		<td>Parent</td>
+   		<td>N/A</td>
+ 	</tr>
+</table>
+
+**Notes**:
+- A root node represents a scene in a cast file.
+- A root node may have `0-n` of any of it's children nodes.
+- All of a root nodes children must have unique hashes.
 
 ### Model:
 <table>
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
    		<td>Skeleton, Mesh, Hair, Blend Shape, Material</td>
-		<td>True</td>
-		<td>False</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Root</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -154,25 +169,23 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 </table>
 
+**Notes**:
+- A model may have at most one skeleton node.
+- A model may have `0-n` of the other children nodes.
+
 ### Mesh:
 <table>
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Model</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -285,20 +298,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Model</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -345,20 +352,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Model</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -411,20 +412,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
    		<td>Bone, IKHandle, Constraint</td>
-		<td>True</td>
-		<td>False</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Model</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 
@@ -433,20 +428,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Skeleton</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -515,20 +504,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Skeleton</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -591,20 +574,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Skeleton</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -693,20 +670,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
    		<td>File, Color</td>
-		<td>True</td>
-		<td>False</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Model</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -812,20 +783,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Material, Instance</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -848,20 +813,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Material</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -899,20 +858,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
    		<td>Skeleton, Curve, CurveModeOverride, NotificationTrack</td>
-		<td>True</td>
-		<td>True</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Root</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -947,20 +900,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Animation</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -1034,20 +981,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Animation</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -1102,20 +1043,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	 <tr>
   		<td>Parent</td>
    		<td>Animation</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -1144,20 +1079,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
    		<td>File</td>
-		<td>True</td>
-		<td>False</td>
  	</tr>
 	<tr>
   		<td>Parent</td>
    		<td>Root</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -1204,20 +1133,14 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 	<tr>
 		<th>Field</th>
 		<th>Type(s)</th>
-		<th>IsArray</th>
-		<th>Required</th>
  	</tr>
  	<tr>
   		<td>Children</td>
-   		<td>None</td>
-		<td>True</td>
-		<td>False</td>
+   		<td>N/A</td>
  	</tr>
 	<tr>
   		<td>Parent</td>
    		<td>Root</td>
-		<td>False</td>
-		<td>True</td>
  	</tr>
 </table>
 <table>
@@ -1252,7 +1175,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 - `Up Axis` can be used as a hint to software to adjust the scene to match a specific up axis.
 - A cast file can have any number of meta nodes but properties designed for hinting should only use the first metadata node instance.
 
-<br>
+<hr>
 
 - Format designed by DTZxPorter with input from the community.
 - Icons by Smashicons
