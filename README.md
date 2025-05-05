@@ -190,7 +190,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 **Notes**:
 - A model may have at most one skeleton node.
 - A model may have `0-n` of the other children nodes.
-- The `Position`, `Rotation`, and `Scale` properties are ignored if the model is instanced.
+- The `Position`, `Rotation`, and `Scale` properties modify the model and it's children in world space.
   - Instance nodes should be preferred for large scenes.
 
 ### Mesh:
