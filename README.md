@@ -128,7 +128,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   		<td>Children</td>
    		<td>Model, Animation, Instance, Metadata</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Parent</td>
    		<td>N/A</td>
  	</tr>
@@ -149,7 +149,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
   		<td>Children</td>
    		<td>Skeleton, Mesh, Hair, Blend Shape, Material</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Parent</td>
    		<td>Root</td>
  	</tr>
@@ -161,17 +161,37 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<th>IsArray</th>
 		<th>Required</th>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Name (n)</td>
    		<td>String (s)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
+	<tr>
+  		<td>Position (p)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+  		<td>Rotation (r)</td>
+   		<td>Vector 4 (v4)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
+	<tr>
+		<td>Scale (s)</td>
+   		<td>Vector 3 (v3)</td>
+		<td>False</td>
+		<td>False</td>
+	</tr>
 </table>
 
 **Notes**:
 - A model may have at most one skeleton node.
 - A model may have `0-n` of the other children nodes.
+- The `Position`, `Rotation`, and `Scale` properties are ignored if the model is instanced.
+  - Instance nodes should be preferred for large scenes.
 
 ### Mesh:
 <table>

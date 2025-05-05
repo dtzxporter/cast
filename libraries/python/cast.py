@@ -295,6 +295,39 @@ class Model(CastNode):
         """Sets the name of this model."""
         self.CreateProperty("n", "s").values = [name]
 
+    def Position(self):
+        """The position of this model."""
+        position = self.properties.get("p")
+        if position is not None:
+            return position.values
+        return None
+
+    def SetPosition(self, position):
+        """Sets the position of this model."""
+        self.CreateProperty("p", "3v").values = list(position)
+
+    def Rotation(self):
+        """The rotation of this model."""
+        rotation = self.properties.get("r")
+        if rotation is not None:
+            return rotation.values
+        return None
+
+    def SetRotation(self, rotation):
+        """Sets the rotation of this model."""
+        self.CreateProperty("r", "4v").values = list(rotation)
+
+    def Scale(self):
+        """The scale of this model."""
+        scale = self.properties.get("s")
+        if scale is not None:
+            return scale.values
+        return None
+
+    def SetScale(self, scale):
+        """Sets the scale of this model."""
+        self.CreateProperty("s", "3v").values = list(scale)
+
     def Skeleton(self):
         """The skeleton embedded in this model."""
         return self.ChildOfType(Skeleton)
