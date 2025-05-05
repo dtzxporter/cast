@@ -988,7 +988,7 @@ class Bone(CastNode):
         ssc = self.properties.get("ssc")
         if ssc is not None:
             return ssc.values[0] >= 1
-        return None
+        return True
 
     def SetSegmentScaleCompensate(self, enabled):
         """Sets whether or not children bones are effected by the scale of this bone."""

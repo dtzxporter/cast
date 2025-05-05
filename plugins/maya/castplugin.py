@@ -1507,11 +1507,11 @@ def importSkeletonNode(skeleton):
         newBone = handles[i]
         paths[i] = newBone.fullPathName()
 
-        if bone.SegmentScaleCompensate() is not None:
-            segmentScale = bone.SegmentScaleCompensate()
-            scalePlug = newBone.findPlug("segmentScaleCompensate")
-            if scalePlug is not None:
-                scalePlug.setBool(bool(segmentScale))
+        ssc = bone.SegmentScaleCompensate()
+        segmentScaleCompensate = newBone.findPlug("segmentScaleCompensate")
+
+        if segmentScaleCompensate is not None:
+            segmentScaleCompensate.setBool(bool(ssc))
 
         if bone.LocalPosition() is not None:
             localPos = bone.LocalPosition()
