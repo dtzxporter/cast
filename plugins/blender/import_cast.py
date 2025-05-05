@@ -48,6 +48,26 @@ def utilityFindShaderNode(material, bl_idname):
     return None
 
 
+def utilityCreatePRS(position, rotation, scale):
+    position = Vector(position or (0, 0, 0))
+    scale = Vector(scale or (1, 1, 1))
+
+    if rotation:
+        rotation = Quaternion(
+            (rotation[3], rotation[0], rotation[1], rotation[2]))
+    else:
+        rotation = Quaternion()
+
+    return (position, rotation, scale)
+
+
+def utilitySetPRS(object, position, rotation, scale):
+    object.location = position
+    object.rotation_mode = 'QUATERNION'
+    object.rotation_quaternion = rotation
+    object.scale = scale
+
+
 def utilityGetOrCreateConstraint(constraintBone, type, targetBone):
     for constraint in constraintBone.constraints:
         if constraint.type != type:
@@ -605,6 +625,17 @@ def importModelNode(self, model, path, selectedObject):
     # For mesh import performance, unlink from scene until we're done
     bpy.context.scene.collection.children.unlink(collection)
 
+    # Optional transform to apply to the armature, or each separate mesh.
+    modelMeshTransform = False
+
+    (modelPosition, modelRotation, modelScale) = \
+        utilityCreatePRS(model.Position(), model.Rotation(), model.Scale())
+
+    if skeletonObj:
+        utilitySetPRS(skeletonObj, modelPosition, modelRotation, modelScale)
+    else:
+        modelMeshTransform = True
+
     meshes = model.Meshes()
     meshHandles = {}
 
@@ -671,6 +702,7 @@ def importModelNode(self, model, path, selectedObject):
                 boneGroups.append(meshObj.vertex_groups.new(name=bone.Name()))
 
             meshObj.parent = skeletonObj
+
             modifier = meshObj.modifiers.new('Armature Rig', 'ARMATURE')
             modifier.object = skeletonObj
             modifier.use_bone_envelopes = False
@@ -698,6 +730,9 @@ def importModelNode(self, model, path, selectedObject):
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(len(newMesh.vertices)):
                     boneGroups[weightBoneBuffer[x]].add((x,), 1.0, "REPLACE")
+
+        if modelMeshTransform:
+            utilitySetPRS(meshObj, modelPosition, modelRotation, modelScale)
 
         collection.objects.link(meshObj)
 
@@ -911,6 +946,10 @@ def importModelNode(self, model, path, selectedObject):
             # Parent hair to skeleton if necessary:
             if skeletonObj is not None and self.import_skin:
                 hairObj.parent = skeletonObj
+
+            if modelMeshTransform:
+                utilitySetPRS(hairObj, modelPosition,
+                              modelRotation, modelScale)
 
             collection.objects.link(hairObj)
 
@@ -1489,15 +1528,11 @@ def importInstanceNodes(self, nodes, context, path):
             newInstance.show_instancer_for_render = False
             newInstance.show_instancer_for_viewport = False
 
-            position = instance.Position()
-            rotation = instance.Rotation()
-            scale = instance.Scale()
+            (position, rotation, scale) = \
+                utilityCreatePRS(instance.Position(),
+                                 instance.Rotation(), instance.Scale())
 
-            newInstance.location = Vector(position)
-            newInstance.rotation_mode = 'QUATERNION'
-            newInstance.rotation_quaternion = Quaternion(
-                (rotation[3], rotation[0], rotation[1], rotation[2]))
-            newInstance.scale = Vector(scale)
+            utilitySetPRS(newInstance, position, rotation, scale)
 
             instanceGroup.objects.link(newInstance)
 
