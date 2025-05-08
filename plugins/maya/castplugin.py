@@ -42,7 +42,7 @@ sceneSettings = {
 }
 
 # Shared version number
-version = "1.84"
+version = "1.85"
 
 # Time unit to framerate map
 framerateMap = {
@@ -310,6 +310,26 @@ def utilitySetRadioItem(names):
                 name, query=True, radioButton=True))
 
     utilitySaveSettings()
+
+
+def utilityCreatePRS(position, rotation, scale):
+    position = position or (0, 0, 0)
+    rotation = rotation or (0, 0, 0, 1)
+    scale = scale or (1, 1, 1)
+
+    return (position, rotation, scale)
+
+
+def utilitySetPRS(transform, position, rotation, scale):
+    transform.setTranslation(OpenMaya.MVector(
+        position[0], position[1], position[2]), OpenMaya.MSpace.kTransform)
+    transform.setRotation(OpenMaya.MQuaternion(
+        rotation[0], rotation[1], rotation[2], rotation[3]))
+
+    scaleUtility = OpenMaya.MScriptUtil()
+    scaleUtility.createFromList([scale[0], scale[1], scale[2]], 3)
+
+    transform.setScale(scaleUtility.asDoublePtr())
 
 
 def utilityLerp(a, b, time):
@@ -2009,6 +2029,16 @@ def importModelNode(model, path):
         importSkeletonConstraintNode(
             model.Skeleton(), handles, paths, indexes, jointTransform)
 
+    # Optional transform to apply to the skeleton, or each separate mesh.
+    # Must be done here, after skinning and bind pose has been used.
+    (modelPosition, modelRotation, modelScale) = \
+        utilityCreatePRS(model.Position(), model.Rotation(), model.Scale())
+
+    if jointTransform:
+        utilitySetPRS(jointTransform, modelPosition, modelRotation, modelScale)
+    else:
+        utilitySetPRS(meshTransform, modelPosition, modelRotation, modelScale)
+
 
 def importCurveNode(node, path, timeUnit, startFrame, overrides):
     propertySwitcher = {
@@ -2261,19 +2291,11 @@ def importInstanceNodes(nodes, path):
 
             transform = OpenMaya.MFnTransform(dagPath)
 
-            position = instance.Position()
-            rotation = instance.Rotation()
-            scale = instance.Scale()
+            (position, rotation, scale) = \
+                utilityCreatePRS(instance.Position(),
+                                 instance.Rotation(), instance.Scale())
 
-            transform.setTranslation(OpenMaya.MVector(
-                position[0], position[1], position[2]), OpenMaya.MSpace.kWorld)
-            transform.setRotation(OpenMaya.MQuaternion(
-                rotation[0], rotation[1], rotation[2], rotation[3]))
-
-            scaleUtility = OpenMaya.MScriptUtil()
-            scaleUtility.createFromList([scale[0], scale[1], scale[2]], 3)
-
-            transform.setScale(scaleUtility.asDoublePtr())
+            utilitySetPRS(transform, position, rotation, scale)
 
             cmds.parent(newInstance, instanceGroup.fullPathName())
 
