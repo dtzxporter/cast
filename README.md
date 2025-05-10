@@ -25,7 +25,7 @@ The goal of cast is to create an easy to use format for models, animations, mate
 - Frequently asked questions: [FAQ](FAQ.md)
 
 ## File stucture:
-All files start with a cast header:
+All files are in little endian byte order and start with a cast header:
 ```c++
 struct CastHeader
 {
