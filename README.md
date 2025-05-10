@@ -643,7 +643,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
  	</tr>
 	<tr>
   		<td>Custom Offset (co)</td>
-   		<td>Vector3, Vector 4 (v3, v4)</td>
+   		<td>Vector 3 (v3), Vector 4 (v4)</td>
 		<td>False</td>
 		<td>False</td>
  	</tr>
