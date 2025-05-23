@@ -79,6 +79,48 @@ def utilityGetOrCreateConstraint(constraintBone, type, targetBone):
     return constraintBone.constraints.new(type)
 
 
+def utilityCreateConnectionNode(material, switcher, metalness, connection, slot, path):
+    if connection.__class__ is File:
+        node = material.node_tree.nodes.new("ShaderNodeTexImage")
+
+        try:
+            node.image = bpy.data.images.load(
+                utilityBuildPath(path, connection.Path()))
+
+            # The following slots are non-color data.
+            if slot in ["metal", "normal", "gloss", "roughness"] \
+                    or (metalness and slot == "specular"):
+                node.image.colorspace_settings.name = "Non-Color"
+
+            # This is a sane setting for most textures, as they will use the alpha channel separately.
+            # Blender also has broken straight/premultiplied modes.
+            node.image.alpha_mode = "CHANNEL_PACKED"
+        except RuntimeError:
+            # Occurs if texture was unsupported or failed to load.
+            pass
+    elif connection.__class__ is Color:
+        node = material.node_tree.nodes.new("ShaderNodeRGB")
+
+        if connection.Name() is not None:
+            node.label = connection.Name()
+        else:
+            node.label = ("Color: %s" % switcher[slot])
+
+        # Handle color conversion if necessary, blender color node is linear.
+        if connection.ColorSpace() == "srgb":
+            # Set the color value, converted to linear, see below for more info.
+            node.outputs["Color"].default_value = \
+                CastColor.toLinearFromSRGB(connection.Rgba())
+        else:
+            # Set the color value, even though we can't separate the alpha channel from this node.
+            # It becomes premultiplied alpha no matter what, which is a pain.
+            node.outputs["Color"].default_value = connection.Rgba()
+    else:
+        return None
+
+    return node
+
+
 def utilityAssignMaterialSlots(material, slots, path):
     # Find the principled shader and output nodes.
     shader = utilityFindShaderNode(material, "ShaderNodeBsdfPrincipled")
@@ -114,7 +156,7 @@ def utilityAssignMaterialSlots(material, slots, path):
             "gloss": "Roughness",
             "normal": "Normal",
             "emissive": "Emission Color" if utilityIsVersionAtLeast(4, 0) else "Emission",
-            "emask": "Emission Strength",
+            "estrength": "Emission Strength",
         }
     else:
         # Set reasonable defaults for specular/gloss workflow.
@@ -129,7 +171,7 @@ def utilityAssignMaterialSlots(material, slots, path):
             "gloss": "Roughness",
             "normal": "Normal",
             "emissive": "Emission Color" if utilityIsVersionAtLeast(4, 0) else "Emission",
-            "emask": "Emission Strength",
+            "estrength": "Emission Strength",
         }
 
     # Prevent duplicate connections if one or more conflict occurs.
@@ -146,42 +188,15 @@ def utilityAssignMaterialSlots(material, slots, path):
 
         used.append(switcher[slot])
 
-        if connection.__class__ is File:
-            node = material.node_tree.nodes.new("ShaderNodeTexImage")
+        node = utilityCreateConnectionNode(
+            material,
+            switcher,
+            metalness,
+            connection,
+            slot,
+            path)
 
-            try:
-                node.image = bpy.data.images.load(
-                    utilityBuildPath(path, connection.Path()))
-
-                # The following slots are non-color data.
-                if slot in ["metal", "normal", "gloss", "roughness"] \
-                        or (metalness and slot == "specular"):
-                    node.image.colorspace_settings.name = "Non-Color"
-
-                # This is a sane setting for most textures, as they will use the alpha channel separately.
-                # Blender also has broken straight/premultiplied modes.
-                node.image.alpha_mode = "CHANNEL_PACKED"
-            except RuntimeError:
-                # Occurs if texture was unsupported or failed to load.
-                pass
-        elif connection.__class__ is Color:
-            node = material.node_tree.nodes.new("ShaderNodeRGB")
-
-            if connection.Name() is not None:
-                node.label = connection.Name()
-            else:
-                node.label = ("Color: %s" % switcher[slot])
-
-            # Handle color conversion if necessary, blender color node is linear.
-            if connection.ColorSpace() == "srgb":
-                # Set the color value, converted to linear, see below for more info.
-                node.outputs["Color"].default_value = \
-                    CastColor.toLinearFromSRGB(connection.Rgba())
-            else:
-                # Set the color value, even though we can't separate the alpha channel from this node.
-                # It becomes premultiplied alpha no matter what, which is a pain.
-                node.outputs["Color"].default_value = connection.Rgba()
-        else:
+        if not node:
             continue
 
         if slot in spots:

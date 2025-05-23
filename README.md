@@ -767,6 +767,12 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
 		<td>False</td>
 	</tr>
+	<tr>
+  		<td>Emissive Strength Hash (estrength)</td>
+   		<td>Integer 64 (l)</td>
+		<td>False</td>
+		<td>False</td>
+	</tr>
 	 <tr>
   		<td>Ambient Occlusion Hash (ao)</td>
    		<td>Integer 64 (l)</td>
