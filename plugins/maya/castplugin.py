@@ -638,6 +638,14 @@ def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMe
     return cluster
 
 
+def utilityGetRootTransform(path):
+    while True:
+        parent = cmds.listRelatives(path, parent=True, fullPath=True)
+        if not parent:
+            return path.split("|")[-1]
+        path = parent[0]
+
+
 def utilityGetSceneSkeleton():
     joints = cmds.ls(type="joint", long=True)
 
@@ -650,8 +658,7 @@ def utilityGetSceneSkeleton():
         skeleton[joint.split("|")[-1]] = joint
 
     # Grab the 'root' transform that cast creates for the new top level parent.
-    skeleton[None] = cmds.listRelatives(
-        joints[0], type="transform", parent=True, fullPath=True)[0]
+    skeleton[None] = utilityGetRootTransform(joints[0])
 
     return skeleton
 
