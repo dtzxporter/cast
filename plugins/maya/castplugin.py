@@ -1278,7 +1278,7 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
 
 def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
     if skeleton is None:
-        return
+        return jointTransform
 
     # Find matching root bones in the selected object.
     # If we had none by the end of the transaction, warn the user that the models aren't compatible.
@@ -1322,7 +1322,7 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
     if not foundMatchingRoot:
         cmds.warning(
             "Could not find compatible root bones make sure the skeletons are compatible.")
-        return
+        return jointTransform
 
     # Create missing bones.
     while missingBones:
@@ -1410,7 +1410,7 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
     # Set it back before finishing merge.
     cmds.setAttr("%s.tx" % newPath.fullPathName(), original)
 
-    jointTransform = OpenMaya.MFnTransform(newPath)
+    return OpenMaya.MFnTransform(newPath)
 
 
 def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
@@ -2012,8 +2012,8 @@ def importModelNode(model, path):
     # Merge with the existing skeleton here if one is selected and we have a skeleton.
     if sceneSettings["importMerge"]:
         if sceneSkeleton:
-            importMergeModel(sceneSkeleton, model.Skeleton(),
-                             handles, paths, jointTransform)
+            jointTransform = importMergeModel(sceneSkeleton, model.Skeleton(),
+                                              handles, paths, jointTransform)
         else:
             cmds.warning(
                 "No skeleton exists to merge to in the current scene.")
