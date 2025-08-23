@@ -19,6 +19,9 @@ try:
 except NameError:
     xrange = range
 
+# Used to whitelist file translator settings
+fileTranslatorSettings = ["exportModel", "exportAnim", "bakeKeyframes"]
+
 # Used for various configuration
 sceneSettings = {
     "importAtTime": False,
@@ -404,19 +407,53 @@ def utilityQueryToggleItem(name):
     return False
 
 
+def utilityBuildTranslatorOptions():
+    global sceneSettings
+
+    options = ""
+
+    for setting in fileTranslatorSettings:
+        options += ("%s=%d;" % (setting, int(sceneSettings[setting])))
+
+    return options
+
+
+def utilityLoadTranslatorOptions(options):
+    global sceneSettings
+
+    for option in [option.split("=") for option in options.split(";")]:
+        if len(option) < 2:
+            continue
+        if option[0] in fileTranslatorSettings:
+            sceneSettings[option[0]] = bool(int(option[1]))
+
+    utilitySaveSettings()
+    utilityCreateMenu(True)
+
+
+def utilityLoadTranslatorCommands():
+    currentPath = os.path.dirname(
+        os.path.realpath(cmds.pluginInfo("castplugin", q=True, p=True)))
+    commandsPath = os.path.join(currentPath, "castpluginoptions.mel")
+
+    try:
+        with open(commandsPath, "r") as file:
+            mel.eval(file.read())
+        return True
+    except:
+        return False
+
+
 def utilityLoadSettings():
     global sceneSettings
 
-    currentPath = os.path.dirname(os.path.realpath(
-        cmds.pluginInfo("castplugin", q=True, p=True)))
+    currentPath = os.path.dirname(
+        os.path.realpath(cmds.pluginInfo("castplugin", q=True, p=True)))
     settingsPath = os.path.join(currentPath, "cast.cfg")
 
     try:
-        file = open(settingsPath, "r")
-        text = file.read()
-        file.close()
-
-        diskSettings = json.loads(text)
+        with open(settingsPath, "r") as file:
+            diskSettings = json.loads(file.read())
     except:
         diskSettings = {}
 
@@ -430,14 +467,21 @@ def utilityLoadSettings():
 def utilitySaveSettings():
     global sceneSettings
 
-    currentPath = os.path.dirname(os.path.realpath(
-        cmds.pluginInfo("castplugin", q=True, p=True)))
+    # Ensures that the translator has the same defaults as our settings.
+    cmds.translator("Cast", do=utilityBuildTranslatorOptions())
+
+    # This sets the latest changes in mayas options cache.
+    cmds.optionVar(init=True,
+                   category="Files/Projects",
+                   sv=["CastOptions", utilityBuildTranslatorOptions()])
+
+    currentPath = os.path.dirname(
+        os.path.realpath(cmds.pluginInfo("castplugin", q=True, p=True)))
     settingsPath = os.path.join(currentPath, "cast.cfg")
 
     try:
-        file = open(settingsPath, "w")
-        file.write(json.dumps(sceneSettings))
-        file.close()
+        with open(settingsPath, "w") as file:
+            file.write(json.dumps(sceneSettings))
     except:
         pass
 
@@ -468,9 +512,13 @@ def utilityRemoveMenu():
         cmds.deleteUI("CastMenu", menu=True)
 
 
-def utilityCreateMenu():
-    cmds.setParent(mel.eval("$tmp = $gMainWindow"))
-    menu = cmds.menu("CastMenu", label="Cast", tearOff=True)
+def utilityCreateMenu(refresh=False):
+    if refresh:
+        menu = cmds.menu("CastMenu", edit=True, deleteAllItems=True)
+        cmds.setParent(menu, menu=True)
+    else:
+        cmds.setParent(mel.eval("$tmp = $gMainWindow"))
+        menu = cmds.menu("CastMenu", label="Cast", tearOff=True)
 
     cmds.menuItem(label="Animation", subMenu=True)
 
@@ -2534,6 +2582,8 @@ class CastFileTranslator(OpenMayaMPx.MPxFileTranslator):
         return "cast"
 
     def writer(self, fileObject, optionString, accessMode):
+        utilityLoadTranslatorOptions(optionString)
+
         exportCast(fileObject.fullName(), exportSelected=accessMode ==
                    OpenMayaMPx.MPxFileTranslator.kExportActiveAccessMode)
 
@@ -2547,19 +2597,34 @@ def createCastTranslator():
 
 def initializePlugin(m_object):
     m_plugin = OpenMayaMPx.MFnPlugin(m_object, "DTZxPorter", version, "Any")
+
+    if utilityLoadTranslatorCommands():
+        commandName = "castTranslatorOptions"
+        commandOptions = utilityBuildTranslatorOptions()
+    else:
+        commandName = None
+        commandOptions = None
+
     try:
         m_plugin.registerFileTranslator(
-            "Cast", None, createCastTranslator)
+            "Cast",
+            None,
+            createCastTranslator,
+            commandName,
+            commandOptions)
     except RuntimeError:
         pass
+
     utilityLoadSettings()
     utilityCreateMenu()
 
 
 def uninitializePlugin(m_object):
     m_plugin = OpenMayaMPx.MFnPlugin(m_object)
+
     try:
         m_plugin.deregisterFileTranslator("Cast")
     except RuntimeError:
         pass
+
     utilityRemoveMenu()
