@@ -124,13 +124,14 @@ def utilityClearNotetracks():
     if cmds.objExists("CastNotetracks"):
         cmds.delete("CastNotetracks")
 
-    notetracks = cmds.textScrollList(
-        "CastNotetrackList", query=True, allItems=True)
+    if cmds.textScrollList("CastNotetrackList", exists=True):
+        notetracks = cmds.textScrollList(
+            "CastNotetrackList", query=True, allItems=True)
 
-    if notetracks:
-        for note in notetracks:
-            cmds.textScrollList("CastNotetrackList",
-                                edit=True, removeItem=note)
+        if notetracks:
+            for note in notetracks:
+                cmds.textScrollList("CastNotetrackList",
+                                    edit=True, removeItem=note)
 
 
 def utilityCreateNotetrack():
@@ -610,6 +611,8 @@ def utilityClearAnimation():
                 pass
             except ValueError:
                 pass
+
+    utilityClearNotetracks()
 
 
 def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMethod="linear"):
