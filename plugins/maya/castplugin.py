@@ -2348,13 +2348,8 @@ def importCast(path):
 def exportAnimation(root, objects):
     animation = root.CreateAnimation()
     animation.SetFramerate(utilityUnitToFramerate(OpenMaya.MTime.uiUnit()))
-    animation.SetLooping(cmds.playbackOptions(
-        query=True, loop=True) == "continuous")
-
-    # Configure the scene to use degrees.
-    currentAngle = cmds.currentUnit(query=True, angle=True)
-
-    cmds.currentUnit(angle="deg")
+    animation.SetLooping(
+        cmds.playbackOptions(query=True, loop=True) == "continuous")
 
     # Grab the smallest and largest keyframe we want to support.
     startFrame = int(cmds.playbackOptions(query=True, ast=True))
@@ -2447,10 +2442,10 @@ def exportAnimation(root, objects):
                 eulerJo = cmds.getAttr("%s.jointOrient" %
                                        export[0], time=frame)[0]
 
-                quat = OpenMaya.MEulerRotation(math.radians(euler[0]), math.radians(
-                    euler[1]), math.radians(euler[2])).asQuaternion()
-                quatJo = OpenMaya.MEulerRotation(math.radians(eulerJo[0]), math.radians(
-                    eulerJo[1]), math.radians(eulerJo[2])).asQuaternion()
+                quat = OpenMaya.MEulerRotation(
+                    euler[0], euler[1], euler[2]).asQuaternion()
+                quatJo = OpenMaya.MEulerRotation(
+                    eulerJo[0], eulerJo[1], eulerJo[2]).asQuaternion()
 
                 value = quat * quatJo
 
@@ -2484,30 +2479,37 @@ def exportAnimation(root, objects):
         notetrack.SetName(note)
         notetrack.SetKeyFrameBuffer([int(x) for x in notifications[note]])
 
-    # Reset scene units back to user setting.
-    cmds.currentUnit(angle=currentAngle)
-
 
 def exportCast(path, exportSelected):
-    cast = Cast()
-    root = cast.CreateRoot()
+    # Query current user settings so we can reset them after the operation completes.
+    currentAngle = cmds.currentUnit(query=True, angle=True)
 
-    meta = root.CreateMetadata()
-    meta.SetSoftware("Cast v%s for %s" % (version, cmds.about(product=True)))
+    try:
+        cast = Cast()
+        root = cast.CreateRoot()
 
-    if sceneSettings["exportAxis"]:
-        meta.SetUpAxis(cmds.upAxis(query=True, ax=True))
+        meta = root.CreateMetadata()
+        meta.SetSoftware("Cast v%s for %s" %
+                         (version, cmds.about(product=True)))
 
-    if sceneSettings["exportAnim"]:
-        if exportSelected:
-            exportAnimation(root, cmds.ls(type="joint", selection=True))
-        else:
-            exportAnimation(root, cmds.ls(type="joint"))
+        if sceneSettings["exportAxis"]:
+            meta.SetUpAxis(cmds.upAxis(query=True, ax=True))
 
-    if sceneSettings["exportModel"]:
-        print("")
+        cmds.currentUnit(angle="rad")
 
-    cast.save(path)
+        if sceneSettings["exportAnim"]:
+            if exportSelected:
+                exportAnimation(root, cmds.ls(type="joint", selection=True))
+            else:
+                exportAnimation(root, cmds.ls(type="joint"))
+
+        if sceneSettings["exportModel"]:
+            print("")
+
+        cast.save(path)
+    finally:
+        # Reset scene units back to user setting.
+        cmds.currentUnit(angle=currentAngle)
 
 
 class CastFileTranslator(OpenMayaMPx.MPxFileTranslator):
