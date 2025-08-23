@@ -125,7 +125,7 @@ def utilityClearNotetracks():
         cmds.delete("CastNotetracks")
 
     if cmds.textScrollList("CastNotetrackList", query=True, exists=True):
-        cmds.textScrollList("CastNotetrackList", removeAll=True)
+        cmds.textScrollList("CastNotetrackList", edit=True, removeAll=True)
 
 
 def utilityCreateNotetrack():
