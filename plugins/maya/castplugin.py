@@ -2546,10 +2546,8 @@ def exportCast(path, exportSelected):
         cmds.currentUnit(angle="rad")
 
         if sceneSettings["exportAnim"]:
-            if exportSelected:
-                exportAnimation(root, cmds.ls(type="joint", selection=True))
-            else:
-                exportAnimation(root, cmds.ls(type="joint"))
+            exportAnimation(root,
+                            cmds.ls(type="joint", selection=exportSelected))
 
         if sceneSettings["exportModel"]:
             print("")
