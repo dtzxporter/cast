@@ -124,14 +124,8 @@ def utilityClearNotetracks():
     if cmds.objExists("CastNotetracks"):
         cmds.delete("CastNotetracks")
 
-    if cmds.textScrollList("CastNotetrackList", exists=True):
-        notetracks = cmds.textScrollList(
-            "CastNotetrackList", query=True, allItems=True)
-
-        if notetracks:
-            for note in notetracks:
-                cmds.textScrollList("CastNotetrackList",
-                                    edit=True, removeItem=note)
+    if cmds.textScrollList("CastNotetrackList", query=True, exists=True):
+        cmds.textScrollList("CastNotetrackList", removeAll=True)
 
 
 def utilityCreateNotetrack():
