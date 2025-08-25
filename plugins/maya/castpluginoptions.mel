@@ -1,4 +1,4 @@
- global proc int castTranslatorOptions(string $parent, string $action, string $settings, string $callback) {
+global proc int castTranslatorOptions(string $parent, string $action, string $settings, string $callback) {
     global string $exportModel, $exportAnim, $bakeKeyframes;
 
     if ($action == "post") {
