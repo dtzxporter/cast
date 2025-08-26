@@ -257,6 +257,31 @@ def utilityEditNotetracks():
     cmds.showWindow(window)
 
 
+def utilityBoneIndex(list, name):
+    for i, v in enumerate(list):
+        if v[0] == name:
+            return i
+    return -1
+
+
+def utilityBoneParent(joint):
+    fullPath = joint.fullPathName()
+    splitPath = fullPath[1:].split("|")
+
+    if len(splitPath) >= 2:
+        selectList = OpenMaya.MSelectionList()
+        selectList.add(fullPath[0:fullPath.find("|", 1)])
+
+        dagPath = OpenMaya.MDagPath()
+
+        selectList.getDagPath(0, dagPath)
+
+        if dagPath.hasFn(OpenMaya.MFn.kJoint):
+            return splitPath[len(splitPath) - 2]
+
+    return None
+
+
 def utilityFramerateToUnit(framerate):
     framerates = list(framerateMap.items())
     (unit, unitFramerate) = min(framerates,
@@ -2364,7 +2389,7 @@ def importCast(path):
         importMetadata(meta)
 
 
-def exportAnimation(root, objects):
+def exportAnimation(root, exportSelected):
     animation = root.CreateAnimation()
     animation.SetFramerate(utilityUnitToFramerate(OpenMaya.MTime.uiUnit()))
     animation.SetLooping(
@@ -2383,6 +2408,9 @@ def exportAnimation(root, objects):
     if endFrame < 0:
         cmds.error("Animation end time must not be negative.")
         return
+
+    # Grab objects which are able to be exported.
+    objects = cmds.ls(type="joint", selection=exportSelected)
 
     simpleProperties = [
         ["translateX", "tx"],
@@ -2499,6 +2527,100 @@ def exportAnimation(root, objects):
         notetrack.SetKeyFrameBuffer([int(x) for x in notifications[note]])
 
 
+def exportModel(root, exportSelected):
+    model = root.CreateModel()
+
+    # Grab all selected, or objects that can be exported.
+    objects = OpenMaya.MSelectionList()
+
+    if exportSelected:
+        OpenMaya.MGlobal.getActiveSelectionList(objects)
+    else:
+        mel.eval("select -r `ls -type joint`;")
+        mel.eval("string $transforms = `ls -tr`;"
+                 "string $meshes = `filterExpand -sm 12 $transforms`;"
+                 "select -add $meshes")
+        OpenMaya.MGlobal.getActiveSelectionList(objects)
+
+    parentStack = []
+    uniqueBones = {}
+
+    for i in xrange(objects.length()):
+        dependNode = OpenMaya.MObject()
+
+        objects.getDependNode(i, dependNode)
+
+        if not dependNode.hasFn(OpenMaya.MFn.kJoint):
+            continue
+
+        joint = OpenMayaAnim.MFnIkJoint(
+            OpenMaya.MFnDagNode(dependNode).dagPath())
+        jointName = joint.name()
+
+        if jointName in uniqueBones:
+            continue
+
+        parentStack.append((jointName, utilityBoneParent(joint)))
+
+        worldPosition = joint.getTranslation(OpenMaya.MSpace.kWorld)
+        localPosition = joint.getTranslation(OpenMaya.MSpace.kTransform)
+
+        worldRotation = OpenMaya.MQuaternion()
+        localRotation = OpenMaya.MQuaternion()
+        localOrientation = OpenMaya.MQuaternion()
+
+        joint.getRotation(worldRotation, OpenMaya.MSpace.kWorld)
+        joint.getRotation(localRotation, OpenMaya.MSpace.kTransform)
+        joint.getOrientation(localOrientation)
+
+        localRotation = localRotation * localOrientation
+
+        scale = OpenMaya.MScriptUtil()
+        scale.createFromList([1.0, 1.0, 1.0], 3)
+        scalePtr = scale.asDoublePtr()
+
+        joint.getScale(scalePtr)
+
+        segmentScaleCompensate = \
+            bool(cmds.getAttr("%s.segmentScaleCompensate" % joint.fullPathName()))
+
+        uniqueBones[jointName] = [-1,
+                                  segmentScaleCompensate,
+                                  (worldPosition.x, worldPosition.y, worldPosition.z),
+                                  (localPosition.x, localPosition.y, localPosition.z),
+                                  (worldRotation.x, worldRotation.y,
+                                   worldRotation.z, worldRotation.w),
+                                  (localRotation.x, localRotation.y,
+                                   localRotation.z, localRotation.w),
+                                  (scale.getDoubleArrayItem(scalePtr, 0),
+                                   scale.getDoubleArrayItem(scalePtr, 1),
+                                   scale.getDoubleArrayItem(scalePtr, 2))]
+
+    for (boneName, boneParent) in parentStack:
+        if boneParent:
+            uniqueBones[boneName][0] = \
+                utilityBoneIndex(parentStack, boneParent)
+
+    if parentStack:
+        skeleton = model.CreateSkeleton()
+
+        for (boneName, _) in parentStack:
+            joint = uniqueBones[boneName]
+
+            bone = skeleton.CreateBone()
+            bone.SetName(boneName)
+            bone.SetParentIndex(joint[0])
+            bone.SetSegmentScaleCompensate(joint[1])
+
+            bone.SetWorldPosition(joint[2])
+            bone.SetLocalPosition(joint[3])
+
+            bone.SetWorldRotation(joint[4])
+            bone.SetLocalRotation(joint[5])
+
+            bone.SetScale(joint[6])
+
+
 def exportCast(path, exportSelected):
     # Query current user settings so we can reset them after the operation completes.
     currentAngle = cmds.currentUnit(query=True, angle=True)
@@ -2517,11 +2639,10 @@ def exportCast(path, exportSelected):
         cmds.currentUnit(angle="rad")
 
         if sceneSettings["exportAnim"]:
-            exportAnimation(root,
-                            cmds.ls(type="joint", selection=exportSelected))
+            exportAnimation(root, exportSelected)
 
         if sceneSettings["exportModel"]:
-            print("")
+            exportModel(root, exportSelected)
 
         cast.save(path)
     finally:
