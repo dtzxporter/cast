@@ -278,12 +278,17 @@ def utilityBoneIndex(list, name):
 def utilityBoneParent(joint):
     fullPath = joint.fullPathName()
     splitPath = fullPath[1:].split("|")
+    splitCount = len(splitPath)
 
-    if len(splitPath) >= 2:
+    if splitCount > 2:
+        dagPath = utilityGetDagPath(splitPath[len(splitPath) - 2])
+    elif splitCount == 2:
         dagPath = utilityGetDagPath(fullPath[0:fullPath.find("|", 1)])
+    else:
+        dagPath = None
 
-        if dagPath.hasFn(OpenMaya.MFn.kJoint):
-            return splitPath[len(splitPath) - 2]
+    if dagPath and dagPath.hasFn(OpenMaya.MFn.kJoint):
+        return splitPath[len(splitPath) - 2]
 
     return None
 
