@@ -257,6 +257,17 @@ def utilityEditNotetracks():
     cmds.showWindow(window)
 
 
+def utilityGetDagPath(pathName):
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(pathName)
+
+    dagPath = OpenMaya.MDagPath()
+
+    selectList.getDagPath(0, dagPath)
+
+    return dagPath
+
+
 def utilityBoneIndex(list, name):
     for i, v in enumerate(list):
         if v[0] == name:
@@ -269,12 +280,7 @@ def utilityBoneParent(joint):
     splitPath = fullPath[1:].split("|")
 
     if len(splitPath) >= 2:
-        selectList = OpenMaya.MSelectionList()
-        selectList.add(fullPath[0:fullPath.find("|", 1)])
-
-        dagPath = OpenMaya.MDagPath()
-
-        selectList.getDagPath(0, dagPath)
+        dagPath = utilityGetDagPath(fullPath[0:fullPath.find("|", 1)])
 
         if dagPath.hasFn(OpenMaya.MFn.kJoint):
             return splitPath[len(splitPath) - 2]
@@ -609,12 +615,7 @@ def utilityClearAnimation():
 
     for jointPath in cmds.ls(type="joint", long=True):
         try:
-            selectList = OpenMaya.MSelectionList()
-            selectList.add(jointPath)
-
-            dagPath = OpenMaya.MDagPath()
-            selectList.getDagPath(0, dagPath)
-
+            dagPath = utilityGetDagPath(jointPath)
             restPosition = utilityGetSavedNodeData(dagPath)
 
             transform = OpenMaya.MFnTransform(dagPath)
@@ -952,11 +953,7 @@ def utilityGetOrCreateCurve(name, property, curveType):
         return None
 
     try:
-        selectList = OpenMaya.MSelectionList()
-        selectList.add(name)
-
-        nodePath = OpenMaya.MDagPath()
-        selectList.getDagPath(0, nodePath)
+        nodePath = utilityGetDagPath(name)
     except RuntimeError:
         cmds.warning("Unable to animate %s[%s] due to a name conflict in the scene" % (
             name, property))
@@ -1331,11 +1328,7 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
         # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
         remappedBones[paths[i]] = sceneSkeleton[bone.Name()]
 
-        selectList = OpenMaya.MSelectionList()
-        selectList.add(sceneSkeleton[bone.Name()])
-
-        existingPath = OpenMaya.MDagPath()
-        selectList.getDagPath(0, existingPath)
+        existingPath = utilityGetDagPath(sceneSkeleton[bone.Name()])
 
         # Store remapped connections for later, after bind pose remap.
         existingBones[i] = (existingPath.fullPathName(),
@@ -2326,13 +2319,7 @@ def importInstanceNodes(nodes, path, sceneRoot):
         for instance in instances:
             newInstance = cmds.instance(base, name=instance.Name())[0]
 
-            selectList = OpenMaya.MSelectionList()
-            selectList.add(newInstance)
-
-            dagPath = OpenMaya.MDagPath()
-            selectList.getDagPath(0, dagPath)
-
-            transform = OpenMaya.MFnTransform(dagPath)
+            transform = OpenMaya.MFnTransform(utilityGetDagPath(newInstance))
 
             (position, rotation, scale) = \
                 utilityCreatePRS(instance.Position(),
@@ -2537,8 +2524,8 @@ def exportModel(root, exportSelected):
         OpenMaya.MGlobal.getActiveSelectionList(objects)
     else:
         mel.eval("select -r `ls -type joint`;")
-        mel.eval("string $transforms = `ls -tr`;"
-                 "string $meshes = `filterExpand -sm 12 $transforms`;"
+        mel.eval("string $transforms[] = `ls -tr`;"
+                 "string $meshes[] = `filterExpand -sm 12 $transforms`;"
                  "select -add $meshes")
         OpenMaya.MGlobal.getActiveSelectionList(objects)
 
@@ -2553,8 +2540,8 @@ def exportModel(root, exportSelected):
         if not dependNode.hasFn(OpenMaya.MFn.kJoint):
             continue
 
-        joint = OpenMayaAnim.MFnIkJoint(
-            OpenMaya.MFnDagNode(dependNode).dagPath())
+        jointPathName = OpenMaya.MFnDagNode(dependNode).fullPathName()
+        joint = OpenMayaAnim.MFnIkJoint(utilityGetDagPath(jointPathName))
         jointName = joint.name()
 
         if jointName in uniqueBones:
