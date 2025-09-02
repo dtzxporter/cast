@@ -2612,6 +2612,32 @@ def exportModel(root, exportSelected):
 
             bone.SetScale(joint[6])
 
+    uniqueMeshes = set()
+
+    for i in xrange(objects.length()):
+        dependNode = OpenMaya.MObject()
+
+        objects.getDependNode(i, dependNode)
+
+        if not dependNode.hasFn(OpenMaya.MFn.kTransform):
+            continue
+
+        transformPathName = OpenMaya.MFnDagNode(dependNode).fullPathName()
+        transformDagPath = utilityGetDagPath(transformPathName)
+
+        try:
+            transformDagPath.extendToShape()
+        except RuntimeError:
+            continue
+
+        meshName = transformDagPath.partialPathName()
+        mesh = OpenMaya.MFnMesh(transformDagPath)
+
+        if meshName in uniqueMeshes:
+            continue
+
+        uniqueMeshes.add(meshName)
+
 
 def exportCast(path, exportSelected):
     # Query current user settings so we can reset them after the operation completes.
