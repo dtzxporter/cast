@@ -5,7 +5,7 @@ import sys
 
 from mathutils import *
 from bpy_extras.io_utils import unpack_list
-from .cast import Cast, CastColor, Model, Animation, Instance, File, Color
+from .cast import Cast, CastColor, Model, Animation, Instance, Metadata, File, Color
 from .shared_cast import utilityIsVersionAtLeast
 
 
@@ -1476,8 +1476,16 @@ def importAnimationNode(self, node, path, selectedObject):
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
-def importInstanceNodes(self, nodes, context, path):
-    rootPath = context.scene.cast_properties.import_scenes_path
+def importInstanceNodes(self, nodes, context, path, sceneRoot):
+    if sceneRoot:
+        root = os.path.dirname(path)
+        rootPath = os.path.join(root, sceneRoot)
+        rootPath = os.path.normpath(rootPath)
+
+        if not os.path.isdir(rootPath):
+            rootPath = context.scene.cast_properties.import_scenes_path
+    else:
+        rootPath = context.scene.cast_properties.import_scenes_path
 
     if len(rootPath) == 0:
         raise Exception("Unable to import instances without a root directory!")
@@ -1549,6 +1557,7 @@ def importCast(self, context, path):
     cast = Cast.load(path)
 
     instances = []
+    meta = None
 
     # Grab the selected object before we start importing because it deselects after creating another object.
     selectedObject = bpy.context.object
@@ -1561,8 +1570,16 @@ def importCast(self, context, path):
         for child in root.ChildrenOfType(Instance):
             instances.append(child)
 
-    if len(instances) > 0:
-        importInstanceNodes(self, instances, context, path)
+        # Grab the first defined meta node, if there is one.
+        meta = meta or root.ChildOfType(Metadata)
+
+    if meta:
+        sceneRoot = meta.SceneRoot()
+    else:
+        sceneRoot = None
+
+    if instances:
+        importInstanceNodes(self, instances, context, path, sceneRoot)
 
 
 def load(self, context, filepath=""):
