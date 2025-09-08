@@ -1511,6 +1511,17 @@ class Metadata(CastNode):
         """Sets the up axis for this scene."""
         self.CreateProperty("up", "s").values = [up]
 
+    def SceneRoot(self):
+        """Optional scene root directory."""
+        root = self.properties.get("sr")
+        if root is not None:
+            return root.values[0]
+        return None
+
+    def SetSceneRoot(self, root):
+        """Sets an optional scene root directory."""
+        self.CreateProperty("sr", "s").values = [root]
+
 
 class Root(CastNode):
     """A root node."""

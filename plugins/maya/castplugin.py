@@ -2258,19 +2258,29 @@ def importAnimationNode(node, path):
     sceneAnimationController.setCurrentTime(wantedSmallestFrame)
 
 
-def importInstanceNodes(nodes, path):
-    overrideCursor = utilityResetCursor()
+def importInstanceNodes(nodes, path, sceneRoot):
+    try:
+        overrideCursor = utilityResetCursor()
 
-    rootPath = cmds.fileDialog2(
-        caption="Select the root directory where instance scenes are located", dialogStyle=2, startingDirectory=path, fileMode=3, okCaption="Import")
+        if sceneRoot:
+            root = os.path.dirname(path)
+            rootPath = os.path.join(root, sceneRoot)
+            rootPath = os.path.normpath(rootPath)
 
-    if overrideCursor:
-        utilitySetWaitCursor()
+            if not os.path.isdir(rootPath):
+                rootPath = None
 
-    if rootPath is None:
-        return cmds.error("Unable to import instances without a root directory!")
+        if not rootPath:
+            rootPath = cmds.fileDialog2(
+                caption="Select the root directory where instance scenes are located", dialogStyle=2, startingDirectory=path, fileMode=3, okCaption="Import")
 
-    rootPath = rootPath[0]
+            if rootPath is None:
+                return cmds.error("Unable to import instances without a root directory!")
+
+            rootPath = rootPath[0]
+    finally:
+        if overrideCursor:
+            utilitySetWaitCursor()
 
     uniqueInstances = {}
 
@@ -2386,8 +2396,13 @@ def importCast(path):
         # Grab the first defined meta node, if there is one.
         meta = meta or root.ChildOfType(Metadata)
 
+    if meta:
+        sceneRoot = meta.SceneRoot()
+    else:
+        sceneRoot = None
+
     if len(instances) > 0:
-        importInstanceNodes(instances, path)
+        importInstanceNodes(instances, path, sceneRoot)
 
     if meta:
         importMetadata(meta)

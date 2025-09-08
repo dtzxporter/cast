@@ -1188,11 +1188,18 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>False</td>
 		<td>False</td>
  	</tr>
+	<tr>
+  		<td>Scene Root (sr)</td>
+   		<td>String (s)</td>
+		<td>False</td>
+		<td>False</td>
+ 	</tr>
 </table>
 
 **Notes:**
 - `Author` and `Software` are just for tagging cast files and have no use outside of metadata.
 - `Up Axis` can be used as a hint to software to adjust the scene to match a specific up axis.
+- `Scene Root` can be used as a root directory for resolving instance and other path relative nodes.
 - A cast file can have any number of meta nodes but properties designed for hinting should only use the first metadata node instance.
 
 <hr>
