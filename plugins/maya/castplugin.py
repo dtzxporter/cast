@@ -2401,7 +2401,7 @@ def importCast(path):
     else:
         sceneRoot = None
 
-    if len(instances) > 0:
+    if instances:
         importInstanceNodes(instances, path, sceneRoot)
 
     if meta:
