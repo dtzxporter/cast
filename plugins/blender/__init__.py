@@ -9,7 +9,7 @@ from .shared_cast import utilityIsVersionAtLeast
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (1, 8, 6),
+    "version": (1, 8, 7),
     "blender": (3, 6, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
@@ -42,7 +42,7 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     bl_description = "Import one or more Cast files"
     bl_options = {'PRESET'}
 
-    directory: StringProperty()
+    directory: StringProperty(subtype="DIR_PATH")
 
     filename_ext = ".cast"
     filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
