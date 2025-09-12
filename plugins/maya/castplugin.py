@@ -935,8 +935,8 @@ def utilityGetOrCreateCurve(name, property, curveType):
 
     restTransform = utilitySaveNodeData(nodePath)
 
-    propertyPlug = OpenMaya.MFnDependencyNode(
-        nodePath.node()).findPlug(property, False)
+    propertyPlug = \
+        OpenMaya.MFnDependencyNode(nodePath.node()).findPlug(property, False)
     propertyPlug.setKeyable(True)
     propertyPlug.setLocked(False)
 
