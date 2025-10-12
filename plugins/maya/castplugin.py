@@ -579,7 +579,8 @@ def utilityCreateMenu(refresh=False):
 
 
 def utilityClearAnimation():
-    cmds.delete(all=True, c=True)
+    cmds.delete(all=True, channels=True)
+    cmds.playbackOptions(minTime=0)
 
     for jointPath in cmds.ls(type="joint", long=True):
         try:
@@ -605,6 +606,9 @@ def utilityClearAnimation():
                 pass
             except ValueError:
                 pass
+
+    # Set the current time back to zero after resetting all joint/shapes to trigger a refresh.
+    cmds.currentTime(0, edit=True)
 
     utilityClearNotetracks()
 
