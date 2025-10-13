@@ -123,6 +123,28 @@ def utilityGetNotetracks():
     return json.loads(cmds.getAttr("CastNotetracks.Notetracks"))
 
 
+def utilitySyncNotetrackEditorList():
+    if not cmds.objExists("CastNotetracks"):
+        return
+
+    if cmds.textScrollList("CastNotetrackList", query=True, exists=True):
+        cmds.textScrollList("CastNotetrackList", edit=True, removeAll=True)
+
+        notifications = []
+        notetracks = utilityGetNotetracks()
+
+        for note in notetracks:
+            for frame in notetracks[note]:
+                notifications.append((frame, note))
+
+        sortedNotifications = []
+
+        for notification in sorted(notifications, key=lambda note: note[0]):
+            sortedNotifications.append("[%d\t] %s" % (notification[0], notification[1]))
+
+        cmds.textScrollList("CastNotetrackList", edit=True, append=sortedNotifications)
+
+
 def utilityClearNotetracks():
     if cmds.objExists("CastNotetracks"):
         cmds.delete("CastNotetracks")
@@ -149,21 +171,7 @@ def utilityCreateNotetrack():
     name = cmds.promptDialog(query=True, text=True)
 
     if utilityAddNotetrack(name, frame):
-        notifications = []
-        notetracks = utilityGetNotetracks()
-
-        for note in notetracks:
-            for frame in notetracks[note]:
-                notifications.append((frame, note))
-
-        sortedNotifications = []
-
-        for notification in sorted(notifications, key=lambda note: note[0]):
-            sortedNotifications.append("[%d\t] %s" %
-                                       (notification[0], notification[1]))
-        cmds.textScrollList("CastNotetrackList", edit=True, removeAll=True)
-        cmds.textScrollList("CastNotetrackList", edit=True,
-                            append=sortedNotifications)
+        utilitySyncNotetrackEditorList()
 
 
 def utilityAddNotetrack(name, frame):
@@ -221,21 +229,10 @@ def utilityEditNotetracks():
     notetrackControl = cmds.text(
         label="Frame:                   Notification:", annotation="Current scene notifications")
 
-    notifications = []
-    notetracks = utilityGetNotetracks()
-
-    for note in notetracks:
-        for frame in notetracks[note]:
-            notifications.append((frame, note))
-
-    sortedNotifications = []
-
-    for notification in sorted(notifications, key=lambda note: note[0]):
-        sortedNotifications.append("[%d\t] %s" %
-                                   (notification[0], notification[1]))
-
     notetrackListControl = cmds.textScrollList(
-        "CastNotetrackList", append=sortedNotifications, allowMultiSelection=True)
+        "CastNotetrackList", allowMultiSelection=True)
+
+    utilitySyncNotetrackEditorList()
 
     addNotificationControl = cmds.button(label="Add Notification",
                                          command=lambda x: utilityCreateNotetrack(),
@@ -2310,6 +2307,10 @@ def importAnimationNode(node, path):
             x, wantedFps, startFrame)
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
+
+    # Sync the notetrack editor if we imported any notetracks.
+    if node.Notifications():
+        utilitySyncNotetrackEditorList()
 
     # Set the animation segment
     if wantedSmallestFrame == OpenMaya.MTime(sys.maxsize, wantedFps):
