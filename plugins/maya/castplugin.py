@@ -134,7 +134,16 @@ def utilityClearNotetracks():
 def utilityCreateNotetrack():
     frame = int(cmds.currentTime(query=True))
 
-    if cmds.promptDialog(title="Cast - Create Notification", message="Enter in the new notification name:\t\t  ") != "Confirm":
+    result = cmds.promptDialog(
+        title="Cast - Create Notification",
+        message="Enter in the new notification name:\t\t  ",
+        button=["Confirm", "Cancel"],
+        defaultButton="Confirm",
+        cancelButton="Cancel",
+        dismissString="Cancel",
+    )
+
+    if result != "Confirm":
         return
 
     name = cmds.promptDialog(query=True, text=True)
