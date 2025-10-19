@@ -644,6 +644,21 @@ def utilityClearAnimation():
     utilityClearNotetracks()
 
 
+def utilityGetSkinCluster(mesh):
+    skinCluster = mel.eval("findRelatedSkinCluster %s" % mesh.fullPathName())
+
+    if not skinCluster:
+        return None
+
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(skinCluster)
+
+    clusterObject = OpenMaya.MObject()
+    selectList.getDependNode(0, clusterObject)
+
+    return OpenMayaAnim.MFnSkinCluster(clusterObject)
+
+
 def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMethod="linear"):
     skinParams = [x for x in bones]
     skinParams.append(newMesh.fullPathName())
