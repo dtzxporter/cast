@@ -173,7 +173,6 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
 
             vertexPositions = [None] * len(blendMesh.verts)
             vertexNormals = [None] * len(blendMesh.verts)
-            faceBuffer = [None] * (len(blendMesh.faces) * 3)
 
             uvLayers = []
             colors = []
@@ -273,13 +272,6 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                 meshNode.SetVertexWeightValueBuffer(vertexWeightValueBuffer)
                 meshNode.SetVertexWeightBoneBuffer(vertexWeightBoneBuffer)
 
-            for i, face in enumerate(blendMesh.faces):
-                faceBuffer[(i * 3)] = face.loops[2].vert.index
-                faceBuffer[(i * 3) +
-                           1] = face.loops[0].vert.index
-                faceBuffer[(i * 3) +
-                           2] = face.loops[1].vert.index
-
             meshNode.SetVertexPositionBuffer(vertexPositions)
             meshNode.SetVertexNormalBuffer(vertexNormals)
 
@@ -292,6 +284,14 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                 meshNode.SetVertexColorBuffer(colorLayer, vertexColors)
 
             meshNode.SetColorLayerCount(len(vertexColorLayers))
+
+            faceTris = blendMesh.calc_loop_triangles()
+            faceBuffer = [None] * (len(faceTris) * 3)
+
+            for i, face in enumerate(faceTris):
+                faceBuffer[(i * 3):(i * 3) + 3] = [face[2].vert.index,
+                                                   face[0].vert.index,
+                                                   face[1].vert.index]
 
             meshNode.SetFaceBuffer(faceBuffer)
 
