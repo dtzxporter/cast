@@ -2659,24 +2659,25 @@ def exportModel(root, exportSelected):
         except RuntimeError:
             continue
 
-        meshName = transformDagPath.partialPathName()
+        meshPath = transformDagPath.partialPathName()
         mesh = OpenMaya.MFnMesh(transformDagPath)
+        meshName = mesh.name()
 
-        if meshName in uniqueMeshes:
+        if meshPath in uniqueMeshes:
             continue
 
-        uniqueMeshes.add(meshName)
+        uniqueMeshes.add(meshPath)
 
         meshNode = model.CreateMesh()
 
-        if not mesh.name.startswith("CastMesh"):
-            meshNode.SetName(mesh.name)
+        if not meshName.startswith("CastShape"):
+            meshNode.SetName(meshName)
 
         uvLayers = \
-            cmds.polyUVSet(transformDagPath.fullPathName(),
+            cmds.polyUVSet(meshPath,
                            q=True, allUVSets=True)
         colorLayers = \
-            cmds.polyColorSet(transformDagPath.fullPathName(),
+            cmds.polyColorSet(meshPath,
                               q=True, allColorSets=True)
 
         vertexIter = OpenMaya.MItMeshVertex(transformDagPath)
@@ -2687,7 +2688,39 @@ def exportModel(root, exportSelected):
         vertexUVLayers = [[None] * vertexCount for _ in uvLayers]
         vertexColorLayers = [[None] * vertexCount for _ in colorLayers]
 
+        normal = OpenMaya.MVector()
+        uv = OpenMaya.MScriptUtil()
+        color = OpenMaya.MColor()
+
+        uv.createFromList([0.0, 0.0], 2)
+        uvPtr = uv.asFloat2Ptr()
+
         while not vertexIter.isDone():
+            index = vertexIter.index()
+
+            position = vertexIter.position(OpenMaya.MSpace.kWorld)
+
+            vertexPositions[index] = \
+                (position.x, position.y, position.z)
+
+            vertexIter.getNormal(normal)
+
+            vertexNormals[index] = \
+                (normal.x, normal.y, normal.z)
+
+            for i, uvLayer in enumerate(uvLayers):
+                vertexIter.getUV(uvPtr, uvLayer)
+
+                vertexUVLayers[i][index] = \
+                    (OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPtr, 0, 0),
+                     OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPtr, 0, 1))
+
+            for i, colorLayer in enumerate(colorLayers):
+                vertexIter.getColor(color, colorLayer)
+
+                vertexColorLayers[i][index] = \
+                    (color.r, color.g, color.b, color.a)
+
             vertexIter.next()
 
         meshNode.SetVertexPositionBuffer(vertexPositions)
@@ -2702,6 +2735,22 @@ def exportModel(root, exportSelected):
             meshNode.SetVertexColorBuffer(colorLayer, vertexColors)
 
         meshNode.SetColorLayerCount(len(vertexColorLayers))
+
+        faceCounts = OpenMaya.MIntArray()
+        faceIndices = OpenMaya.MIntArray()
+
+        mesh.getTriangles(faceCounts, faceIndices)
+
+        faceBuffer = [0] * faceIndices.length()
+
+        face = OpenMaya.MScriptUtil(faceIndices)
+        facePtr = face.asIntPtr()
+
+        for i in xrange(faceIndices.length()):
+            faceBuffer[i] = \
+                OpenMaya.MScriptUtil.getIntArrayItem(facePtr, i)
+
+        meshNode.SetFaceBuffer(faceBuffer)
 
 
 def exportCast(path, exportSelected):
