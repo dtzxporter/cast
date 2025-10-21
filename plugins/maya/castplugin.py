@@ -2550,6 +2550,8 @@ def exportModel(root, exportSelected):
         OpenMaya.MGlobal.getActiveSelectionList(objects)
 
     parentStack = []
+
+    uniqueBoneIndex = 0
     uniqueBones = {}
 
     for i in xrange(objects.length()):
@@ -2591,17 +2593,26 @@ def exportModel(root, exportSelected):
         segmentScaleCompensate = \
             bool(cmds.getAttr("%s.segmentScaleCompensate" % joint.fullPathName()))
 
-        uniqueBones[jointName] = [-1,
-                                  segmentScaleCompensate,
-                                  (worldPosition.x, worldPosition.y, worldPosition.z),
-                                  (localPosition.x, localPosition.y, localPosition.z),
-                                  (worldRotation.x, worldRotation.y,
-                                   worldRotation.z, worldRotation.w),
-                                  (localRotation.x, localRotation.y,
-                                   localRotation.z, localRotation.w),
-                                  (scale.getDoubleArrayItem(scalePtr, 0),
-                                   scale.getDoubleArrayItem(scalePtr, 1),
-                                   scale.getDoubleArrayItem(scalePtr, 2))]
+        uniqueBones[jointName] = [
+            # Parent index in the parent stack.
+            -1,
+            # Segment scale compensate.
+            segmentScaleCompensate,
+            # World position.
+            (worldPosition.x, worldPosition.y, worldPosition.z),
+            (localPosition.x, localPosition.y, localPosition.z),
+            # World rotation.
+            (worldRotation.x, worldRotation.y,
+             worldRotation.z, worldRotation.w),
+            # Local rotation.
+            (localRotation.x, localRotation.y,
+             localRotation.z, localRotation.w),
+            # Scale.
+            (scale.getDoubleArrayItem(scalePtr, 0),
+             scale.getDoubleArrayItem(scalePtr, 1),
+             scale.getDoubleArrayItem(scalePtr, 2)),
+            # Index in the final bone array.
+            0]
 
     for (boneName, boneParent) in parentStack:
         if boneParent:
@@ -2613,6 +2624,9 @@ def exportModel(root, exportSelected):
 
         for (boneName, _) in parentStack:
             joint = uniqueBones[boneName]
+            joint[7] = uniqueBoneIndex
+
+            uniqueBoneIndex += 1
 
             bone = skeleton.CreateBone()
             bone.SetName(boneName)
@@ -2652,6 +2666,42 @@ def exportModel(root, exportSelected):
             continue
 
         uniqueMeshes.add(meshName)
+
+        meshNode = model.CreateMesh()
+
+        if not mesh.name.startswith("CastMesh"):
+            meshNode.SetName(mesh.name)
+
+        uvLayers = \
+            cmds.polyUVSet(transformDagPath.fullPathName(),
+                           q=True, allUVSets=True)
+        colorLayers = \
+            cmds.polyColorSet(transformDagPath.fullPathName(),
+                              q=True, allColorSets=True)
+
+        vertexIter = OpenMaya.MItMeshVertex(transformDagPath)
+        vertexCount = vertexIter.count()
+
+        vertexPositions = [None] * vertexCount
+        vertexNormals = [None] * vertexCount
+        vertexUVLayers = [[None] * vertexCount for _ in uvLayers]
+        vertexColorLayers = [[None] * vertexCount for _ in colorLayers]
+
+        while not vertexIter.isDone():
+            vertexIter.next()
+
+        meshNode.SetVertexPositionBuffer(vertexPositions)
+        meshNode.SetVertexNormalBuffer(vertexNormals)
+
+        for uvLayer, vertexUVs in enumerate(vertexUVLayers):
+            meshNode.SetVertexUVLayerBuffer(uvLayer, vertexUVs)
+
+        meshNode.SetUVLayerCount(len(vertexUVLayers))
+
+        for colorLayer, vertexColors in enumerate(vertexColorLayers):
+            meshNode.SetVertexColorBuffer(colorLayer, vertexColors)
+
+        meshNode.SetColorLayerCount(len(vertexColorLayers))
 
 
 def exportCast(path, exportSelected):
