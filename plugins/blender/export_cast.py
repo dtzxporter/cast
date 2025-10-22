@@ -199,7 +199,6 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                 colors.append(blendMesh.loops.layers.color.active)
 
             vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
-
             vertexMaxInfluence = 0
 
             for i, vert in enumerate(blendMesh.verts):
@@ -211,14 +210,14 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                 vertexLoopCount = len(vert.link_loops)
 
                 # Calculate the maximum influence for this vertex.
-                maximumInfluence = 0
+                influence = 0
 
                 if blendMesh.verts.layers.deform.active is not None:
                     for weight in vert[blendMesh.verts.layers.deform.active].values():
                         if weight > WEIGHT_THRESHOLD:
-                            maximumInfluence += 1
+                            influence += 1
 
-                vertexMaxInfluence = max(vertexMaxInfluence, maximumInfluence)
+                vertexMaxInfluence = max(vertexMaxInfluence, influence)
 
                 # Calculate the average uv coords for each face that shares this vertex.
                 for uvLayer, uvLayerLoop in enumerate(uvLayers):
@@ -246,11 +245,8 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                     vertexColorLayers[0][i] = CastColor.toInteger(
                         (color.x, color.y, color.z, color.w))
 
-            if blendMesh.verts.layers.deform.active is not None and maximumInfluence > 0:
-                meshNode.SetMaximumWeightInfluence(vertexMaxInfluence)
-
+            if vertexMaxInfluence > 0:
                 vertexGroups = [x.name for x in mesh.vertex_groups]
-
                 vertexWeightValueBuffer = [
                     0.0] * (len(blendMesh.verts) * vertexMaxInfluence)
                 vertexWeightBoneBuffer = [
@@ -269,6 +265,7 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
 
                             slot += 1
 
+                meshNode.SetMaximumWeightInfluence(vertexMaxInfluence)
                 meshNode.SetVertexWeightValueBuffer(vertexWeightValueBuffer)
                 meshNode.SetVertexWeightBoneBuffer(vertexWeightBoneBuffer)
 

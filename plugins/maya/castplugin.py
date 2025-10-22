@@ -12,6 +12,9 @@ import maya.OpenMayaMPx as OpenMayaMPx
 
 from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File, Color
 
+# Minimum weight value to be considered.
+WEIGHT_THRESHOLD = 0.000001
+
 # Support Python 3.0+
 try:
     if xrange is None:
@@ -2682,6 +2685,13 @@ def exportModel(root, exportSelected):
             cmds.polyColorSet(meshPath,
                               q=True, allColorSets=True)
 
+        # Find the skin cluster for this mesh.
+        skinCluster = utilityGetSkinCluster(transformDagPath)
+        skinJoints = OpenMaya.MDagPathArray()
+
+        if skinCluster:
+            skinCluster.influenceObjects(skinJoints)
+
         vertexIter = OpenMaya.MItMeshVertex(transformDagPath)
         vertexCount = vertexIter.count()
 
@@ -2689,10 +2699,34 @@ def exportModel(root, exportSelected):
         vertexNormals = [None] * vertexCount
         vertexUVLayers = [[None] * vertexCount for _ in uvLayers]
         vertexColorLayers = [[None] * vertexCount for _ in colorLayers]
+        vertexMaxInfluence = 0
 
         normal = OpenMaya.MVector()
         uv = OpenMaya.MScriptUtil()
         color = OpenMaya.MColor()
+
+        numWeights = OpenMaya.MScriptUtil()
+        numWeightsPtr = numWeights.asUintPtr()
+        weights = OpenMaya.MDoubleArray()
+        bones = [0] * skinJoints.length()
+
+        # Create weight index to bone index lookup.
+        for index in xrange(skinJoints.length()):
+            jointDagPath = skinJoints[index]
+
+            if not jointDagPath.hasFn(OpenMaya.MFn.kJoint):
+                cmds.warning("Skipping non-joint influence object: %s" %
+                             jointDagPath.partialPathName())
+                continue
+
+            joint = OpenMayaAnim.MFnIkJoint(jointDagPath)
+            jointName = joint.name()
+
+            try:
+                bones[index] = uniqueBones[jointName][7]
+            except KeyError:
+                cmds.warning("Skipping joint not in skeleton: %s" % jointName)
+                pass
 
         uv.createFromList([0.0, 0.0], 2)
         uvPtr = uv.asFloat2Ptr()
@@ -2723,7 +2757,53 @@ def exportModel(root, exportSelected):
                 vertexColorLayers[i][index] = \
                     (color.r, color.g, color.b, color.a)
 
+            if skinCluster:
+                skinCluster.getWeights(transformDagPath,
+                                       vertexIter.currentItem(),
+                                       weights,
+                                       numWeightsPtr)
+
+                # Calculate the maximum influence for this vertex.
+                influence = 0
+
+                for vindex in xrange(weights.length()):
+                    if weights[vindex] > WEIGHT_THRESHOLD:
+                        influence += 1
+
+                vertexMaxInfluence = max(vertexMaxInfluence, influence)
+
             vertexIter.next()
+
+        if vertexMaxInfluence > 0:
+            vertexWeightValueBuffer = [0.0] * vertexCount * vertexMaxInfluence
+            vertexWeightBoneBuffer = [0] * vertexCount * vertexMaxInfluence
+
+            vertexIter.reset()
+
+            while not vertexIter.isDone():
+                index = vertexIter.index()
+
+                skinCluster.getWeights(transformDagPath,
+                                       vertexIter.currentItem(),
+                                       weights,
+                                       numWeightsPtr)
+
+                slot = 0
+
+                for vindex in xrange(weights.length()):
+                    if weights[vindex] > WEIGHT_THRESHOLD:
+                        vertexWeightValueBuffer[(
+                            index * vertexMaxInfluence) + slot] = weights[vindex]
+                        vertexWeightBoneBuffer[(
+                            index * vertexMaxInfluence) + slot] = bones[vindex]
+
+                        slot += 1
+
+                vertexIter.next()
+
+            meshNode.SetMaximumWeightInfluence(vertexMaxInfluence)
+            meshNode.SetVertexWeightValueBuffer(vertexWeightValueBuffer)
+            meshNode.SetVertexWeightBoneBuffer(vertexWeightBoneBuffer)
 
         meshNode.SetVertexPositionBuffer(vertexPositions)
         meshNode.SetVertexNormalBuffer(vertexNormals)
