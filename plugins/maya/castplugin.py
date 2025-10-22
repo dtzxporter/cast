@@ -1775,7 +1775,7 @@ def importModelNode(model, path):
                 scriptUtil.asFloatPtr(), len(faces))
 
             scriptUtil = OpenMaya.MScriptUtil()
-            scriptUtil.createFromList([1 - y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
+            scriptUtil.createFromList([1.0 - y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
                                                         for x in xrange(len(faces))] for y in xs], len(faces))
 
             uvVBuffer = OpenMaya.MFloatArray(
@@ -2713,7 +2713,7 @@ def exportModel(root, exportSelected):
 
                 vertexUVLayers[i][index] = \
                     (OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPtr, 0, 0),
-                     OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPtr, 0, 1))
+                     1.0 - OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPtr, 0, 1))
 
             for i, colorLayer in enumerate(colorLayers):
                 vertexIter.getColor(color, colorLayer)
