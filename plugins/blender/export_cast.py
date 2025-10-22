@@ -285,6 +285,7 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
 
             meshNode.SetColorLayerCount(len(vertexColorLayers))
 
+            # Automatically converts n-gons to triangle faces.
             faceTris = blendMesh.calc_loop_triangles()
             faceBuffer = [None] * (len(faceTris) * 3)
 

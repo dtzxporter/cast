@@ -1776,7 +1776,7 @@ def importModelNode(model, path):
 
             scriptUtil = OpenMaya.MScriptUtil()
             scriptUtil.createFromList([1.0 - y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
-                                                        for x in xrange(len(faces))] for y in xs], len(faces))
+                                                          for x in xrange(len(faces))] for y in xs], len(faces))
 
             uvVBuffer = OpenMaya.MFloatArray(
                 scriptUtil.asFloatPtr(), len(faces))
@@ -2673,9 +2673,11 @@ def exportModel(root, exportSelected):
         if not meshName.startswith("CastShape"):
             meshNode.SetName(meshName)
 
+        # Collect uv layers for this mesh.
         uvLayers = \
             cmds.polyUVSet(meshPath,
                            q=True, allUVSets=True)
+        # Collect color layers for this mesh.
         colorLayers = \
             cmds.polyColorSet(meshPath,
                               q=True, allColorSets=True)
@@ -2739,6 +2741,7 @@ def exportModel(root, exportSelected):
         faceCounts = OpenMaya.MIntArray()
         faceIndices = OpenMaya.MIntArray()
 
+        # Automatically converts n-gons to triangle faces.
         mesh.getTriangles(faceCounts, faceIndices)
 
         faceBuffer = [0] * faceIndices.length()
