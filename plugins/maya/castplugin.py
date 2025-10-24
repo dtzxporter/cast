@@ -2826,12 +2826,8 @@ def exportModel(root, exportSelected):
 
         faceBuffer = [0] * faceIndices.length()
 
-        face = OpenMaya.MScriptUtil(faceIndices)
-        facePtr = face.asIntPtr()
-
         for i in xrange(faceIndices.length()):
-            faceBuffer[i] = \
-                OpenMaya.MScriptUtil.getIntArrayItem(facePtr, i)
+            faceBuffer[i] = faceIndices[i]
 
         meshNode.SetFaceBuffer(faceBuffer)
 
