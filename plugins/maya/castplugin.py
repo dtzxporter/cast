@@ -123,6 +123,30 @@ def utilityGetNotetracks():
     return json.loads(cmds.getAttr("CastNotetracks.Notetracks"))
 
 
+def utilitySyncNotetracks():
+    if not cmds.objExists("CastNotetracks"):
+        return
+
+    if cmds.textScrollList("CastNotetrackList", query=True, exists=True):
+        cmds.textScrollList("CastNotetrackList", edit=True, removeAll=True)
+
+        notifications = []
+        notetracks = utilityGetNotetracks()
+
+        for note in notetracks:
+            for frame in notetracks[note]:
+                notifications.append((frame, note))
+
+        sortedNotifications = []
+
+        for notification in sorted(notifications, key=lambda note: note[0]):
+            sortedNotifications.append(
+                "[%d\t] %s" % (notification[0], notification[1]))
+
+        cmds.textScrollList("CastNotetrackList", edit=True,
+                            append=sortedNotifications)
+
+
 def utilityClearNotetracks():
     if cmds.objExists("CastNotetracks"):
         cmds.delete("CastNotetracks")
@@ -134,27 +158,20 @@ def utilityClearNotetracks():
 def utilityCreateNotetrack():
     frame = int(cmds.currentTime(query=True))
 
-    if cmds.promptDialog(title="Cast - Create Notification", message="Enter in the new notification name:\t\t  ") != "Confirm":
+    result = cmds.promptDialog(title="Cast - Create Notification",
+                               message="Enter in the new notification name:\t\t  ",
+                               button=["Confirm", "Cancel"],
+                               defaultButton="Confirm",
+                               cancelButton="Cancel",
+                               dismissString="Cancel")
+
+    if result != "Confirm":
         return
 
     name = cmds.promptDialog(query=True, text=True)
 
     if utilityAddNotetrack(name, frame):
-        notifications = []
-        notetracks = utilityGetNotetracks()
-
-        for note in notetracks:
-            for frame in notetracks[note]:
-                notifications.append((frame, note))
-
-        sortedNotifications = []
-
-        for notification in sorted(notifications, key=lambda note: note[0]):
-            sortedNotifications.append("[%d\t] %s" %
-                                       (notification[0], notification[1]))
-        cmds.textScrollList("CastNotetrackList", edit=True, removeAll=True)
-        cmds.textScrollList("CastNotetrackList", edit=True,
-                            append=sortedNotifications)
+        utilitySyncNotetracks()
 
 
 def utilityAddNotetrack(name, frame):
@@ -212,21 +229,10 @@ def utilityEditNotetracks():
     notetrackControl = cmds.text(
         label="Frame:                   Notification:", annotation="Current scene notifications")
 
-    notifications = []
-    notetracks = utilityGetNotetracks()
-
-    for note in notetracks:
-        for frame in notetracks[note]:
-            notifications.append((frame, note))
-
-    sortedNotifications = []
-
-    for notification in sorted(notifications, key=lambda note: note[0]):
-        sortedNotifications.append("[%d\t] %s" %
-                                   (notification[0], notification[1]))
-
     notetrackListControl = cmds.textScrollList(
-        "CastNotetrackList", append=sortedNotifications, allowMultiSelection=True)
+        "CastNotetrackList", allowMultiSelection=True)
+
+    utilitySyncNotetracks()
 
     addNotificationControl = cmds.button(label="Add Notification",
                                          command=lambda x: utilityCreateNotetrack(),
@@ -2287,20 +2293,33 @@ def importAnimationNode(node, path):
     progress = utilityCreateProgress("Importing animation...", len(curves))
 
     for i, x in enumerate(curves):
-        (smallestFrame, largestFrame) = importCurveNode(
-            x, path, wantedFps, startFrame, curveModeOverrides)
+        (smallestFrame, largestFrame) = importCurveNode(x,
+                                                        path,
+                                                        wantedFps,
+                                                        startFrame,
+                                                        curveModeOverrides)
+
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
-        utilityStepProgress(
-            progress, "Importing curve [%d] of [%d]..." % (i + 1, len(curves)))
+
+        utilityStepProgress(progress,
+                            "Importing curve [%d] of [%d]..." % (i + 1, len(curves)))
 
     utilityEndProgress(progress)
 
-    for x in node.Notifications():
-        (smallestFrame, largestFrame) = importNotificationTrackNode(
-            x, wantedFps, startFrame)
+    notifications = node.Notifications()
+
+    for x in notifications:
+        (smallestFrame, largestFrame) = importNotificationTrackNode(x,
+                                                                    wantedFps,
+                                                                    startFrame)
+
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
+
+    # Sync the notetrack editor if we imported any notetracks.
+    if notifications:
+        utilitySyncNotetracks()
 
     # Set the animation segment
     if wantedSmallestFrame == OpenMaya.MTime(sys.maxsize, wantedFps):
