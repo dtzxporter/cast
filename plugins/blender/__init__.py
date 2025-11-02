@@ -42,12 +42,14 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     bl_description = "Import one or more Cast files"
     bl_options = {'PRESET'}
 
-    directory: StringProperty(subtype="DIR_PATH")
+    directory: StringProperty(subtype="DIR_PATH", options={'SKIP_SAVE'})
 
     filename_ext = ".cast"
     filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
 
-    files: CollectionProperty(type=bpy.types.PropertyGroup)
+    files: CollectionProperty(
+        type=bpy.types.OperatorFileListElement, options={'SKIP_SAVE'})
+    filepath: StringProperty(subtype="FILE_PATH", options={'SKIP_SAVE'})
 
     import_time: BoolProperty(
         name="Import At Scene Time", description="Import animations starting at the current scene time", default=False)
@@ -145,6 +147,13 @@ class ImportCast(bpy.types.Operator, ImportHelper):
             self.report({'ERROR'}, str(e))
             return {'FINISHED'}
 
+    def invoke(self, context, event):
+        if self.directory or self.filepath:
+            return self.execute(context)
+
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
     @classmethod
     def poll(self, context):
         return True
@@ -159,8 +168,6 @@ class ExportCast(bpy.types.Operator, ExportHelper):
 
     filename_ext = ".cast"
     filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
-
-    files: CollectionProperty(type=bpy.types.PropertyGroup)
 
     export_selected: BoolProperty(
         name="Export Selected", description="Whether or not to only export the selected object", default=False)
@@ -209,6 +216,18 @@ class ExportCast(bpy.types.Operator, ExportHelper):
         return True
 
 
+if utilityIsVersionAtLeast(4, 1):
+    class DragAndDropCast(bpy.types.FileHandler):
+        bl_idname = "SCENE_FH_cast_import"
+        bl_label = "File handler for cast import"
+        bl_import_operator = "import_scene.cast"
+        bl_file_extensions = ".cast"
+
+        @classmethod
+        def poll_drop(cls, context):
+            return (context.area and context.area.type == 'VIEW_3D')
+
+
 def menu_func_cast_import(self, context):
     self.layout.operator(ImportCast.bl_idname, text="Cast (.cast)")
 
@@ -228,6 +247,9 @@ def register():
 
     bpy.types.Scene.cast_properties = PointerProperty(type=CastProperties)
 
+    if utilityIsVersionAtLeast(4, 1):
+        bpy.utils.register_class(DragAndDropCast)
+
 
 def unregister():
     bpy.utils.unregister_class(ImportCast)
@@ -239,6 +261,9 @@ def unregister():
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_cast_export)
 
     del bpy.types.Scene.cast_properties
+
+    if utilityIsVersionAtLeast(4, 1):
+        bpy.utils.unregister_class(DragAndDropCast)
 
 
 bpy.types.PoseBone.cast_bind_pose_scale = FloatVectorProperty(
