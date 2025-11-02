@@ -735,6 +735,45 @@ def utilityGetCurveInterpolation(curvePath):
         return "none"
 
 
+def utilityQueryMaterialSlots(shader, matNode, path):
+    slots = {
+        "baseColor": "albedo",
+        "color": "diffuse",
+        "ambientColor": "specular",
+        "specular": "specular",
+        "specularColor": "specular",
+        "metalness": "metal",
+        "specularRoughness": "roughness",
+        "specularAnisotropy": "aniso",
+        "normalCamera": "normal",
+    }
+
+    fileConnections = cmds.listConnections(shader,
+                                           plugs=True,
+                                           connections=True,
+                                           type="file")
+
+    for i in xrange(0, len(fileConnections), 2):
+        connection = fileConnections[i].split(".")[-1]
+        node = fileConnections[i + 1].split(".")[0]
+
+        if not cmds.objExists("%s.fileTextureName" % node):
+            continue
+
+        file = matNode.CreateFile()
+        filePath = cmds.getAttr("%s.fileTextureName" % node)
+
+        try:
+            # Attempt to build a relative path to the image based on where the cast is being saved.
+            file.SetPath(os.path.relpath(filePath, os.path.dirname(path)))
+        except:
+            # Fallback to the absolute path of the image.
+            file.SetPath(filePath)
+
+        if connection in slots:
+            matNode.SetSlot(slots[connection], file.Hash())
+
+
 def utilityAssignMaterialSlots(shader, slots, basic, path):
     # Determine workflow, metalness/roughness or specular/gloss
     metalness = ("metal" in slots and not basic)
@@ -811,8 +850,8 @@ def utilityAssignMaterialSlots(shader, slots, basic, path):
             cmds.connectAttr(("%s.outUV" % texture2dNode),
                              ("%s.uvCoord" % node))
         elif connection.__class__ is Color:
-            node = cmds.shadingNode("colorConstant", name=(
-                "color_%s" % slot), asUtility=True)
+            node = cmds.shadingNode("colorConstant",
+                                    name=("color_%s" % slot), asUtility=True)
 
             # Handle color conversion if necessary, maya color node is linear.
             if connection.ColorSpace() == "srgb":
@@ -856,6 +895,25 @@ def utilityAssignMaterialSlots(shader, slots, basic, path):
         else:
             cmds.connectAttr(("%s.outColor" % node), ("%s.%s" % (
                 shader, switcher[slot])), force=True)
+
+
+def utilityGetMaterial(mesh, path):
+    shaders = OpenMaya.MObjectArray()
+    shaderIndices = OpenMaya.MIntArray()
+    materialPlugs = OpenMaya.MPlugArray()
+
+    mesh.getConnectedShaders(path.instanceNumber(), shaders, shaderIndices)
+
+    for i in xrange(shaders.length()):
+        shaderNode = OpenMaya.MFnDependencyNode(shaders[i])
+
+        shaderPlug = shaderNode.findPlug("surfaceShader")
+        shaderPlug.connectedTo(materialPlugs, True, False)
+
+        if materialPlugs.length() > 0:
+            return OpenMaya.MFnDependencyNode(materialPlugs[0].node()).name()
+
+    return None
 
 
 def utilityCreateMaterial(name, type, slots={}, path=""):
@@ -2537,7 +2595,7 @@ def exportAnimation(root, exportSelected):
         notetrack.SetKeyFrameBuffer([int(x) for x in notifications[note]])
 
 
-def exportModel(root, exportSelected):
+def exportModel(root, exportSelected, filePath):
     model = root.CreateModel()
 
     # Grab all selected, or objects that can be exported.
@@ -2645,6 +2703,7 @@ def exportModel(root, exportSelected):
             bone.SetScale(joint[6])
 
     uniqueMeshes = set()
+    uniqueMaterials = {}
 
     for i in xrange(objects.length()):
         dependNode = OpenMaya.MObject()
@@ -2675,6 +2734,23 @@ def exportModel(root, exportSelected):
 
         if not meshName.startswith("CastShape"):
             meshNode.SetName(meshName)
+
+        # Collect, deduplicate materials.
+        material = utilityGetMaterial(mesh, transformDagPath)
+
+        if material:
+            if material in uniqueMaterials:
+                meshNode.SetMaterial(uniqueMaterials[material])
+            else:
+                matNode = model.CreateMaterial()
+                matNode.SetName(material)
+                matNode.SetType("pbr")
+
+                utilityQueryMaterialSlots(material, matNode, filePath)
+
+                uniqueMaterials[material] = matNode.Hash()
+
+                meshNode.SetMaterial(uniqueMaterials[material])
 
         # Collect uv layers for this mesh.
         uvLayers = \
@@ -2853,7 +2929,7 @@ def exportCast(path, exportSelected):
             exportAnimation(root, exportSelected)
 
         if sceneSettings["exportModel"]:
-            exportModel(root, exportSelected)
+            exportModel(root, exportSelected, path)
 
         cast.save(path)
     finally:
