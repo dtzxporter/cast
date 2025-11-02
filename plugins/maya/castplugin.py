@@ -12,6 +12,9 @@ import maya.OpenMayaMPx as OpenMayaMPx
 
 from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File, Color
 
+# Minimum weight value to be considered.
+WEIGHT_THRESHOLD = 0.000001
+
 # Support Python 3.0+
 try:
     if xrange is None:
@@ -255,6 +258,42 @@ def utilityEditNotetracks():
                     ])
 
     cmds.showWindow(window)
+
+
+def utilityGetDagPath(pathName):
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(pathName)
+
+    dagPath = OpenMaya.MDagPath()
+
+    selectList.getDagPath(0, dagPath)
+
+    return dagPath
+
+
+def utilityBoneIndex(list, name):
+    for i, v in enumerate(list):
+        if v[0] == name:
+            return i
+    return -1
+
+
+def utilityBoneParent(joint):
+    fullPath = joint.fullPathName()
+    splitPath = fullPath[1:].split("|")
+    splitCount = len(splitPath)
+
+    if splitCount > 2:
+        dagPath = utilityGetDagPath(splitPath[len(splitPath) - 2])
+    elif splitCount == 2:
+        dagPath = utilityGetDagPath(fullPath[0:fullPath.find("|", 1)])
+    else:
+        dagPath = None
+
+    if dagPath and dagPath.hasFn(OpenMaya.MFn.kJoint):
+        return splitPath[len(splitPath) - 2]
+
+    return None
 
 
 def utilityFramerateToUnit(framerate):
@@ -584,12 +623,7 @@ def utilityClearAnimation():
 
     for jointPath in cmds.ls(type="joint", long=True):
         try:
-            selectList = OpenMaya.MSelectionList()
-            selectList.add(jointPath)
-
-            dagPath = OpenMaya.MDagPath()
-            selectList.getDagPath(0, dagPath)
-
+            dagPath = utilityGetDagPath(jointPath)
             restPosition = utilityGetSavedNodeData(dagPath)
 
             transform = OpenMaya.MFnTransform(dagPath)
@@ -611,6 +645,21 @@ def utilityClearAnimation():
     cmds.currentTime(0, edit=True)
 
     utilityClearNotetracks()
+
+
+def utilityGetSkinCluster(mesh):
+    skinCluster = mel.eval("findRelatedSkinCluster %s" % mesh.fullPathName())
+
+    if not skinCluster:
+        return None
+
+    selectList = OpenMaya.MSelectionList()
+    selectList.add(skinCluster)
+
+    clusterObject = OpenMaya.MObject()
+    selectList.getDependNode(0, clusterObject)
+
+    return OpenMayaAnim.MFnSkinCluster(clusterObject)
 
 
 def utilityCreateSkinCluster(newMesh, bones=[], maxWeightInfluence=1, skinningMethod="linear"):
@@ -684,6 +733,45 @@ def utilityGetCurveInterpolation(curvePath):
         cmds.rotationInterpolation(curvePath, q=True)
     except RuntimeError:
         return "none"
+
+
+def utilityQueryMaterialSlots(shader, matNode, path):
+    slots = {
+        "baseColor": "albedo",
+        "color": "diffuse",
+        "ambientColor": "specular",
+        "specular": "specular",
+        "specularColor": "specular",
+        "metalness": "metal",
+        "specularRoughness": "roughness",
+        "specularAnisotropy": "aniso",
+        "normalCamera": "normal",
+    }
+
+    fileConnections = cmds.listConnections(shader,
+                                           plugs=True,
+                                           connections=True,
+                                           type="file")
+
+    for i in xrange(0, len(fileConnections), 2):
+        connection = fileConnections[i].split(".")[-1]
+        node = fileConnections[i + 1].split(".")[0]
+
+        if not cmds.objExists("%s.fileTextureName" % node):
+            continue
+
+        file = matNode.CreateFile()
+        filePath = cmds.getAttr("%s.fileTextureName" % node)
+
+        try:
+            # Attempt to build a relative path to the image based on where the cast is being saved.
+            file.SetPath(os.path.relpath(filePath, os.path.dirname(path)))
+        except:
+            # Fallback to the absolute path of the image.
+            file.SetPath(filePath)
+
+        if connection in slots:
+            matNode.SetSlot(slots[connection], file.Hash())
 
 
 def utilityAssignMaterialSlots(shader, slots, basic, path):
@@ -762,8 +850,8 @@ def utilityAssignMaterialSlots(shader, slots, basic, path):
             cmds.connectAttr(("%s.outUV" % texture2dNode),
                              ("%s.uvCoord" % node))
         elif connection.__class__ is Color:
-            node = cmds.shadingNode("colorConstant", name=(
-                "color_%s" % slot), asUtility=True)
+            node = cmds.shadingNode("colorConstant",
+                                    name=("color_%s" % slot), asUtility=True)
 
             # Handle color conversion if necessary, maya color node is linear.
             if connection.ColorSpace() == "srgb":
@@ -807,6 +895,25 @@ def utilityAssignMaterialSlots(shader, slots, basic, path):
         else:
             cmds.connectAttr(("%s.outColor" % node), ("%s.%s" % (
                 shader, switcher[slot])), force=True)
+
+
+def utilityGetMaterial(mesh, path):
+    shaders = OpenMaya.MObjectArray()
+    shaderIndices = OpenMaya.MIntArray()
+    materialPlugs = OpenMaya.MPlugArray()
+
+    mesh.getConnectedShaders(path.instanceNumber(), shaders, shaderIndices)
+
+    for i in xrange(shaders.length()):
+        shaderNode = OpenMaya.MFnDependencyNode(shaders[i])
+
+        shaderPlug = shaderNode.findPlug("surfaceShader")
+        shaderPlug.connectedTo(materialPlugs, True, False)
+
+        if materialPlugs.length() > 0:
+            return OpenMaya.MFnDependencyNode(materialPlugs[0].node()).name()
+
+    return None
 
 
 def utilityCreateMaterial(name, type, slots={}, path=""):
@@ -927,11 +1034,7 @@ def utilityGetOrCreateCurve(name, property, curveType):
         return None
 
     try:
-        selectList = OpenMaya.MSelectionList()
-        selectList.add(name)
-
-        nodePath = OpenMaya.MDagPath()
-        selectList.getDagPath(0, nodePath)
+        nodePath = utilityGetDagPath(name)
     except RuntimeError:
         cmds.warning("Unable to animate %s[%s] due to a name conflict in the scene" % (
             name, property))
@@ -1306,11 +1409,7 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
         # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
         remappedBones[paths[i]] = sceneSkeleton[bone.Name()]
 
-        selectList = OpenMaya.MSelectionList()
-        selectList.add(sceneSkeleton[bone.Name()])
-
-        existingPath = OpenMaya.MDagPath()
-        selectList.getDagPath(0, existingPath)
+        existingPath = utilityGetDagPath(sceneSkeleton[bone.Name()])
 
         # Store remapped connections for later, after bind pose remap.
         existingBones[i] = (existingPath.fullPathName(),
@@ -1737,8 +1836,8 @@ def importModelNode(model, path):
                 scriptUtil.asFloatPtr(), len(faces))
 
             scriptUtil = OpenMaya.MScriptUtil()
-            scriptUtil.createFromList([1 - y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
-                                                        for x in xrange(len(faces))] for y in xs], len(faces))
+            scriptUtil.createFromList([1.0 - y for xs in [uvLayer[faces[x] * 2 + 1:faces[x] * 2 + 2]
+                                                          for x in xrange(len(faces))] for y in xs], len(faces))
 
             uvVBuffer = OpenMaya.MFloatArray(
                 scriptUtil.asFloatPtr(), len(faces))
@@ -2301,13 +2400,7 @@ def importInstanceNodes(nodes, path, sceneRoot):
         for instance in instances:
             newInstance = cmds.instance(base, name=instance.Name())[0]
 
-            selectList = OpenMaya.MSelectionList()
-            selectList.add(newInstance)
-
-            dagPath = OpenMaya.MDagPath()
-            selectList.getDagPath(0, dagPath)
-
-            transform = OpenMaya.MFnTransform(dagPath)
+            transform = OpenMaya.MFnTransform(utilityGetDagPath(newInstance))
 
             (position, rotation, scale) = \
                 utilityCreatePRS(instance.Position(),
@@ -2364,7 +2457,7 @@ def importCast(path):
         importMetadata(meta)
 
 
-def exportAnimation(root, objects):
+def exportAnimation(root, exportSelected):
     animation = root.CreateAnimation()
     animation.SetFramerate(utilityUnitToFramerate(OpenMaya.MTime.uiUnit()))
     animation.SetLooping(
@@ -2383,6 +2476,9 @@ def exportAnimation(root, objects):
     if endFrame < 0:
         cmds.error("Animation end time must not be negative.")
         return
+
+    # Grab objects which are able to be exported.
+    objects = cmds.ls(type="joint", selection=exportSelected)
 
     simpleProperties = [
         ["translateX", "tx"],
@@ -2499,6 +2595,319 @@ def exportAnimation(root, objects):
         notetrack.SetKeyFrameBuffer([int(x) for x in notifications[note]])
 
 
+def exportModel(root, exportSelected, filePath):
+    model = root.CreateModel()
+
+    # Grab all selected, or objects that can be exported.
+    objects = OpenMaya.MSelectionList()
+
+    if exportSelected:
+        OpenMaya.MGlobal.getActiveSelectionList(objects)
+    else:
+        mel.eval("select -r `ls -type joint`;")
+        mel.eval("string $transforms[] = `ls -tr`;"
+                 "string $meshes[] = `filterExpand -sm 12 $transforms`;"
+                 "select -add $meshes")
+        OpenMaya.MGlobal.getActiveSelectionList(objects)
+
+    parentStack = []
+
+    uniqueBoneIndex = 0
+    uniqueBones = {}
+
+    for i in xrange(objects.length()):
+        dependNode = OpenMaya.MObject()
+
+        objects.getDependNode(i, dependNode)
+
+        if not dependNode.hasFn(OpenMaya.MFn.kJoint):
+            continue
+
+        jointPathName = OpenMaya.MFnDagNode(dependNode).fullPathName()
+        joint = OpenMayaAnim.MFnIkJoint(utilityGetDagPath(jointPathName))
+        jointName = joint.name()
+
+        if jointName in uniqueBones:
+            continue
+
+        parentStack.append((jointName, utilityBoneParent(joint)))
+
+        worldPosition = joint.getTranslation(OpenMaya.MSpace.kWorld)
+        localPosition = joint.getTranslation(OpenMaya.MSpace.kTransform)
+
+        worldRotation = OpenMaya.MQuaternion()
+        localRotation = OpenMaya.MQuaternion()
+        localOrientation = OpenMaya.MQuaternion()
+
+        joint.getRotation(worldRotation, OpenMaya.MSpace.kWorld)
+        joint.getRotation(localRotation, OpenMaya.MSpace.kTransform)
+        joint.getOrientation(localOrientation)
+
+        localRotation = localRotation * localOrientation
+
+        scale = OpenMaya.MScriptUtil()
+        scale.createFromList([1.0, 1.0, 1.0], 3)
+        scalePtr = scale.asDoublePtr()
+
+        joint.getScale(scalePtr)
+
+        segmentScaleCompensate = \
+            bool(cmds.getAttr("%s.segmentScaleCompensate" % joint.fullPathName()))
+
+        uniqueBones[jointName] = [
+            # Parent index in the parent stack.
+            -1,
+            # Segment scale compensate.
+            segmentScaleCompensate,
+            # World position.
+            (worldPosition.x, worldPosition.y, worldPosition.z),
+            (localPosition.x, localPosition.y, localPosition.z),
+            # World rotation.
+            (worldRotation.x, worldRotation.y,
+             worldRotation.z, worldRotation.w),
+            # Local rotation.
+            (localRotation.x, localRotation.y,
+             localRotation.z, localRotation.w),
+            # Scale.
+            (scale.getDoubleArrayItem(scalePtr, 0),
+             scale.getDoubleArrayItem(scalePtr, 1),
+             scale.getDoubleArrayItem(scalePtr, 2)),
+            # Index in the final bone array.
+            0]
+
+    for (boneName, boneParent) in parentStack:
+        if boneParent:
+            uniqueBones[boneName][0] = \
+                utilityBoneIndex(parentStack, boneParent)
+
+    if parentStack:
+        skeleton = model.CreateSkeleton()
+
+        for (boneName, _) in parentStack:
+            joint = uniqueBones[boneName]
+            joint[7] = uniqueBoneIndex
+
+            uniqueBoneIndex += 1
+
+            bone = skeleton.CreateBone()
+            bone.SetName(boneName)
+            bone.SetParentIndex(joint[0])
+            bone.SetSegmentScaleCompensate(joint[1])
+
+            bone.SetWorldPosition(joint[2])
+            bone.SetLocalPosition(joint[3])
+
+            bone.SetWorldRotation(joint[4])
+            bone.SetLocalRotation(joint[5])
+
+            bone.SetScale(joint[6])
+
+    uniqueMeshes = set()
+    uniqueMaterials = {}
+
+    for i in xrange(objects.length()):
+        dependNode = OpenMaya.MObject()
+
+        objects.getDependNode(i, dependNode)
+
+        if not dependNode.hasFn(OpenMaya.MFn.kTransform):
+            continue
+
+        transformPathName = OpenMaya.MFnDagNode(dependNode).fullPathName()
+        transformDagPath = utilityGetDagPath(transformPathName)
+
+        try:
+            transformDagPath.extendToShape()
+        except RuntimeError:
+            continue
+
+        meshPath = transformDagPath.partialPathName()
+        mesh = OpenMaya.MFnMesh(transformDagPath)
+        meshName = mesh.name()
+
+        if meshPath in uniqueMeshes:
+            continue
+
+        uniqueMeshes.add(meshPath)
+
+        meshNode = model.CreateMesh()
+
+        if not meshName.startswith("CastShape"):
+            meshNode.SetName(meshName)
+
+        # Collect, deduplicate materials.
+        material = utilityGetMaterial(mesh, transformDagPath)
+
+        if material:
+            if material in uniqueMaterials:
+                meshNode.SetMaterial(uniqueMaterials[material])
+            else:
+                matNode = model.CreateMaterial()
+                matNode.SetName(material)
+                matNode.SetType("pbr")
+
+                utilityQueryMaterialSlots(material, matNode, filePath)
+
+                uniqueMaterials[material] = matNode.Hash()
+
+                meshNode.SetMaterial(uniqueMaterials[material])
+
+        # Collect uv layers for this mesh.
+        uvLayers = \
+            cmds.polyUVSet(meshPath,
+                           q=True, allUVSets=True)
+        # Collect color layers for this mesh.
+        colorLayers = \
+            cmds.polyColorSet(meshPath,
+                              q=True, allColorSets=True)
+
+        # Find the skin cluster for this mesh.
+        skinCluster = utilityGetSkinCluster(transformDagPath)
+        skinJoints = OpenMaya.MDagPathArray()
+
+        if skinCluster:
+            skinCluster.influenceObjects(skinJoints)
+
+        vertexIter = OpenMaya.MItMeshVertex(transformDagPath)
+        vertexCount = vertexIter.count()
+
+        vertexPositions = [None] * vertexCount
+        vertexNormals = [None] * vertexCount
+        vertexUVLayers = [[None] * vertexCount for _ in uvLayers]
+        vertexColorLayers = [[None] * vertexCount for _ in colorLayers]
+        vertexMaxInfluence = 0
+
+        normal = OpenMaya.MVector()
+        uv = OpenMaya.MScriptUtil()
+        color = OpenMaya.MColor()
+
+        numWeights = OpenMaya.MScriptUtil()
+        numWeightsPtr = numWeights.asUintPtr()
+        weights = OpenMaya.MDoubleArray()
+        bones = [0] * skinJoints.length()
+
+        # Create weight index to bone index lookup.
+        for index in xrange(skinJoints.length()):
+            jointDagPath = skinJoints[index]
+
+            if not jointDagPath.hasFn(OpenMaya.MFn.kJoint):
+                cmds.warning("Skipping non-joint influence object: %s" %
+                             jointDagPath.partialPathName())
+                continue
+
+            joint = OpenMayaAnim.MFnIkJoint(jointDagPath)
+            jointName = joint.name()
+
+            try:
+                bones[index] = uniqueBones[jointName][7]
+            except KeyError:
+                cmds.warning("Skipping joint not in skeleton: %s" % jointName)
+                pass
+
+        uv.createFromList([0.0, 0.0], 2)
+        uvPtr = uv.asFloat2Ptr()
+
+        while not vertexIter.isDone():
+            index = vertexIter.index()
+
+            position = vertexIter.position(OpenMaya.MSpace.kWorld)
+
+            vertexPositions[index] = \
+                (position.x, position.y, position.z)
+
+            vertexIter.getNormal(normal)
+
+            vertexNormals[index] = \
+                (normal.x, normal.y, normal.z)
+
+            for i, uvLayer in enumerate(uvLayers):
+                vertexIter.getUV(uvPtr, uvLayer)
+
+                vertexUVLayers[i][index] = \
+                    (OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPtr, 0, 0),
+                     1.0 - OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPtr, 0, 1))
+
+            for i, colorLayer in enumerate(colorLayers):
+                vertexIter.getColor(color, colorLayer)
+
+                vertexColorLayers[i][index] = \
+                    (color.r, color.g, color.b, color.a)
+
+            if skinCluster:
+                skinCluster.getWeights(transformDagPath,
+                                       vertexIter.currentItem(),
+                                       weights,
+                                       numWeightsPtr)
+
+                # Calculate the maximum influence for this vertex.
+                influence = 0
+
+                for vindex in xrange(weights.length()):
+                    if weights[vindex] > WEIGHT_THRESHOLD:
+                        influence += 1
+
+                vertexMaxInfluence = max(vertexMaxInfluence, influence)
+
+            vertexIter.next()
+
+        if vertexMaxInfluence > 0:
+            vertexWeightValueBuffer = [0.0] * vertexCount * vertexMaxInfluence
+            vertexWeightBoneBuffer = [0] * vertexCount * vertexMaxInfluence
+
+            vertexIter.reset()
+
+            while not vertexIter.isDone():
+                index = vertexIter.index()
+
+                skinCluster.getWeights(transformDagPath,
+                                       vertexIter.currentItem(),
+                                       weights,
+                                       numWeightsPtr)
+
+                slot = 0
+
+                for vindex in xrange(weights.length()):
+                    if weights[vindex] > WEIGHT_THRESHOLD:
+                        vertexWeightValueBuffer[(
+                            index * vertexMaxInfluence) + slot] = weights[vindex]
+                        vertexWeightBoneBuffer[(
+                            index * vertexMaxInfluence) + slot] = bones[vindex]
+
+                        slot += 1
+
+                vertexIter.next()
+
+            meshNode.SetMaximumWeightInfluence(vertexMaxInfluence)
+            meshNode.SetVertexWeightValueBuffer(vertexWeightValueBuffer)
+            meshNode.SetVertexWeightBoneBuffer(vertexWeightBoneBuffer)
+
+        meshNode.SetVertexPositionBuffer(vertexPositions)
+        meshNode.SetVertexNormalBuffer(vertexNormals)
+
+        for uvLayer, vertexUVs in enumerate(vertexUVLayers):
+            meshNode.SetVertexUVLayerBuffer(uvLayer, vertexUVs)
+
+        meshNode.SetUVLayerCount(len(vertexUVLayers))
+
+        for colorLayer, vertexColors in enumerate(vertexColorLayers):
+            meshNode.SetVertexColorBuffer(colorLayer, vertexColors)
+
+        meshNode.SetColorLayerCount(len(vertexColorLayers))
+
+        faceCounts = OpenMaya.MIntArray()
+        faceIndices = OpenMaya.MIntArray()
+
+        # Automatically converts n-gons to triangle faces.
+        mesh.getTriangles(faceCounts, faceIndices)
+
+        faceBuffer = [0] * faceIndices.length()
+
+        for i in xrange(faceIndices.length()):
+            faceBuffer[i] = faceIndices[i]
+
+        meshNode.SetFaceBuffer(faceBuffer)
+
+
 def exportCast(path, exportSelected):
     # Query current user settings so we can reset them after the operation completes.
     currentAngle = cmds.currentUnit(query=True, angle=True)
@@ -2517,11 +2926,10 @@ def exportCast(path, exportSelected):
         cmds.currentUnit(angle="rad")
 
         if sceneSettings["exportAnim"]:
-            exportAnimation(root,
-                            cmds.ls(type="joint", selection=exportSelected))
+            exportAnimation(root, exportSelected)
 
         if sceneSettings["exportModel"]:
-            print("")
+            exportModel(root, exportSelected, path)
 
         cast.save(path)
     finally:
