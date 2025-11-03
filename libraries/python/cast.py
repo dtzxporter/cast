@@ -1,4 +1,5 @@
 import struct
+import itertools
 
 castHashBase = 0x534E495752545250
 
@@ -139,24 +140,26 @@ class CastProperty(object):
         """Loads a cast property from the given file."""
         header = struct.unpack("2sHI", file.read(0x8))
 
-        self.name = struct.unpack(("%ds" % header[1]), file.read(header[1]))[
-            0].decode("utf-8")
+        self.name = struct.unpack(("%ds" % header[1]),
+                                  file.read(header[1]))[0].decode("utf-8")
         self.type = CastProperty_t(header[0].decode("utf-8").strip('\0'))
 
         if (self.type.size == 0 and self.type.fmt == "s"):
             self.values = [CastString_t(file).value]
         else:
             self.values = [None] * header[2]
-            self.values = struct.unpack(
-                self.type.fmt * header[2], file.read(self.type.size * header[2]))
+            self.values = struct.unpack(self.type.fmt * header[2],
+                                        file.read(self.type.size * header[2]))
 
     def save(self, file):
         """Saves this cast property to the given file."""
         identifier = self.type.identifier.encode("utf-8")
         name = self.name.encode("utf-8")
 
-        file.write(struct.pack(
-            "2sHI", identifier, len(name), int(len(self.values) / self.type.array)))
+        file.write(struct.pack("2sHI",
+                               identifier,
+                               len(name),
+                               int(len(self.values) / self.type.array)))
         file.write(name)
 
         if self.type.size == 0 and self.type.fmt == "s":
@@ -258,8 +261,12 @@ class CastNode(object):
 
     def save(self, file):
         """Saves this cast node to the given file."""
-        file.write(struct.pack("IIQII", self.identifier, self.length(),
-                               self.hash, len(self.properties), len(self.childNodes)))
+        file.write(struct.pack("IIQII",
+                               self.identifier,
+                               self.length(),
+                               self.hash,
+                               len(self.properties),
+                               len(self.childNodes)))
 
         for property in self.properties.values():
             property.save(file)
@@ -481,8 +488,8 @@ class Curve(CastNode):
 
     def SetKeyFrameBuffer(self, values):
         """Sets the collection of keyframes."""
-        self.CreateProperty("kb", castTypeForMaximum(
-            values)).values = list(values)
+        self.CreateProperty("kb",
+                            castTypeForMaximum(values)).values = list(values)
 
     def KeyValueBuffer(self):
         """The collection of keyframe values."""
@@ -497,7 +504,8 @@ class Curve(CastNode):
 
     def SetVec4KeyValueBuffer(self, values):
         """Sets the collection of keyframe values as a collection of vec4s."""
-        self.CreateProperty("kv", "4v").values = list(sum(values, ()))
+        self.CreateProperty("kv", "4v").values = \
+            list(itertools.chain.from_iterable(values))
 
     def SetByteKeyValueBuffer(self, values):
         """Sets the collection of keyframe values as a collection of bytes."""
@@ -623,8 +631,8 @@ class NotificationTrack(CastNode):
 
     def SetKeyFrameBuffer(self, values):
         """Sets the collection of keyframes this notification fires on."""
-        self.CreateProperty("kb", castTypeForMaximum(
-            values)).values = list(values)
+        self.CreateProperty("kb",
+                            castTypeForMaximum(values)).values = list(values)
 
 
 class Mesh(CastNode):
@@ -715,8 +723,8 @@ class Mesh(CastNode):
 
     def SetFaceBuffer(self, values):
         """Sets the collection of faces for this mesh."""
-        self.CreateProperty("f", castTypeForMaximum(values)
-                            ).values = list(values)
+        self.CreateProperty("f",
+                            castTypeForMaximum(values)).values = list(values)
 
     def VertexPositionBuffer(self):
         """The collection of vertex positions for this mesh."""
@@ -727,7 +735,8 @@ class Mesh(CastNode):
 
     def SetVertexPositionBuffer(self, values):
         """Sets the collection of vertex positions for this mesh."""
-        self.CreateProperty("vp", "3v").values = list(sum(values, ()))
+        self.CreateProperty("vp", "3v").values = \
+            list(itertools.chain.from_iterable(values))
 
     def VertexNormalBuffer(self):
         """The collection of vertex normals for this mesh."""
@@ -738,7 +747,8 @@ class Mesh(CastNode):
 
     def SetVertexNormalBuffer(self, values):
         """Sets the collection of vertex normals for this mesh."""
-        self.CreateProperty("vn", "3v").values = list(sum(values, ()))
+        self.CreateProperty("vn", "3v").values = \
+            list(itertools.chain.from_iterable(values))
 
     def VertexTangentBuffer(self):
         """The collection of vertex tangents for this mesh."""
@@ -749,7 +759,8 @@ class Mesh(CastNode):
 
     def SetVertexTangentBuffer(self, values):
         """Sets the collection of vertex tangents for this mesh."""
-        self.CreateProperty("vt", "3v").values = list(sum(values, ()))
+        self.CreateProperty("vt", "3v").values = \
+            list(itertools.chain.from_iterable(values))
 
     def VertexColorLayerBuffer(self, index):
         """The vertex color layer collection for the given layer index."""
@@ -770,8 +781,8 @@ class Mesh(CastNode):
         if values and isinstance(values[0], int):
             self.CreateProperty("c%d" % index, "i").values = list(values)
         else:
-            self.CreateProperty(
-                "c%d" % index, "4v").values = list(sum(values, ()))
+            self.CreateProperty("c%d" % index, "4v").values = \
+                list(itertools.chain.from_iterable(values))
 
     def VertexColorLayerBufferPacked(self, index):
         """Whether or not the vertex color layer is in packed integer format (CastColor) or floating point format."""
@@ -792,7 +803,8 @@ class Mesh(CastNode):
 
     def SetVertexUVLayerBuffer(self, index, values):
         """Sets the uv layer collection for the given layer index."""
-        self.CreateProperty("u%d" % index, "2v").values = list(sum(values, ()))
+        self.CreateProperty("u%d" % index, "2v").values = \
+            list(itertools.chain.from_iterable(values))
 
     def VertexWeightBoneBuffer(self):
         """Gets the vertex weight bone index buffer."""
@@ -803,8 +815,8 @@ class Mesh(CastNode):
 
     def SetVertexWeightBoneBuffer(self, values):
         """Sets the vertex weight bone index buffer."""
-        self.CreateProperty("wb", castTypeForMaximum(
-            values)).values = list(values)
+        self.CreateProperty("wb",
+                            castTypeForMaximum(values)).values = list(values)
 
     def VertexWeightValueBuffer(self):
         """Gets the vertex weight value buffer."""
@@ -861,8 +873,8 @@ class Hair(CastNode):
 
     def SetSegmentBuffer(self, values):
         """Sets the number of segments for each strand in this hair."""
-        self.CreateProperty("se", castTypeForMaximum(
-            values)).values = list(values)
+        self.CreateProperty("se",
+                            castTypeForMaximum(values)).values = list(values)
 
     def ParticleBuffer(self):
         """The collection of particles for this hair."""
@@ -873,7 +885,8 @@ class Hair(CastNode):
 
     def SetParticleBuffer(self, values):
         """Sets the collection of particles for this hair."""
-        self.CreateProperty("pt", "3v").values = list(sum(values, ()))
+        self.CreateProperty("pt", "3v").values = \
+            list(itertools.chain.from_iterable(values))
 
     def Material(self):
         """Gets the material used for this hair."""
@@ -924,8 +937,8 @@ class BlendShape(CastNode):
 
     def SetTargetShapeVertexIndices(self, indices):
         """Sets a collection of target shape vertex indices."""
-        self.CreateProperty("vi", castTypeForMaximum(
-            indices)).values = list(indices)
+        self.CreateProperty("vi",
+                            castTypeForMaximum(indices)).values = list(indices)
 
     def TargetShapeVertexPositions(self):
         """A collection of target shape vertex positions."""
@@ -936,7 +949,8 @@ class BlendShape(CastNode):
 
     def SetTargetShapeVertexPositions(self, positions):
         """Sets a collection of target shape vertex positions."""
-        self.CreateProperty("vp", "3v").values = list(sum(positions, ()))
+        self.CreateProperty("vp", "3v").values = \
+            list(itertools.chain.from_iterable(positions))
 
     def TargetWeightScale(self):
         """The target shape scale value."""
@@ -1613,8 +1627,11 @@ class Cast(object):
         except IOError:
             raise Exception("Could not create file for writing: %s\n" % path)
 
-        file.write(struct.pack(
-            "IIII", 0x74736163, 0x1, len(self.rootNodes), 0))
+        file.write(struct.pack("IIII",
+                               0x74736163,
+                               0x1,
+                               len(self.rootNodes),
+                               0))
 
         for rootNode in self.rootNodes:
             rootNode.save(file)
