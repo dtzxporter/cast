@@ -2774,11 +2774,11 @@ def exportModel(root, exportSelected, filePath):
         # Collect uv layers for this mesh.
         uvLayers = \
             cmds.polyUVSet(meshPath,
-                           q=True, allUVSets=True)
+                           q=True, allUVSets=True) or []
         # Collect color layers for this mesh.
         colorLayers = \
             cmds.polyColorSet(meshPath,
-                              q=True, allColorSets=True)
+                              q=True, allColorSets=True) or []
 
         # Find the skin cluster for this mesh.
         skinCluster = utilityGetSkinCluster(transformDagPath)
