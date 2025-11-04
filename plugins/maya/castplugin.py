@@ -290,7 +290,7 @@ def utilityBoneParent(joint):
     splitCount = len(splitPath)
 
     if splitCount > 2:
-        dagPath = utilityGetDagPath(splitPath[len(splitPath) - 2])
+        dagPath = utilityGetDagPath("|".join(splitPath[0:len(splitPath) - 2]))
     elif splitCount == 2:
         dagPath = utilityGetDagPath(fullPath[0:fullPath.find("|", 1)])
     else:
