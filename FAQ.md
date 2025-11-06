@@ -1,5 +1,8 @@
 # Cast | Frequently asked questions
 
+### Q: Can I convert from SEModel/SEAnim to Cast:
+A: SECast, a lossless converter to cast: [SECast](https://dtzxporter.com/tools/secast). If your tool supports exporting to cast directly, that is always better.
+
 ### Q: In Autodesk Maya, why doesn't cast set the animation range when importing an animation:
 A: In later versions of maya, they added import options. To configure them go to `File -> Import (Click the Square)` then set your playback settings to match: ![maya](images/maya-import.png)
 

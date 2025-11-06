@@ -10,18 +10,15 @@ The goal of cast is to create an easy to use format for models, animations, mate
 - Autodesk Maya (2016+): [Releases](https://github.com/dtzxporter/cast/releases)
 - Blender (3.6+): [Releases](https://github.com/dtzxporter/cast/releases)
 
-# Programming libraries:
-- Python: [Libraries/Python](https://github.com/dtzxporter/cast/tree/master/libraries/python)
+## Programming libraries:
+- Python: [cast.py](https://github.com/dtzxporter/cast/tree/master/libraries/python)
 - .NET Framework (by Scobalula): [Cast.NET](https://github.com/Scobalula/Cast.NET)
+- Java (by Jandk): [tinycast](https://github.com/jandk/tinycast)
 
-# Viewers:
+## Viewers:
 - CastModelViewer (By echo000): [Github](https://github.com/echo000/CastModelViewer)
 
-# Coming from SEAnim/SEModel:
-- SECast, a lossless converter to cast: [SECast](https://dtzxporter.com/tools/secast)
-- **Note:** If your tool supports exporting to cast directly, that is always better.
-
-# FAQ:
+## FAQ:
 - Frequently asked questions: [FAQ](FAQ.md)
 
 ## File stucture:
