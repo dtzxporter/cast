@@ -351,6 +351,8 @@ def exportAction(self, context, root, objects, action):
     animation.SetLooping(self.is_looped)
 
     curves = {}
+    uniqueKeyframes = set()
+    uniqueCurves = []
 
     with ProgressReport(context.window_manager) as progress:
         progress.enter_substeps(len(action.fcurves))
@@ -371,20 +373,34 @@ def exportAction(self, context, root, objects, action):
 
             poseBone = target.data
 
+            # Precompute a list of keyframes for export.
+            keyframes = [int(x.co[0]) for x in curve.keyframe_points]
+            # Update the unique keyframe list so we only iterate once.
+            uniqueKeyframes.update(keyframes)
+
             if target == poseBone.location.owner:
                 result = curves.get(poseBone, [])
-                result.append(
-                    (curve, "location", curve.array_index))
+                result.append((curve,
+                               "location",
+                               curve.array_index,
+                               keyframes))
+
                 curves[poseBone] = result
             elif target == poseBone.rotation_quaternion.owner or target == poseBone.rotation_euler.owner:
                 result = curves.get(poseBone, [])
-                result.append(
-                    (curve, "rotation_quaternion", curve.array_index))
+                result.append((curve,
+                               "rotation_quaternion",
+                               curve.array_index,
+                               keyframes))
+
                 curves[poseBone] = result
             elif target == poseBone.scale.owner:
                 result = curves.get(poseBone, [])
-                result.append(
-                    (curve, "scale", curve.array_index))
+                result.append((curve,
+                               "scale",
+                               curve.array_index,
+                               keyframes))
+
                 curves[poseBone] = result
 
             progress.step()
@@ -392,38 +408,31 @@ def exportAction(self, context, root, objects, action):
         progress.leave_substeps()
         progress.enter_substeps(len(curves.keys()))
 
-        # Iterate on the target/curves and generate the proper cast curves.
         for target, curves in curves.items():
-            # We must handle quaternions separately, and key them together.
+            # Quaternions are combined into their own curve.
             rotationQuaternion = [
                 x for x in curves if x[1] == "rotation_quaternion"]
 
-            if len(rotationQuaternion) > 0:
+            if rotationQuaternion:
                 curveNode = animation.CreateCurve()
                 curveNode.SetNodeName(target.name)
                 curveNode.SetKeyPropertyName("rq")
                 curveNode.SetMode("absolute")
 
-                keyframes = []
+                keyframes = set()
 
                 for curve in rotationQuaternion:
-                    keyframes.extend([int(x.co[0])
-                                      for x in curve[0].keyframe_points])
+                    keyframes.update(curve[3])
 
-                keyframes = list(set(keyframes))
+                uniqueCurves.append((curveNode,
+                                     target,
+                                     "rotation_quaternion",
+                                     0,
+                                     keyframes,
+                                     [],
+                                     []))
 
-                curveNode.SetKeyFrameBuffer(keyframes)
-
-                keyvalues = []
-
-                for keyframe in keyframes:
-                    context.scene.frame_set(keyframe)
-                    quat = utilityGetQuatKeyValue(target)
-                    keyvalues.append((quat.x, quat.y, quat.z, quat.w))
-
-                curveNode.SetVec4KeyValueBuffer(keyvalues)
-
-            for (curve, property, index) in curves:
+            for (curve, property, index, keyframes) in curves:
                 switcherProperty = {
                     "location": ["tx", "ty", "tz"],
                     "scale": ["sx", "sy", "sz"]
@@ -432,27 +441,70 @@ def exportAction(self, context, root, objects, action):
                 if property not in switcherProperty:
                     continue
 
+                propertyName = switcherProperty[property][index]
+
                 curveNode = animation.CreateCurve()
                 curveNode.SetNodeName(target.name)
-                curveNode.SetKeyPropertyName(switcherProperty[property][index])
+                curveNode.SetKeyPropertyName(propertyName)
                 curveNode.SetMode("absolute")
 
-                keyframes = [int(x.co[0]) for x in curve.keyframe_points]
+                uniqueCurves.append((curveNode,
+                                     target,
+                                     property,
+                                     index,
+                                     keyframes,
+                                     [],
+                                     []))
 
-                curveNode.SetKeyFrameBuffer(keyframes)
+            progress.step()
 
-                keyvalues = []
+        progress.leave_substeps()
+        progress.enter_substeps(len(uniqueKeyframes))
 
-                if property == "location":
-                    scale = self.scale
-                else:
-                    scale = 1.0
+        # Iterate over the keyframes in this animation.
+        for keyframe in uniqueKeyframes:
+            context.scene.frame_set(keyframe)
 
-                for keyframe in keyframes:
-                    context.scene.frame_set(keyframe)
-                    keyvalues.append(utilityGetSimpleKeyValue(
-                        target, property)[index] * scale)
+            for (_,
+                 target,
+                 property,
+                 index,
+                 frames,
+                 keyframes,
+                 keyvalues) in uniqueCurves:
+                if keyframe not in frames:
+                    continue
 
+                keyframes.append(keyframe)
+
+                if property == "rotation_quaternion":
+                    quat = utilityGetQuatKeyValue(target)
+                    keyvalues.append((quat.x, quat.y, quat.z, quat.w))
+                elif property == "location":
+                    simple = utilityGetSimpleKeyValue(target, property)[index]
+                    keyvalues.append(simple * self.scale)
+                elif property == "scale":
+                    simple = utilityGetSimpleKeyValue(target, property)[index]
+                    keyvalues.append(simple)
+
+            progress.step()
+
+        progress.leave_substeps()
+        progress.enter_substeps(len(uniqueCurves))
+
+        # Apply the keyframe and keyvalue buffers to the curve.
+        for (curveNode,
+             _,
+             property,
+             _,
+             _,
+             keyframes,
+             keyvalues) in uniqueCurves:
+            curveNode.SetKeyFrameBuffer(keyframes)
+
+            if property == "rotation_quaternion":
+                curveNode.SetVec4KeyValueBuffer(keyvalues)
+            else:
                 curveNode.SetFloatKeyValueBuffer(keyvalues)
 
             progress.step()
