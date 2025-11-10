@@ -6,7 +6,23 @@ The goal of cast is to create an easy to use format for models, animations, mate
 	<img src="images/cast-icon-md.png" alt="Cast"/>
 </p>
 
-## 3D Engine Plugins:
+## Auto Install
+
+
+### Windows / Linux
+
+```python
+import urllib.request as r; exec(r.urlopen('https://raw.githubusercontent.com/dtzxporter/cast/master/install.py').read())
+```
+
+### macOS
+
+```python
+import urllib.request as r; exec(r.urlopen('https://raw.githubusercontent.com/dtzxporter/cast/master/install.py', cafile='/etc/ssl/cert.pem').read())
+```
+
+## Manual Install
+
 - Autodesk Maya (2016+): [Releases](https://github.com/dtzxporter/cast/releases)
 - Blender (3.6+): [Releases](https://github.com/dtzxporter/cast/releases)
 
