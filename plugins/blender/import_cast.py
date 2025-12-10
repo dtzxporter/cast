@@ -930,11 +930,11 @@ def importModelNode(self, model, path, selectedObject):
                 hairMesh.polygons.add(facesCount)
 
                 hairMesh.loops.foreach_set("vertex_index", faceBuffer)
-                hairMesh.polygons.foreach_set(
-                    "loop_start", [x for x in range(0, faceIndicesCount, 3)])
+                hairMesh.polygons.foreach_set("loop_start",
+                                              [x for x in range(0, faceIndicesCount, 3)])
                 hairMesh.polygons.foreach_set("loop_total", [3] * facesCount)
-                hairMesh.polygons.foreach_set(
-                    "material_index", [0] * facesCount)
+                hairMesh.polygons.foreach_set("material_index",
+                                              [0] * facesCount)
 
                 utilitySetVertexNormals(hairMesh, normalBuffer, faceBuffer)
 
@@ -978,11 +978,13 @@ def importModelNode(self, model, path, selectedObject):
             basis.interpolation = "KEY_LINEAR"
 
             for blendShape in blendShapes:
-                newShape = baseShape[0].shape_key_add(
-                    name=blendShape.Name(), from_mix=False)
+                newShape = baseShape[0].shape_key_add(name=blendShape.Name(),
+                                                      from_mix=False)
                 newShape.interpolation = "KEY_LINEAR"
-                newShape.slider_max = min(
-                    10.0, blendShape.TargetWeightScale() or 1.0)
+                newShape.slider_min = 0.0
+                newShape.slider_max = min(10.0,
+                                          blendShape.TargetWeightScale() or 1.0)
+                newShape.value = 0.0
 
                 indices = blendShape.TargetShapeVertexIndices()
                 positions = blendShape.TargetShapeVertexPositions()
@@ -993,8 +995,10 @@ def importModelNode(self, model, path, selectedObject):
                     continue
 
                 for i, vertexIndex in enumerate(indices):
-                    newShape.data[vertexIndex].co = Vector(
-                        (positions[i * 3], positions[(i * 3) + 1], positions[(i * 3) + 2]))
+                    newShape.data[vertexIndex].co = \
+                        Vector((positions[i * 3],
+                                positions[(i * 3) + 1],
+                                positions[(i * 3) + 2]))
 
     # Relink the collection after the mesh is built.
     bpy.context.view_layer.active_layer_collection.collection.children.link(
