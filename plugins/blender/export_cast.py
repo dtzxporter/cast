@@ -1,11 +1,11 @@
 import bpy
-import bpy_types
 import bmesh
 import os
 
 from bpy_extras.wm_utils.progress_report import ProgressReport
 from mathutils import *
 from .cast import Cast, CastColor
+from .shared_cast import utilityIsVersionAtLeast
 
 # Minimum weight value to be considered.
 WEIGHT_THRESHOLD = 0.000001
@@ -37,6 +37,17 @@ def utilityGetQuatKeyValue(object):
         return (object.parent.matrix.to_3x3().inverted() @ object.matrix.to_3x3()).to_quaternion()
     else:
         return object.matrix.to_quaternion()
+
+
+def utilityGetActionCurves(action):
+    if utilityIsVersionAtLeast(5, 0):
+        slot = action.slots.active
+
+        for layer in action.layers:
+            for strip in layer.strips:
+                return strip.channelbag(slot).fcurves
+    else:
+        return action.fcurves
 
 
 def utilityAssignMaterialSlots(material, matNode, filepath):
@@ -354,12 +365,15 @@ def exportAction(self, context, root, objects, action):
     uniqueKeyframes = set()
     uniqueCurves = []
 
+    # Grab the curves from the action based on the current slot if necessary.
+    fcurves = utilityGetActionCurves(action)
+
     with ProgressReport(context.window_manager) as progress:
-        progress.enter_substeps(len(action.fcurves))
+        progress.enter_substeps(len(fcurves))
 
         # First pass will gather the curves we need to include in the animation and the properties they are keyed to.
         # This is because for curves like rotation_quaternion, we need all of the curves in one cast curve.
-        for curve in action.fcurves:
+        for curve in fcurves:
             result = utilityResolveObjectTarget(objects, curve.data_path)
 
             if result is None:
@@ -368,7 +382,7 @@ def exportAction(self, context, root, objects, action):
                 (object, target) = result
 
             # Right now, only support bone keys. Eventually, we will also check for BlendShape keys, and visibility keys.
-            if type(target.data) != bpy_types.PoseBone:
+            if type(target.data) != bpy.types.PoseBone:
                 continue
 
             poseBone = target.data
