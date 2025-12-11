@@ -53,8 +53,10 @@ def utilityCreatePRS(position, rotation, scale):
     scale = Vector(scale or (1, 1, 1))
 
     if rotation:
-        rotation = Quaternion(
-            (rotation[3], rotation[0], rotation[1], rotation[2]))
+        rotation = Quaternion((rotation[3],
+                               rotation[0],
+                               rotation[1],
+                               rotation[2]))
     else:
         rotation = Quaternion()
 
@@ -218,30 +220,40 @@ def utilitySetVertexNormals(mesh, vertexNormals, faces):
             tuple(zip(*(iter(vertexNormals),) * 3)))
     else:
         mesh.create_normals_split()
-        mesh.loops.foreach_set("normal", unpack_list(
-            [(vertexNormals[x * 3], vertexNormals[(x * 3) + 1], vertexNormals[(x * 3) + 2]) for x in faces]))
+        mesh.loops.foreach_set("normal", unpack_list([(vertexNormals[x * 3],
+                                                       vertexNormals[(
+                                                           x * 3) + 1],
+                                                       vertexNormals[(x * 3) + 2]) for x in faces]))
 
         mesh.validate(clean_customdata=False)
         clnors = array.array('f', [0.0] * (len(mesh.loops) * 3))
         mesh.loops.foreach_get("normal", clnors)
 
-        mesh.polygons.foreach_set(
-            "use_smooth", [True] * len(mesh.polygons))
+        mesh.polygons.foreach_set("use_smooth",
+                                  [True] * len(mesh.polygons))
 
         mesh.normals_split_custom_set(
             tuple(zip(*(iter(clnors),) * 3)))
         mesh.use_auto_smooth = True
 
 
-def utilityGetOrCreateCurve(fcurves, poseBones, name, curve):
+def utilityGetOrCreateCurve(action, actionObject, poseBones, name, curve):
     if not name in poseBones:
         return None
 
     bone = poseBones[name]
 
-    return fcurves.find(data_path="pose.bones[\"%s\"].%s" %
-                        (bone.name, curve[0]), index=curve[1]) or fcurves.new(data_path="pose.bones[\"%s\"].%s" %
-                                                                              (bone.name, curve[0]), index=curve[1], action_group=bone.name)
+    if utilityIsVersionAtLeast(5, 0):
+        return action.fcurve_ensure_for_datablock(actionObject,
+                                                  "pose.bones[\"%s\"].%s" % (bone.name,
+                                                                             curve[0]),
+                                                  index=curve[1],
+                                                  group_name=bone.name)
+    else:
+        return action.fcurves.find(data_path="pose.bones[\"%s\"].%s" % (bone.name, curve[0]),
+                                   index=curve[1]) or action.fcurves.new(data_path="pose.bones[\"%s\"].%s" % (bone.name, curve[0]),
+                                                                         index=curve[1],
+                                                                         action_group=bone.name)
 
 
 def utilityGetOrCreateSlot(action):
@@ -303,8 +315,9 @@ def importSkeletonConstraintNode(self, skeleton, poses):
             if customOffset:
                 constraintBone.location = Vector(customOffset)
 
-            ct = utilityGetOrCreateConstraint(
-                constraintBone, "COPY_LOCATION", targetBone)
+            ct = utilityGetOrCreateConstraint(constraintBone,
+                                              "COPY_LOCATION",
+                                              targetBone)
 
             if maintainOffset or customOffset:
                 ct.use_offset = True
@@ -313,11 +326,14 @@ def importSkeletonConstraintNode(self, skeleton, poses):
         elif type == "or":
             if customOffset:
                 constraintBone.rotation_mode = 'QUATERNION'
-                constraintBone.rotation_quaternion = Quaternion(
-                    (customOffset[3], customOffset[0], customOffset[1], customOffset[2]))
+                constraintBone.rotation_quaternion = Quaternion((customOffset[3],
+                                                                 customOffset[0],
+                                                                 customOffset[1],
+                                                                 customOffset[2]))
 
-            ct = utilityGetOrCreateConstraint(
-                constraintBone, "COPY_ROTATION", targetBone)
+            ct = utilityGetOrCreateConstraint(constraintBone,
+                                              "COPY_ROTATION",
+                                              targetBone)
 
             if maintainOffset or customOffset:
                 ct.mix_mode = 'OFFSET'
@@ -327,8 +343,9 @@ def importSkeletonConstraintNode(self, skeleton, poses):
             if customOffset:
                 constraintBone.scale = Vector(customOffset)
 
-            ct = utilityGetOrCreateConstraint(
-                constraintBone, "COPY_SCALE", targetBone)
+            ct = utilityGetOrCreateConstraint(constraintBone,
+                                              "COPY_SCALE",
+                                              targetBone)
 
             if maintainOffset or customOffset:
                 ct.use_offset = True
@@ -382,8 +399,8 @@ def importMergeModel(self, selectedObj, skeletonObj, poses):
         bone.matrix = selectedObj.pose.bones[bone.name].matrix
 
     if not foundMatchingRoot:
-        self.report(
-            {"WARNING"}, "Could not find compatible root bones make sure the skeletons are compatible.")
+        self.report({"WARNING"},
+                    "Could not find compatible root bones make sure the skeletons are compatible.")
         return
 
     bpy.context.view_layer.objects.active = skeletonObj
@@ -529,8 +546,8 @@ def importSkeletonIKNode(self, skeleton, poses):
 
         if poleBone is not None:
             # Warn until we figure out how to emulate this effectively.
-            self.report(
-                {"WARNING"}, "Unable to setup %s fully due to blender not supporting pole (twist) bones." % ik.name)
+            self.report({"WARNING"},
+                        "Unable to setup %s fully due to blender not supporting pole (twist) bones." % ik.name)
 
 
 def importSkeletonNode(name, skeleton, collection):
@@ -563,15 +580,18 @@ def importSkeletonNode(name, skeleton, collection):
             newBone.inherit_scale = 'FULL'
 
         tempQuat = bone.LocalRotation()  # Also sucks, WXYZ? => XYZW master race
-        rotation = Quaternion(
-            (tempQuat[3], tempQuat[0], tempQuat[1], tempQuat[2]))
+        rotation = Quaternion((tempQuat[3],
+                               tempQuat[0],
+                               tempQuat[1],
+                               tempQuat[2]))
 
         translation = Vector(bone.LocalPosition())
 
         scale = Vector(bone.Scale() or (1.0, 1.0, 1.0))
 
-        matrices[newBone.name] = Matrix.LocRotScale(
-            translation, rotation, None)
+        matrices[newBone.name] = Matrix.LocRotScale(translation,
+                                                    rotation,
+                                                    None)
         scales[newBone.name] = scale
         handles[i] = newBone
 
@@ -617,8 +637,10 @@ def importModelNode(self, model, path, selectedObject):
     bpy.context.scene.collection.children.link(collection)
 
     # Import skeleton for binds, materials for meshes
-    (skeletonObj, poses) = importSkeletonNode(
-        modelName, model.Skeleton(), collection)
+    (skeletonObj, poses) = importSkeletonNode(modelName,
+                                              model.Skeleton(),
+                                              collection)
+
     materialArray = {key: value for (key, value) in (
         importMaterialNode(path, x) for x in model.Materials())}
 
@@ -629,7 +651,9 @@ def importModelNode(self, model, path, selectedObject):
     modelMeshTransform = False
 
     (modelPosition, modelRotation, modelScale) = \
-        utilityCreatePRS(model.Position(), model.Rotation(), model.Scale())
+        utilityCreatePRS(model.Position(),
+                         model.Rotation(),
+                         model.Scale())
 
     if skeletonObj:
         utilitySetPRS(skeletonObj, modelPosition, modelRotation, modelScale)
@@ -655,23 +679,27 @@ def importModelNode(self, model, path, selectedObject):
         facesCount = int(faceIndicesCount / 3)
 
         # Remap face indices to match blender's winding order
-        faces = unpack_list([(faces[x + 1], faces[x + 2], faces[x + 0])
-                             for x in range(0, faceIndicesCount, 3)])
+        faces = unpack_list([(faces[x + 1],
+                              faces[x + 2],
+                              faces[x + 0]) for x in range(0, faceIndicesCount, 3)])
 
         newMesh.loops.add(faceIndicesCount)
         newMesh.polygons.add(facesCount)
 
         newMesh.loops.foreach_set("vertex_index", faces)
-        newMesh.polygons.foreach_set(
-            "loop_start", [x for x in range(0, faceIndicesCount, 3)])
+        newMesh.polygons.foreach_set("loop_start",
+                                     [x for x in range(0, faceIndicesCount, 3)])
         newMesh.polygons.foreach_set("loop_total", [3] * facesCount)
         newMesh.polygons.foreach_set("material_index", [0] * facesCount)
 
         for i in range(mesh.UVLayerCount()):
             uvBuffer = mesh.VertexUVLayerBuffer(i)
+
             newMesh.uv_layers.new(do_init=False)
-            newMesh.uv_layers[i].data.foreach_set("uv", unpack_list(
-                [(uvBuffer[x * 2], 1.0 - uvBuffer[(x * 2) + 1]) for x in faces]))
+            newMesh.uv_layers[i].data.foreach_set("uv",
+                                                  unpack_list(
+                                                      [(uvBuffer[x * 2],
+                                                        1.0 - uvBuffer[(x * 2) + 1]) for x in faces]))
 
         for i in range(mesh.ColorLayerCount()):
             vertexColors = mesh.VertexColorLayerBuffer(i)
@@ -724,8 +752,9 @@ def importModelNode(self, model, path, selectedObject):
                     for j in range(maximumInfluence):
                         i = j + (x * maximumInfluence)
 
-                        boneGroups[weightBoneBuffer[i]].add(
-                            (x,), weightValueBuffer[i], "ADD")
+                        boneGroups[weightBoneBuffer[i]].add((x,),
+                                                            weightValueBuffer[i],
+                                                            "ADD")
             elif maximumInfluence > 0:  # Fast path for simple weighted meshes
                 weightBoneBuffer = mesh.VertexWeightBoneBuffer()
                 for x in range(len(newMesh.vertices)):
@@ -785,8 +814,8 @@ def importModelNode(self, model, path, selectedObject):
                 # We need to have a selected target mesh to apply the new hair particle system to.
                 # The particle system will also inherit blend shape data and weights from the root faces.
                 if not selectedObject or selectedObject.type != 'MESH':
-                    self.report(
-                        {'WARNING'}, "You must select a mesh to use with particle hair.")
+                    self.report({'WARNING'},
+                                "You must select a mesh to use with particle hair.")
                     continue
 
                 particleSystemModifier = \
@@ -816,8 +845,8 @@ def importModelNode(self, model, path, selectedObject):
                         break
 
                 if evaulatedModifier is None:
-                    self.report(
-                        {'WARNING'}, "Failed to find evaulated modifier for particle hair system.")
+                    self.report({'WARNING'},
+                                "Failed to find evaulated modifier for particle hair system.")
                     continue
 
                 particleSystem = evaulatedModifier.particle_system
@@ -990,8 +1019,8 @@ def importModelNode(self, model, path, selectedObject):
                 positions = blendShape.TargetShapeVertexPositions()
 
                 if not indices or not positions:
-                    self.report(
-                        {'WARNING'}, "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
+                    self.report({'WARNING'},
+                                "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShape[0].name))
                     continue
 
                 for i, vertexIndex in enumerate(indices):
@@ -1009,8 +1038,8 @@ def importModelNode(self, model, path, selectedObject):
         if selectedObject and selectedObject.type == 'ARMATURE':
             importMergeModel(self, selectedObject, skeletonObj, poses)
         else:
-            self.report(
-                {'WARNING'}, "You must select an armature to merge to.")
+            self.report({'WARNING'},
+                        "You must select an armature to merge to.")
 
     # Import any ik handles now that the meshes are bound because the constraints may effect the bind pose.
     if self.import_ik:
@@ -1027,7 +1056,7 @@ def importModelNode(self, model, path, selectedObject):
             bpy.ops.object.mode_set(mode='OBJECT')
 
 
-def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, overrides):
+def importRotCurveNode(node, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -1035,11 +1064,19 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
-    mode = utilityResolveCurveModeOverride(
-        bone, node.Mode(), overrides, isRotate=True)
+    mode = utilityResolveCurveModeOverride(bone,
+                                           node.Mode(),
+                                           overrides,
+                                           isRotate=True)
 
-    tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
-        ("rotation_quaternion", 0), ("rotation_quaternion", 1), ("rotation_quaternion", 2), ("rotation_quaternion", 3)]]
+    tracks = [utilityGetOrCreateCurve(action,
+                                      actionObject,
+                                      poseBones,
+                                      nodeName,
+                                      x) for x in [("rotation_quaternion", 0),
+                                                   ("rotation_quaternion", 1),
+                                                   ("rotation_quaternion", 2),
+                                                   ("rotation_quaternion", 3)]]
 
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
@@ -1057,8 +1094,10 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
         existing = {}
 
         for i in range(0, len(keyValueBuffer), 4):
-            existing[keyFrameBuffer[int(i / 4)]] = Quaternion(
-                (keyValueBuffer[i + 3], keyValueBuffer[i], keyValueBuffer[i + 1], keyValueBuffer[i + 2]))
+            existing[keyFrameBuffer[int(i / 4)]] = Quaternion((keyValueBuffer[i + 3],
+                                                               keyValueBuffer[i],
+                                                               keyValueBuffer[i + 1],
+                                                               keyValueBuffer[i + 2]))
 
         lastKeyframeValue = None
         lastKeyframeFrame = None
@@ -1088,8 +1127,8 @@ def importRotCurveNode(node, nodeName, fcurves, poseBones, path, startFrame, ove
 
             if nextKeyframeFrame is not None and nextKeyframeFrame > frame:
                 if lastKeyframeValue != nextKeyframeValue:
-                    rotations.append(lastKeyframeValue.slerp(
-                        nextKeyframeValue, (frame - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
+                    rotations.append(lastKeyframeValue.slerp(nextKeyframeValue,
+                                                             (frame - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
                     keyframes.append(frame)
                 continue
 
@@ -1151,8 +1190,8 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
         except:
             mesh.animation_data_create()
 
-        action = mesh.animation_data.action or bpy.data.actions.new(
-            animName)
+        action = mesh.animation_data.action or \
+            bpy.data.actions.new(animName)
 
         mesh.animation_data.action = action
         mesh.animation_data.action.use_fake_user = True
@@ -1161,9 +1200,16 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
             mesh.animation_data.action_slot = \
                 utilityGetOrCreateSlot(action)
 
-        curve = action.fcurves.find(data_path="shape_keys.key_blocks[\"%s\"].value" %
-                                    nodeName, index=0) or action.fcurves.new(data_path="shape_keys.key_blocks[\"%s\"].value" %
-                                                                             nodeName, index=0, action_group=nodeName)
+        if utilityIsVersionAtLeast(5, 0):
+            action.fcurve_ensure_for_datablock(mesh,
+                                               "shape_keys.key_blocks[\"%s\"].value" % nodeName,
+                                               index=0,
+                                               group_name=nodeName)
+        else:
+            curve = action.fcurves.find(data_path="shape_keys.key_blocks[\"%s\"].value" % nodeName,
+                                        index=0) or action.fcurves.new(data_path="shape_keys.key_blocks[\"%s\"].value" % nodeName,
+                                                                       index=0,
+                                                                       action_group=nodeName)
 
         # We found a mesh that has a matching shape key, add the curve.
         curves.append(curve)
@@ -1184,7 +1230,7 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
     return (smallestFrame, largestFrame)
 
 
-def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
+def importScaleCurveNodes(nodes, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -1200,8 +1246,13 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
 
     mode = utilityResolveCurveModeOverride(bone, mode, overrides, isScale=True)
 
-    tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
-        ("scale", 0), ("scale", 1), ("scale", 2)]]
+    tracks = [utilityGetOrCreateCurve(action,
+                                      actionObject,
+                                      poseBones,
+                                      nodeName,
+                                      x) for x in [("scale", 0),
+                                                   ("scale", 1),
+                                                   ("scale", 2)]]
 
     # This works around the issue where EditBone.matrix destroys the scale which means that
     # a model which has an non-1.0 scale when the bind pose is applied will not scale correctly.
@@ -1231,8 +1282,10 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
 
                 utilityAddKeyframe(tracks[axis], frame, value[axis], "LINEAR")
             elif mode == "relative" or mode == "additive":
-                utilityAddKeyframe(
-                    tracks[axis], frame, keyValueBuffer[i], "LINEAR")
+                utilityAddKeyframe(tracks[axis],
+                                   frame,
+                                   keyValueBuffer[i],
+                                   "LINEAR")
 
     # Reset temporary matrices used to calculate the keyframe locations.
     bone.matrix_basis.identity()
@@ -1243,7 +1296,7 @@ def importScaleCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame,
     return (smallestFrame, largestFrame)
 
 
-def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, overrides):
+def importLocCurveNodes(nodes, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -1257,11 +1310,18 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
         if node is not None:
             mode = node.Mode()
 
-    mode = utilityResolveCurveModeOverride(
-        bone, mode, overrides, isTranslate=True)
+    mode = utilityResolveCurveModeOverride(bone,
+                                           mode,
+                                           overrides,
+                                           isTranslate=True)
 
-    tracks = [utilityGetOrCreateCurve(fcurves, poseBones, nodeName, x) for x in [
-        ("location", 0), ("location", 1), ("location", 2)]]
+    tracks = [utilityGetOrCreateCurve(action,
+                                      actionObject,
+                                      poseBones,
+                                      nodeName,
+                                      x) for x in [("location", 0),
+                                                   ("location", 1),
+                                                   ("location", 2)]]
 
     lastFrame = 0
 
@@ -1269,8 +1329,8 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
     for axis, node in enumerate(nodes):
         if node is None:
             if bone.parent is None:
-                utilityAddKeyframe(
-                    tracks[axis], 0, bone.matrix.translation[axis], "LINEAR")
+                utilityAddKeyframe(tracks[axis], 0,
+                                   bone.matrix.translation[axis], "LINEAR")
             else:
                 utilityAddKeyframe(tracks[axis], 0,
                                    (bone.parent.matrix.inverted() @ bone.matrix).translation[axis], "LINEAR")
@@ -1279,8 +1339,10 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
             keyValueBuffer = node.KeyValueBuffer()
 
             for i, frame in enumerate(keyFrameBuffer):
-                utilityAddKeyframe(
-                    tracks[axis], frame, keyValueBuffer[i], "LINEAR")
+                utilityAddKeyframe(tracks[axis],
+                                   frame,
+                                   keyValueBuffer[i],
+                                   "LINEAR")
                 lastFrame = max(lastFrame, frame)
 
     keyFrameBuffer = []
@@ -1289,8 +1351,9 @@ def importLocCurveNodes(nodes, nodeName, fcurves, poseBones, path, startFrame, o
     # Now, we need to bake the curves into sampled keyframes that collectively animate the transform.
     for frame in range(0, lastFrame + 1):
         keyFrameBuffer.append(frame)
-        keyValueBuffer.append((tracks[0].evaluate(
-            frame), tracks[1].evaluate(frame), tracks[2].evaluate(frame)))
+        keyValueBuffer.append((tracks[0].evaluate(frame),
+                               tracks[1].evaluate(frame),
+                               tracks[2].evaluate(frame)))
 
     # Now, we need to actually generate keyframes for each of the tracks based on the mode.
     for track in tracks:
@@ -1365,8 +1428,8 @@ def importAnimationNode(self, node, path, selectedObject):
     if self.import_reset:
         action = bpy.data.actions.new(animName)
     else:
-        action = selectedObject.animation_data.action or bpy.data.actions.new(
-            animName)
+        action = selectedObject.animation_data.action or \
+            bpy.data.actions.new(animName)
 
     selectedObject.animation_data.action = action
     selectedObject.animation_data.action.use_fake_user = True
@@ -1421,13 +1484,24 @@ def importAnimationNode(self, node, path, selectedObject):
         hasAdditiveCurve = hasAdditiveCurve or x.Mode() == "additive"
 
         if property == "rq":
-            (smallestFrame, largestFrame) = importRotCurveNode(
-                x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+            (smallestFrame, largestFrame) = importRotCurveNode(x,
+                                                               nodeName,
+                                                               action,
+                                                               selectedObject,
+                                                               poseBones,
+                                                               path,
+                                                               startFrame,
+                                                               curveModeOverrides)
+
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "bs":
-            (smallestFrame, largestFrame) = importBlendShapeCurveNode(
-                x, nodeName, animName, selectedObject, startFrame)
+            (smallestFrame, largestFrame) = importBlendShapeCurveNode(x,
+                                                                      nodeName,
+                                                                      animName,
+                                                                      selectedObject,
+                                                                      startFrame)
+
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "tx":
@@ -1444,27 +1518,43 @@ def importAnimationNode(self, node, path, selectedObject):
             utilityStashCurveComponent(scaleCurves, x, nodeName, 2)
 
     for nodeName, x in locCurves.items():
-        (smallestFrame, largestFrame) = importLocCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+        (smallestFrame, largestFrame) = importLocCurveNodes(x,
+                                                            nodeName,
+                                                            action,
+                                                            selectedObject,
+                                                            poseBones,
+                                                            path,
+                                                            startFrame,
+                                                            curveModeOverrides)
+
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     for nodeName, x in scaleCurves.items():
-        (smallestFrame,  largestFrame) = importScaleCurveNodes(
-            x, nodeName, action.fcurves, poseBones, path, startFrame, curveModeOverrides)
+        (smallestFrame,  largestFrame) = importScaleCurveNodes(x,
+                                                               nodeName,
+                                                               action,
+                                                               selectedObject,
+                                                               poseBones,
+                                                               path,
+                                                               startFrame,
+                                                               curveModeOverrides)
+
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     for x in node.Notifications():
-        (smallestFrame, largestFrame) = importNotificationTrackNode(
-            x, action, startFrame)
+        (smallestFrame, largestFrame) = importNotificationTrackNode(x,
+                                                                    action,
+                                                                    startFrame)
+
         wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     # Tell the user that we had an additive animation if necessary.
     if hasAdditiveCurve:
-        self.report(
-            {"WARNING"}, "Animation %s is additive and needs to be blended using the NLA editor." % animName)
+        self.report({"WARNING"},
+                    "Animation %s is additive and needs to be blended using the NLA editor." % animName)
 
     # Set the animation segment.
     if wantedSmallestFrame == sys.maxsize:
@@ -1517,13 +1607,13 @@ def importInstanceNodes(self, nodes, context, path, sceneRoot):
         try:
             importCast(self, context, instancePath)
         except:
-            self.report(
-                {'WARNING'}, "Instance: %s failed to import or not found, skipping..." % instancePath)
+            self.report({'WARNING'},
+                        "Instance: %s failed to import or not found, skipping..." % instancePath)
             continue
 
         if not bpy.context.view_layer.active_layer_collection.collection.children:
-            self.report(
-                {'WARNING'}, "Instance: %s did not import anything, skipping..." % instancePath)
+            self.report({'WARNING'},
+                        "Instance: %s did not import anything, skipping..." % instancePath)
             continue
 
         base = bpy.context.view_layer.active_layer_collection.collection.children[-1]
@@ -1542,7 +1632,8 @@ def importInstanceNodes(self, nodes, context, path, sceneRoot):
 
             (position, rotation, scale) = \
                 utilityCreatePRS(instance.Position(),
-                                 instance.Rotation(), instance.Scale())
+                                 instance.Rotation(),
+                                 instance.Scale())
 
             utilitySetPRS(newInstance, position, rotation, scale)
 
