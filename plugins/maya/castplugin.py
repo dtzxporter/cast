@@ -1042,8 +1042,8 @@ def utilityGetOrCreateCurve(name, property, curveType):
     try:
         nodePath = utilityGetDagPath(name)
     except RuntimeError:
-        cmds.warning("Unable to animate %s[%s] due to a name conflict in the scene" % (
-            name, property))
+        cmds.warning("Unable to animate \"%s.%s\" due to a name conflict in the scene" % (name,
+                                                                                          property))
         return None
 
     restTransform = utilitySaveNodeData(nodePath)
@@ -1083,10 +1083,6 @@ def utilityImportQuatTrackData(tracks, property, timeUnit, frameStart, frameBuff
 
     smallestFrame = OpenMaya.MTime(sys.maxsize, timeUnit)
     largestFrame = OpenMaya.MTime(0, timeUnit)
-
-    # We must have three tracks here
-    if None in tracks:
-        return (smallestFrame, largestFrame)
 
     valuesX = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
     valuesY = OpenMaya.MDoubleArray(len(frameBuffer), 0.0)
@@ -1194,6 +1190,8 @@ def utilityImportBlendShapeTrackData(shapeName, timeUnit, frameStart, frameBuffe
             deformers.append(deformer)
 
     if not deformers:
+        cmds.warning(
+            "Skipping blend shape track \"%s\" no matching deformer was found." % shapeName)
         return (smallestFrame, largestFrame)
 
     track = OpenMayaAnim.MFnAnimCurve()
@@ -2125,8 +2123,11 @@ def importModelNode(model, path):
     # Merge with the existing skeleton here if one is selected and we have a skeleton.
     if sceneSettings["importMerge"]:
         if sceneSkeleton:
-            jointTransform = importMergeModel(sceneSkeleton, model.Skeleton(),
-                                              handles, paths, jointTransform)
+            jointTransform = importMergeModel(sceneSkeleton,
+                                              model.Skeleton(),
+                                              handles,
+                                              paths,
+                                              jointTransform)
         else:
             cmds.warning(
                 "No skeleton exists to merge to in the current scene.")
@@ -2134,13 +2135,19 @@ def importModelNode(model, path):
     # Import any ik handles now that the meshes are bound because the constraints may
     # effect the bind pose of the joints causing the meshes to deform incorrectly.
     if sceneSettings["importIK"]:
-        importSkeletonIKNode(model.Skeleton(), handles,
-                             paths, indexes, jointTransform)
+        importSkeletonIKNode(model.Skeleton(),
+                             handles,
+                             paths,
+                             indexes,
+                             jointTransform)
 
     # Import any additional constraints.
     if sceneSettings["importConstraints"]:
-        importSkeletonConstraintNode(
-            model.Skeleton(), handles, paths, indexes, jointTransform)
+        importSkeletonConstraintNode(model.Skeleton(),
+                                     handles,
+                                     paths,
+                                     indexes,
+                                     jointTransform)
 
     # Optional transform to apply to the skeleton, or each separate mesh.
     # Must be done here, after skinning and bind pose has been used.
@@ -2200,27 +2207,43 @@ def importCurveNode(node, path, timeUnit, startFrame, overrides):
     if not propertyName in propertySwitcher:
         return (smallestFrame, largestFrame)
 
-    tracks = [utilityGetOrCreateCurve(
-        nodeName, x, typeSwitcher[propertyName]) for x in propertySwitcher[propertyName]]
+    tracks = [utilityGetOrCreateCurve(nodeName,
+                                      x,
+                                      typeSwitcher[propertyName]) for x in propertySwitcher[propertyName]]
 
-    if tracks is None:
+    # We must have all available tracks before applying the data.
+    if tracks is None or None in tracks:
+        cmds.warning("Skipping curve track \"%s.%s\" no matching node was found." % (nodeName,
+                                                                                     propertyName))
         return (smallestFrame, largestFrame)
 
     # Resolve any override if necessary.
     nodeMode = node.Mode()
 
     if propertyName in ["tx", "ty", "tz"]:
-        nodeMode = utilityResolveCurveModeOverride(
-            nodeName, nodeMode, overrides, isTranslate=True)
+        nodeMode = utilityResolveCurveModeOverride(nodeName,
+                                                   nodeMode,
+                                                   overrides,
+                                                   isTranslate=True)
     elif propertyName in ["rq"]:
-        nodeMode = utilityResolveCurveModeOverride(
-            nodeName, nodeMode, overrides, isRotate=True)
+        nodeMode = utilityResolveCurveModeOverride(nodeName,
+                                                   nodeMode,
+                                                   overrides,
+                                                   isRotate=True)
     elif propertyName in ["sx", "sy", "sz"]:
-        nodeMode = utilityResolveCurveModeOverride(
-            nodeName, nodeMode, overrides, isScale=True)
+        nodeMode = utilityResolveCurveModeOverride(nodeName,
+                                                   nodeMode,
+                                                   overrides,
+                                                   isScale=True)
 
-    (smallestFrame, largestFrame) = trackSwitcher[propertyName](
-        tracks, propertyName, timeUnit, startFrame, keyFrameBuffer, keyValueBuffer, nodeMode, node.AdditiveBlendWeight())
+    (smallestFrame, largestFrame) = trackSwitcher[propertyName](tracks,
+                                                                propertyName,
+                                                                timeUnit,
+                                                                startFrame,
+                                                                keyFrameBuffer,
+                                                                keyValueBuffer,
+                                                                nodeMode,
+                                                                node.AdditiveBlendWeight())
 
     # Make sure we have at least one quaternion track to set the interpolation mode to
     if propertyName == "rq":
