@@ -76,8 +76,8 @@ def utilityAssignMaterialSlots(material, matNode, filepath):
 
             try:
                 # Attempt to build a relative path to the image based on where the cast is being saved.
-                file.SetPath(os.path.relpath(
-                    node.image.filepath, os.path.dirname(filepath)))
+                file.SetPath(os.path.relpath(node.image.filepath,
+                                             os.path.dirname(filepath)))
             except:
                 # Fallback to the absolute path of the image.
                 file.SetPath(node.image.filepath)
@@ -124,18 +124,24 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
             else:
                 boneNode.SetParentIndex(-1)
 
-            boneNode.SetLocalPosition(
-                (position.x * self.scale, position.y * self.scale, position.z * self.scale))
-            boneNode.SetLocalRotation(
-                (rotation.x, rotation.y, rotation.z, rotation.w))
+            boneNode.SetLocalPosition((position.x * self.scale,
+                                       position.y * self.scale,
+                                       position.z * self.scale))
+            boneNode.SetLocalRotation((rotation.x,
+                                       rotation.y,
+                                       rotation.z,
+                                       rotation.w))
             boneNode.SetScale((scale.x, scale.y, scale.z))
 
             (position, rotation, _) = bone.matrix.decompose()
 
-            boneNode.SetWorldPosition(
-                (position.x * self.scale, position.y * self.scale, position.z * self.scale))
-            boneNode.SetWorldRotation(
-                (rotation.x, rotation.y, rotation.z, rotation.w))
+            boneNode.SetWorldPosition((position.x * self.scale,
+                                       position.y * self.scale,
+                                       position.z * self.scale))
+            boneNode.SetWorldRotation((rotation.x,
+                                       rotation.y,
+                                       rotation.z,
+                                       rotation.w))
 
         bpy.ops.object.mode_set(mode='POSE')
 
@@ -179,8 +185,11 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                 meshNode.SetSkinningMethod("quaternion")
 
             blendMesh = bmesh.new(use_operators=False)
-            blendMesh.from_mesh(
-                mesh.data, face_normals=False, vertex_normals=True, use_shape_key=False, shape_key_index=0)
+            blendMesh.from_mesh(mesh.data,
+                                face_normals=False,
+                                vertex_normals=True,
+                                use_shape_key=False,
+                                shape_key_index=0)
 
             vertexPositions = [None] * len(blendMesh.verts)
             vertexNormals = [None] * len(blendMesh.verts)
@@ -213,10 +222,12 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
             vertexMaxInfluence = 0
 
             for i, vert in enumerate(blendMesh.verts):
-                vertexPositions[i] = (
-                    vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
-                vertexNormals[i] = (
-                    vert.normal.x, vert.normal.y, vert.normal.z)
+                vertexPositions[i] = (vert.co.x * self.scale,
+                                      vert.co.y * self.scale,
+                                      vert.co.z * self.scale)
+                vertexNormals[i] = (vert.normal.x,
+                                    vert.normal.y,
+                                    vert.normal.z)
 
                 vertexLoopCount = len(vert.link_loops)
 
@@ -253,15 +264,17 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                     for loop in vert.link_loops:
                         color += loop[colors[0]] / vertexLoopCount
 
-                    vertexColorLayers[0][i] = CastColor.toInteger(
-                        (color.x, color.y, color.z, color.w))
+                    vertexColorLayers[0][i] = CastColor.toInteger((color.x,
+                                                                   color.y,
+                                                                   color.z,
+                                                                   color.w))
 
             if vertexMaxInfluence > 0:
                 vertexGroups = [x.name for x in mesh.vertex_groups]
-                vertexWeightValueBuffer = [
-                    0.0] * (len(blendMesh.verts) * vertexMaxInfluence)
-                vertexWeightBoneBuffer = [
-                    0] * (len(blendMesh.verts) * vertexMaxInfluence)
+                vertexWeightValueBuffer = \
+                    [0.0] * (len(blendMesh.verts) * vertexMaxInfluence)
+                vertexWeightBoneBuffer = \
+                    [0] * (len(blendMesh.verts) * vertexMaxInfluence)
 
                 for i, vert in enumerate(blendMesh.verts):
                     weights = vert[blendMesh.verts.layers.deform.active]
@@ -322,19 +335,24 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                     meshNode.SetName(target.name)
 
                     blendMesh = bmesh.new(use_operators=False)
-                    blendMesh.from_mesh(
-                        mesh.data, face_normals=False, vertex_normals=True, use_shape_key=True, shape_key_index=i)
+                    blendMesh.from_mesh(mesh.data,
+                                        face_normals=False,
+                                        vertex_normals=True,
+                                        use_shape_key=True,
+                                        shape_key_index=i)
 
                     # Just set the new positions, which is the only supported blender operation at the moment.
                     for i, vert in enumerate(blendMesh.verts):
-                        vertexPositions[i] = (
-                            vert.co.x * self.scale, vert.co.y * self.scale, vert.co.z * self.scale)
+                        vertexPositions[i] = (vert.co.x * self.scale,
+                                              vert.co.y * self.scale,
+                                              vert.co.z * self.scale)
 
                     meshNode.SetVertexPositionBuffer(vertexPositions)
                     meshNode.SetVertexNormalBuffer(vertexNormals)
                     meshNode.SetFaceBuffer(faceBuffer)
 
                     blendMesh.free()
+
                     targetWeights.append(target.slider_max)
                     targetShapes.append(meshNode.Hash())
 
@@ -565,12 +583,18 @@ def save(self, context, filepath=""):
 
         # Export either the armature's action, or all of the actions in the scene.
         if self.export_selected:
-            exportAction(self, context, root, [selectedObject],
+            exportAction(self,
+                         context,
+                         root,
+                         [selectedObject],
                          selectedObject.animation_data.action)
         else:
             for action in bpy.data.actions:
-                exportAction(self, context, root, list(
-                    bpy.data.objects), action)
+                exportAction(self,
+                             context,
+                             root,
+                             list(bpy.data.objects),
+                             action)
 
     if self.incl_model:
         # Check that selected object is an 'ARMATURE' or mesh if we're exporting selected models.

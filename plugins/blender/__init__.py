@@ -20,8 +20,10 @@ bl_info = {
 
 
 class CastProperties(bpy.types.PropertyGroup):
-    import_scenes_path: StringProperty(
-        name="Path", description="Select the root directory where instance scenes are located", default="", subtype="DIR_PATH")
+    import_scenes_path: StringProperty(name="Path",
+                                       description="Select the root directory where instance scenes are located",
+                                       default="",
+                                       subtype="DIR_PATH")
 
 
 class CastImportScenePanel(bpy.types.Panel):
@@ -47,41 +49,52 @@ class ImportCast(bpy.types.Operator, ImportHelper):
     filename_ext = ".cast"
     filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
 
-    files: CollectionProperty(
-        type=bpy.types.OperatorFileListElement, options={'SKIP_SAVE'})
+    files: CollectionProperty(type=bpy.types.OperatorFileListElement,
+                              options={'SKIP_SAVE'})
     filepath: StringProperty(subtype="FILE_PATH", options={'SKIP_SAVE'})
 
-    import_time: BoolProperty(
-        name="Import At Scene Time", description="Import animations starting at the current scene time", default=False)
+    import_time: BoolProperty(name="Import At Scene Time",
+                              description="Import animations starting at the current scene time",
+                              default=False)
 
-    import_reset: BoolProperty(
-        name="Import Resets Scene", description="Imported animations will create new actions instead of blending", default=True)
+    import_reset: BoolProperty(name="Import Resets Scene",
+                               description="Imported animations will create new actions instead of blending",
+                               default=True)
 
-    import_skin: BoolProperty(
-        name="Import Bind Skin", description="Imports and binds a model to it's smooth skin", default=True)
+    import_skin: BoolProperty(name="Import Bind Skin",
+                              description="Imports and binds a model to it's smooth skin",
+                              default=True)
 
-    import_ik: BoolProperty(
-        name="Import IK Handles", description="Imports and configures ik handles for the models skeleton", default=True)
+    import_ik: BoolProperty(name="Import IK Handles",
+                            description="Imports and configures ik handles for the models skeleton",
+                            default=True)
 
-    import_constraints: BoolProperty(
-        name="Import Constraints", description="Imports and configures constraints for the models skeleton", default=True)
+    import_constraints: BoolProperty(name="Import Constraints",
+                                     description="Imports and configures constraints for the models skeleton",
+                                     default=True)
 
-    import_blend_shapes: BoolProperty(
-        name="Import Blend Shapes", description="Imports and configures blend shapes for a model", default=True)
+    import_blend_shapes: BoolProperty(name="Import Blend Shapes",
+                                      description="Imports and configures blend shapes for a model",
+                                      default=True)
 
-    import_hair: BoolProperty(
-        name="Import Hair", description="Imports hair definitions for models", default=True)
+    import_hair: BoolProperty(name="Import Hair",
+                              description="Imports hair definitions for models",
+                              default=True)
 
-    import_merge: BoolProperty(
-        name="Import Merge", description="Imports and merges models together with the selected armature")
+    import_merge: BoolProperty(name="Import Merge",
+                               description="Imports and merges models together with the selected armature")
 
-    create_hair_type: EnumProperty(name="Type", description="Change the way hair definitions are imported",
+    create_hair_type: EnumProperty(name="Type",
+                                   description="Change the way hair definitions are imported",
                                    items=[("curve", "Create Curve Hairs", "Creates hairs as curves"),
-                                          ("mesh", "Create Mesh Hairs", "Creates hairs as simple meshes")], default="curve")
+                                          ("mesh", "Create Mesh Hairs", "Creates hairs as simple meshes")],
+                                   default="curve")
 
-    create_hair_subtype: EnumProperty(name="Mode", description="Change how hair will render",
+    create_hair_subtype: EnumProperty(name="Mode",
+                                      description="Change how hair will render",
                                       items=[("bevel", "Curves", "Curves will render naturally"),
-                                             ("particle", "Particle System", "Curves will use the particle system")], default="bevel")
+                                             ("particle", "Particle System", "Curves will use the particle system")],
+                                      default="bevel")
 
     def draw(self, context):
         self.layout.label(text="Import Settings")
@@ -169,26 +182,35 @@ class ExportCast(bpy.types.Operator, ExportHelper):
     filename_ext = ".cast"
     filter_glob: StringProperty(default="*.cast", options={'HIDDEN'})
 
-    export_selected: BoolProperty(
-        name="Export Selected", description="Whether or not to only export the selected object", default=False)
+    export_selected: BoolProperty(name="Export Selected",
+                                  description="Whether or not to only export the selected object",
+                                  default=False)
 
-    incl_model: BoolProperty(
-        name="Include Models", description="Whether or not to export model data", default=True)
+    incl_model: BoolProperty(name="Include Models",
+                             description="Whether or not to export model data",
+                             default=True)
 
-    incl_animation: BoolProperty(
-        name="Include Animations", description="Whether or not to export animation data", default=True)
+    incl_animation: BoolProperty(name="Include Animations",
+                                 description="Whether or not to export animation data",
+                                 default=True)
 
-    incl_notetracks: BoolProperty(
-        name="Include Notetracks", description="Whether or not to export pose markers as notetracks", default=True)
+    incl_notetracks: BoolProperty(name="Include Notetracks",
+                                  description="Whether or not to export pose markers as notetracks",
+                                  default=True)
 
-    is_looped: BoolProperty(
-        name="Looped", description="Mark the animation as looping", default=False)
+    is_looped: BoolProperty(name="Looped",
+                            description="Mark the animation as looping",
+                            default=False)
 
-    scale: FloatProperty(
-        name="Scale", description="Apply a scale modifier to any meshes, bones, or animation data", default=1.0)
+    scale: FloatProperty(name="Scale",
+                         description="Apply a scale modifier to any meshes, bones, or animation data",
+                         default=1.0)
 
-    up_axis: EnumProperty(
-        name="Up", description="Override the up axis for this scene", items=[("y", "Y Up", "The Y axis points up"), ("z", "Z Up", "The Z axis points up")], default="y")
+    up_axis: EnumProperty(name="Up",
+                          description="Override the up axis for this scene",
+                          items=[("y", "Y Up", "The Y axis points up"),
+                                 ("z", "Z Up", "The Z axis points up")],
+                          default="y")
 
     def draw(self, context):
         self.layout.label(text="Export Settings")
@@ -266,8 +288,9 @@ def unregister():
         bpy.utils.unregister_class(DragAndDropCast)
 
 
-bpy.types.PoseBone.cast_bind_pose_scale = FloatVectorProperty(
-    name="Cast bind pose scale", description="Used to help cast workaround a blender issue where the bind pose scale is destroyed on EditBones.", default=(1.0, 1.0, 1.0))
+bpy.types.PoseBone.cast_bind_pose_scale = FloatVectorProperty(name="Cast bind pose scale",
+                                                              description="Used to help cast workaround a blender issue where the bind pose scale is destroyed on EditBones.",
+                                                              default=(1.0, 1.0, 1.0))
 
 if __name__ == "__main__":
     register()

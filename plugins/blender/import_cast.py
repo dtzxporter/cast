@@ -152,8 +152,8 @@ def utilityAssignMaterialSlots(material, slots, path):
             node = material.node_tree.nodes.new("ShaderNodeTexImage")
 
             try:
-                node.image = bpy.data.images.load(
-                    utilityBuildPath(path, connection.Path()))
+                node.image = bpy.data.images.load(utilityBuildPath(path,
+                                                                   connection.Path()))
 
                 # The following slots are non-color data.
                 if slot in ["metal", "normal", "gloss", "roughness"] \
@@ -193,21 +193,21 @@ def utilityAssignMaterialSlots(material, slots, path):
             normalMap = material.node_tree.nodes.new("ShaderNodeNormalMap")
             normalMap.location = spots["normal|convert"]
 
-            material.node_tree.links.new(
-                normalMap.inputs["Color"], node.outputs["Color"])
-            material.node_tree.links.new(
-                shader.inputs[switcher[slot]], normalMap.outputs["Normal"])
+            material.node_tree.links.new(normalMap.inputs["Color"],
+                                         node.outputs["Color"])
+            material.node_tree.links.new(shader.inputs[switcher[slot]],
+                                         normalMap.outputs["Normal"])
         elif slot == "gloss":
             invert = material.node_tree.nodes.new("ShaderNodeInvert")
             invert.location = spots["gloss|invert"]
 
-            material.node_tree.links.new(
-                invert.inputs["Color"], node.outputs["Color"])
-            material.node_tree.links.new(
-                shader.inputs[switcher[slot]], invert.outputs["Color"])
+            material.node_tree.links.new(invert.inputs["Color"],
+                                         node.outputs["Color"])
+            material.node_tree.links.new(shader.inputs[switcher[slot]],
+                                         invert.outputs["Color"])
         else:
-            material.node_tree.links.new(
-                shader.inputs[switcher[slot]], node.outputs["Color"])
+            material.node_tree.links.new(shader.inputs[switcher[slot]],
+                                         node.outputs["Color"])
 
 
 def utilitySetVertexNormals(mesh, vertexNormals, faces):
@@ -293,8 +293,9 @@ def utilityGetBindposeScale(poseBone):
     bindPoseScale = Matrix.LocRotScale(None, None, Vector((1.0, 1.0, 1.0)))
 
     if poseBone is not None:
-        bindPoseScale = bindPoseScale @ Matrix.LocRotScale(None, None, Vector(
-            getattr(poseBone, "cast_bind_pose_scale", (1.0, 1.0, 1.0))))
+        bindPoseScale = bindPoseScale @ Matrix.LocRotScale(None,
+                                                           None,
+                                                           Vector(getattr(poseBone, "cast_bind_pose_scale", (1.0, 1.0, 1.0))))
 
     return bindPoseScale
 
