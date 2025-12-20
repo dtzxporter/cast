@@ -1057,11 +1057,13 @@ def importModelNode(self, model, path, selectedObject):
             bpy.ops.object.mode_set(mode='OBJECT')
 
 
-def importRotCurveNode(node, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
+def importRotCurveNode(self, node, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
     if not nodeName in poseBones:
+        self.report({"WARNING"},
+                    "Skipping curve track \"%s.rq\" no matching node was found." % nodeName)
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
@@ -1167,7 +1169,7 @@ def importRotCurveNode(node, nodeName, action, actionObject, poseBones, path, st
     return (smallestFrame, largestFrame)
 
 
-def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
+def importBlendShapeCurveNode(self, node, nodeName, animName, armature, startFrame):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
@@ -1215,6 +1217,11 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
         # We found a mesh that has a matching shape key, add the curve.
         curves.append(curve)
 
+    if not curves:
+        self.report({"WARNING"},
+                    "Skipping blend shape track \"%s\" no matching deformer was found." % nodeName)
+        return (smallestFrame, largestFrame)
+
     # For every curve add the values directly.
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
@@ -1231,11 +1238,13 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
     return (smallestFrame, largestFrame)
 
 
-def importScaleCurveNodes(nodes, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
+def importScaleCurveNodes(self, nodes, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
     if not nodeName in poseBones:
+        self.report({"WARNING"},
+                    "Skipping curve track \"%s.s\" no matching node was found." % nodeName)
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
@@ -1297,11 +1306,13 @@ def importScaleCurveNodes(nodes, nodeName, action, actionObject, poseBones, path
     return (smallestFrame, largestFrame)
 
 
-def importLocCurveNodes(nodes, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
+def importLocCurveNodes(self, nodes, nodeName, action, actionObject, poseBones, path, startFrame, overrides):
     smallestFrame = sys.maxsize
     largestFrame = 0
 
     if not nodeName in poseBones:
+        self.report({"WARNING"},
+                    "Skipping curve track \"%s.t\" no matching node was found." % nodeName)
         return (smallestFrame, largestFrame)
 
     bone = poseBones[nodeName]
@@ -1485,7 +1496,8 @@ def importAnimationNode(self, node, path, selectedObject):
         hasAdditiveCurve = hasAdditiveCurve or x.Mode() == "additive"
 
         if property == "rq":
-            (smallestFrame, largestFrame) = importRotCurveNode(x,
+            (smallestFrame, largestFrame) = importRotCurveNode(self,
+                                                               x,
                                                                nodeName,
                                                                action,
                                                                selectedObject,
@@ -1497,7 +1509,8 @@ def importAnimationNode(self, node, path, selectedObject):
             wantedSmallestFrame = min(smallestFrame, wantedSmallestFrame)
             wantedLargestFrame = max(largestFrame, wantedLargestFrame)
         elif property == "bs":
-            (smallestFrame, largestFrame) = importBlendShapeCurveNode(x,
+            (smallestFrame, largestFrame) = importBlendShapeCurveNode(self,
+                                                                      x,
                                                                       nodeName,
                                                                       animName,
                                                                       selectedObject,
@@ -1519,7 +1532,8 @@ def importAnimationNode(self, node, path, selectedObject):
             utilityStashCurveComponent(scaleCurves, x, nodeName, 2)
 
     for nodeName, x in locCurves.items():
-        (smallestFrame, largestFrame) = importLocCurveNodes(x,
+        (smallestFrame, largestFrame) = importLocCurveNodes(self,
+                                                            x,
                                                             nodeName,
                                                             action,
                                                             selectedObject,
@@ -1532,7 +1546,8 @@ def importAnimationNode(self, node, path, selectedObject):
         wantedLargestFrame = max(largestFrame, wantedLargestFrame)
 
     for nodeName, x in scaleCurves.items():
-        (smallestFrame,  largestFrame) = importScaleCurveNodes(x,
+        (smallestFrame,  largestFrame) = importScaleCurveNodes(self,
+                                                               x,
                                                                nodeName,
                                                                action,
                                                                selectedObject,

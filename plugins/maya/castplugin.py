@@ -2212,7 +2212,7 @@ def importCurveNode(node, path, timeUnit, startFrame, overrides):
                                       typeSwitcher[propertyName]) for x in propertySwitcher[propertyName]]
 
     # We must have all available tracks before applying the data.
-    if tracks is None or None in tracks:
+    if not tracks or None in tracks:
         cmds.warning("Skipping curve track \"%s.%s\" no matching node was found." % (nodeName,
                                                                                      propertyName))
         return (smallestFrame, largestFrame)
