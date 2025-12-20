@@ -256,16 +256,16 @@ def utilityGetOrCreateCurve(action, actionObject, poseBones, name, curve):
                                                                          action_group=bone.name)
 
 
-def utilityGetOrCreateSlot(action):
+def utilityGetOrCreateSlot(action, objectType):
     slot = None
 
     for existingSlot in action.slots:
-        if existingSlot.target_id_type == "OBJECT" and existingSlot.name_display == "cast":
+        if existingSlot.target_id_type == objectType and existingSlot.name_display == "cast":
             slot = existingSlot
             break
 
     if slot is None:
-        slot = action.slots.new(id_type="OBJECT", name="cast")
+        slot = action.slots.new(id_type=objectType, name="cast")
 
     action.slots.active = slot
 
@@ -1199,13 +1199,13 @@ def importBlendShapeCurveNode(node, nodeName, animName, armature, startFrame):
 
         if utilityIsVersionAtLeast(4, 4):
             mesh.animation_data.action_slot = \
-                utilityGetOrCreateSlot(action)
+                utilityGetOrCreateSlot(action, "MESH")
 
         if utilityIsVersionAtLeast(5, 0):
-            action.fcurve_ensure_for_datablock(mesh,
-                                               "shape_keys.key_blocks[\"%s\"].value" % nodeName,
-                                               index=0,
-                                               group_name=nodeName)
+            curve = action.fcurve_ensure_for_datablock(mesh,
+                                                       "shape_keys.key_blocks[\"%s\"].value" % nodeName,
+                                                       index=0,
+                                                       group_name=nodeName)
         else:
             curve = action.fcurves.find(data_path="shape_keys.key_blocks[\"%s\"].value" % nodeName,
                                         index=0) or action.fcurves.new(data_path="shape_keys.key_blocks[\"%s\"].value" % nodeName,
@@ -1437,7 +1437,7 @@ def importAnimationNode(self, node, path, selectedObject):
 
     if utilityIsVersionAtLeast(4, 4):
         selectedObject.animation_data.action_slot = \
-            utilityGetOrCreateSlot(action)
+            utilityGetOrCreateSlot(action, "OBJECT")
 
     scene = bpy.context.scene
     scene.render.fps = round(node.Framerate())
