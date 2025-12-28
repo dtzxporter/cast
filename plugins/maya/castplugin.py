@@ -22,7 +22,7 @@ try:
 except NameError:
     xrange = range
 
-# Used for various configuration
+# Used for various configuration (Persists to disk)
 sceneSettings = {
     "importAtTime": False,
     "importSkin": True,
@@ -42,6 +42,11 @@ sceneSettings = {
     "createCurveHairs": True,
     "createMeshHairs": False,
     "setupArnoldHair": True,
+}
+
+# Used for runtime configuration (Does not persist to disk)
+runtimeSettings = {
+    "retargetScale": 1.0,
 }
 
 # Shared version number
@@ -266,6 +271,67 @@ def utilityEditNotetracks():
     cmds.showWindow(window)
 
 
+def utilityRetargetScale():
+    result = cmds.promptDialog(title="Cast - Retarget Scale",
+                               message="Enter in a retarget scale factor:\t\t  ",
+                               text=str(runtimeSettings["retargetScale"]),
+                               button=["Set", "Apply", "Cancel"],
+                               defaultButton="Set",
+                               cancelButton="Cancel",
+                               dismissString="Cancel")
+
+    if result != "Apply" and result != "Set":
+        return
+
+    scaleText = cmds.promptDialog(query=True, text=True)
+    scaleText = scaleText.strip()
+
+    try:
+        scale = float(scaleText)
+    except ValueError:
+        cmds.error("Retarget scale factor must be a number: \"%s\"" %
+                   scaleText)
+        return
+
+    # Set the runtime retarget scale, so that we can apply it to other animations going forward.
+    if result == "Set":
+        runtimeSettings["retargetScale"] = scale
+        return
+
+    # Apply the retarget scale without setting the runtime value to just this animation.
+    joints = cmds.ls(type="joint")
+
+    progress = utilityCreateProgress("Applying retarget scale...",
+                                     len(joints) * 3)
+
+    for joint in joints:
+        for attr in ["translateX", "translateY", "translateZ"]:
+            keyframes = cmds.keyframe(joint, at=attr, query=True, tc=True)
+
+            if not keyframes:
+                utilityStepProgress(progress, "Applying retarget scale...")
+                continue
+
+            values = cmds.keyframe(joint,
+                                   at=attr,
+                                   query=True,
+                                   valueChange=True)
+            values = [x * scale for x in values]
+
+            for keyframe, value in zip(keyframes, values):
+                cmds.keyframe(joint,
+                              at=attr,
+                              edit=True,
+                              valueChange=value,
+                              time=(keyframe,))
+            utilityStepProgress(progress, "Applying retarget scale...")
+    utilityEndProgress(progress)
+
+
+def utilityResetRetargetScale():
+    runtimeSettings["retargetScale"] = 1.0
+
+
 def utilityGetDagPath(pathName):
     selectList = OpenMaya.MSelectionList()
     selectList.add(pathName)
@@ -450,10 +516,10 @@ def utilityQueryToggleItem(name):
 
 
 def utilityLoadSettings():
-    global sceneSettings
-
     currentPath = os.path.dirname(
-        os.path.realpath(cmds.pluginInfo("castplugin", q=True, p=True)))
+        os.path.realpath(cmds.pluginInfo("castplugin",
+                                         q=True,
+                                         p=True)))
     settingsPath = os.path.join(currentPath, "cast.cfg")
 
     try:
@@ -470,10 +536,10 @@ def utilityLoadSettings():
 
 
 def utilitySaveSettings():
-    global sceneSettings
-
     currentPath = os.path.dirname(
-        os.path.realpath(cmds.pluginInfo("castplugin", q=True, p=True)))
+        os.path.realpath(cmds.pluginInfo("castplugin",
+                                         q=True,
+                                         p=True)))
     settingsPath = os.path.join(currentPath, "cast.cfg")
 
     try:
@@ -539,6 +605,14 @@ def utilityCreateMenu(refresh=False):
 
     cmds.menuItem("editNotetracks", label="Edit Notifications",
                   annotation="Edit the animations notifications", command=lambda x: utilityEditNotetracks())
+
+    cmds.menuItem(divider=True)
+
+    cmds.menuItem("retargetScale", label="Retarget Scale",
+                  annotation="Apply a retarget scale factor to an animation", command=lambda x: utilityRetargetScale())
+
+    cmds.menuItem("resetRetargetScale", label="Reset Retarget Scale",
+                  annotation="Resets the retarget scale factor", command=lambda x: utilityResetRetargetScale())
 
     cmds.setParent(menu, menu=True)
 
@@ -1262,13 +1336,18 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
     else:
         rest = 0.0
 
+    if property in ["tx", "ty", "tz"]:
+        scaleFactor = runtimeSettings["retargetScale"]
+    else:
+        scaleFactor = 1.0
+
     # Default track mode is absolute meaning that the
     # values are what they should be in the curve already
     if mode == "absolute" or mode is None:
         curveValueBuffer = OpenMaya.MDoubleArray(len(valueBuffer), 0.0)
 
         for i, value in enumerate(valueBuffer):
-            curveValueBuffer[i] = value
+            curveValueBuffer[i] = value * scaleFactor
     # Additive curves are applied to any existing curve value in the scene
     # so we will add it to the sample at the given time
     elif mode == "additive":
@@ -1281,11 +1360,13 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
                 sample = rest
 
             if property in ["sx", "sy", "sz"]:
-                curveValueBuffer[i] = utilityLerp(
-                    sample, sample * value, blendWeight)
+                curveValueBuffer[i] = utilityLerp(sample,
+                                                  sample * value * scaleFactor,
+                                                  blendWeight)
             else:
-                curveValueBuffer[i] = utilityLerp(
-                    sample, sample + value, blendWeight)
+                curveValueBuffer[i] = utilityLerp(sample,
+                                                  sample + value * scaleFactor,
+                                                  blendWeight)
     # Relative curves are applied against the resting position value in the scene
     # we will add it to the rest position
     elif mode == "relative":
@@ -1293,9 +1374,9 @@ def utilityImportSingleTrackData(tracks, property, timeUnit, frameStart, frameBu
 
         for i, value in enumerate(valueBuffer):
             if property in ["sx", "sy", "sz"]:
-                curveValueBuffer[i] = rest * value
+                curveValueBuffer[i] = rest * value * scaleFactor
             else:
-                curveValueBuffer[i] = rest + value
+                curveValueBuffer[i] = rest + value * scaleFactor
 
     if timeBuffer.length() <= 0:
         return (smallestFrame, largestFrame)
@@ -2348,10 +2429,10 @@ def importAnimationNode(node, path):
     if wantedSmallestFrame == OpenMaya.MTime(sys.maxsize, wantedFps):
         wantedSmallestFrame = OpenMaya.MTime(0, wantedFps)
 
-    sceneAnimationController.setAnimationStartEndTime(
-        wantedSmallestFrame, wantedLargestFrame)
-    sceneAnimationController.setMinMaxTime(
-        wantedSmallestFrame, wantedLargestFrame)
+    sceneAnimationController.setAnimationStartEndTime(wantedSmallestFrame,
+                                                      wantedLargestFrame)
+    sceneAnimationController.setMinMaxTime(wantedSmallestFrame,
+                                           wantedLargestFrame)
     sceneAnimationController.setCurrentTime(wantedSmallestFrame)
 
 
