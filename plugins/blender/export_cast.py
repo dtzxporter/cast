@@ -26,7 +26,7 @@ def utilityGetSimpleKeyValue(object, property):
         if object.parent is not None:
             return object.parent.matrix.inverted() @ object.matrix.translation
         else:
-            return object.matrix_basis.translation
+            return object.matrix.translation
     elif property == "scale":
         return object.scale
     return None
@@ -42,6 +42,14 @@ def utilityGetQuatKeyValue(object):
 def utilityGetActionCurves(action):
     if utilityIsVersionAtLeast(5, 0):
         slot = action.slots.active
+
+        # Fall back to the first slot, which is usually set when a legacy action exists.
+        # Sometimes this may not be set as active, even when the animation plays in the viewport.
+        if not slot:
+            if len(action.slots) > 0:
+                slot = action.slots[0]
+            else:
+                return []
 
         for layer in action.layers:
             for strip in layer.strips:
