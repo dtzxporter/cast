@@ -30,6 +30,7 @@ sceneSettings = {
     "importAtTime": False,
     "importSkin": True,
     "importReset": False,
+    "importLooping": True,
     "importIK": True,
     "importConstraints": True,
     "importBlendShapes": True,
@@ -597,6 +598,9 @@ def utilityCreateMenu(refresh=False):
 
     cmds.menuItem("importReset", label="Import Resets Scene", annotation="Importing animations clears all existing animations in the scene",
                   checkBox=utilityQueryToggleItem("importReset"), command=lambda x: utilitySetToggleItem("importReset"))
+
+    cmds.menuItem("importLooping", label="Import Looping", annotation="Imports and configures looping playback modes",
+                  checkBox=utilityQueryToggleItem("importLooping"), command=lambda x: utilitySetToggleItem("importLooping"))
 
     cmds.menuItem(divider=True)
 
@@ -2373,7 +2377,7 @@ def importAnimationNode(node, path):
     sceneAnimationController.setAutoKeyMode(False)
 
     # Check if the user requests the scene be cleared for each import.
-    if utilityQueryToggleItem("importReset"):
+    if sceneSettings["importReset"]:
         utilityClearAnimation()
 
     switcherLoop = {
@@ -2382,7 +2386,8 @@ def importAnimationNode(node, path):
         1: OpenMayaAnim.MAnimControl.kPlaybackLoop,
     }
 
-    sceneAnimationController.setPlaybackMode(switcherLoop[node.Looping()])
+    if sceneSettings["importLooping"]:
+        sceneAnimationController.setPlaybackMode(switcherLoop[node.Looping()])
 
     # Pick the closest supported framerate.
     wantedFps = utilityFramerateToUnit(node.Framerate())
