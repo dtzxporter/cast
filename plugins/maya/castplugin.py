@@ -2,6 +2,7 @@ import os
 import json
 import math
 import sys
+import string
 
 import maya.mel as mel
 import maya.cmds as cmds
@@ -14,6 +15,8 @@ from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File, Co
 
 # Minimum weight value to be considered.
 WEIGHT_THRESHOLD = 0.000001
+# Allowed name characters for maya nodes.
+ALLOWED_CHARACTERS = set(string.ascii_letters + string.digits + "_")
 
 # Support Python 3.0+
 try:
@@ -114,6 +117,10 @@ def utilitySetWaitCursor():
             QtGui.QCursor(QtCore.Qt.WaitCursor))
     except:
         pass
+
+
+def utilitySanitizeName(name):
+    return "".join(ch if ch in ALLOWED_CHARACTERS else "_" for ch in name)
 
 
 def utilityGetNotetracks():
@@ -1110,8 +1117,13 @@ def utilitySaveNodeData(dagPath):
 
 
 def utilityGetOrCreateCurve(name, property, curveType):
+    # Attempt to find the object using the provided name, if that name is not found
+    # try a sanitized version, maya automatically does this when we create objects.
     if not cmds.objExists("%s.%s" % (name, property)):
-        return None
+        name = utilitySanitizeName(name)
+
+        if not cmds.objExists("%s.%s" % (name, property)):
+            return None
 
     try:
         nodePath = utilityGetDagPath(name)
