@@ -54,7 +54,7 @@ runtimeSettings = {
 }
 
 # Shared version number
-version = "1.97"
+version = "1.98"
 
 # Time unit to framerate map
 framerateMap = {
@@ -2927,7 +2927,7 @@ def exportModel(root, exportSelected, filePath):
         vertexColorLayers = [[None] * vertexCount for _ in colorLayers]
         vertexMaxInfluence = 0
 
-        normal = OpenMaya.MVector()
+        normals = OpenMaya.MVectorArray()
         uv = OpenMaya.MScriptUtil()
         color = OpenMaya.MColor()
 
@@ -2965,7 +2965,15 @@ def exportModel(root, exportSelected, filePath):
             vertexPositions[index] = \
                 (position.x, position.y, position.z)
 
-            vertexIter.getNormal(normal)
+            # Maya has a method that claims it returns averaged normals getNormal(normal, OpenMaya.MSpace.kWorld),
+            # however for some vertices this calculation is broken, so we do it manually here.
+            vertexIter.getNormals(normals, OpenMaya.MSpace.kWorld)
+
+            normal = OpenMaya.MVector()
+
+            for i in xrange(normals.length()):
+                normal = normal + normals[i]
+            normal.normalize()
 
             vertexNormals[index] = \
                 (normal.x, normal.y, normal.z)
