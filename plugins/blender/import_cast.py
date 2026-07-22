@@ -516,7 +516,7 @@ def importSkeletonIKNode(self, skeleton, poses):
 
         if not poleVectorBone:
             self.report({"WARNING"},
-                        "Skipped ik \"%s\" setup due to blender requiring a pole vector bone." % ik.name)
+                        "Skipped ik \"%s\" setup due to Blender incompatibility." % ik.name)
 
             startBone.constraints.remove(ik)
             continue
@@ -550,7 +550,7 @@ def importSkeletonIKNode(self, skeleton, poses):
         if targetOffset is not None:
             # Warn until we figure out how to emulate this effectively.
             self.report({"WARNING"},
-                        "Unable to setup \"%s\" fully due to blender not supporting target offsets." % ik.name)
+                        "Unable to setup \"%s\" fully due to Blender not supporting target offsets." % ik.name)
 
         if poleVectorBone is not None:
             poleVector = poses[poleVectorBone.Name()]
@@ -563,7 +563,7 @@ def importSkeletonIKNode(self, skeleton, poses):
         if poleBone is not None:
             # Warn until we figure out how to emulate this effectively.
             self.report({"WARNING"},
-                        "Unable to setup \"%s\" fully due to blender not supporting pole (twist) bones." % ik.name)
+                        "Unable to setup \"%s\" fully due to Blender not supporting pole (twist) bones." % ik.name)
 
 
 def importSkeletonNode(name, skeleton, collection):
