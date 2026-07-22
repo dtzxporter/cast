@@ -54,7 +54,7 @@ runtimeSettings = {
 }
 
 # Shared version number
-version = "1.98"
+version = "1.99"
 
 # Time unit to framerate map
 framerateMap = {
