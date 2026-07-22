@@ -192,18 +192,16 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
             if len(deformers) > 0 and deformers[0].use_deform_preserve_volume:
                 meshNode.SetSkinningMethod("quaternion")
 
-            blendMesh = bmesh.new(use_operators=False)
+            blendMesh = bmesh.new(use_operators=True)
             blendMesh.from_mesh(mesh.data,
                                 face_normals=False,
                                 vertex_normals=True,
                                 use_shape_key=False,
                                 shape_key_index=0)
 
-            vertexPositions = [None] * len(blendMesh.verts)
-            vertexNormals = [None] * len(blendMesh.verts)
-
             uvLayers = []
             colors = []
+            edgeSplits = []
 
             # Collect the uv layers for this mesh, making the active the first.
             if blendMesh.loops.layers.uv.active is not None:
@@ -213,8 +211,6 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                 for layer in blendMesh.loops.layers.uv.values():
                     if layer != uvLayers[0]:
                         uvLayers.append(layer)
-
-            vertexUVLayers = [[None] * len(blendMesh.verts) for _ in uvLayers]
 
             # Collect the color layer for this mesh, we only support one, the active one.
             if blendMesh.verts.layers.float_color.active is not None:
@@ -226,6 +222,35 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
             elif blendMesh.loops.layers.color.active is not None:
                 colors.append(blendMesh.loops.layers.color.active)
 
+            # Split any uv seams so that each vertex has it's own uv.
+            for edge in blendMesh.edges:
+                if not edge.is_manifold:
+                    continue
+
+                loops = edge.link_loops
+
+                if len(loops) != 2:
+                    continue
+
+                l0, l1 = loops
+
+                for uvLayer in uvLayers:
+                    uv0a = l0[uvLayer].uv
+                    uv0b = l0.link_loop_next[uvLayer].uv
+
+                    uv1a = l1[uvLayer].uv
+                    uv1b = l1.link_loop_next[uvLayer].uv
+
+                    if (uv0a - uv1b).length > 1e-6 or (uv0b - uv1a).length > 1e-6:
+                        edgeSplits.append(edge)
+                        break
+
+            if edgeSplits:
+                bmesh.ops.split_edges(blendMesh, edges=edgeSplits)
+
+            vertexPositions = [None] * len(blendMesh.verts)
+            vertexNormals = [None] * len(blendMesh.verts)
+            vertexUVLayers = [[None] * len(blendMesh.verts) for _ in uvLayers]
             vertexColorLayers = [[None] * len(blendMesh.verts) for _ in colors]
             vertexMaxInfluence = 0
 
@@ -342,12 +367,16 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                     meshNode = model.CreateMesh()
                     meshNode.SetName(target.name)
 
-                    blendMesh = bmesh.new(use_operators=False)
+                    blendMesh = bmesh.new(use_operators=True)
                     blendMesh.from_mesh(mesh.data,
                                         face_normals=False,
                                         vertex_normals=True,
                                         use_shape_key=True,
                                         shape_key_index=i)
+
+                    # Reuse the same edge splits as the source mesh.
+                    if edgeSplits:
+                        bmesh.ops.split_edges(blendMesh, edges=edgeSplits)
 
                     # Just set the new positions, which is the only supported blender operation at the moment.
                     for i, vert in enumerate(blendMesh.verts):
