@@ -18,6 +18,10 @@ from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File, Co
 WEIGHT_THRESHOLD = 0.000001
 # Allowed name characters for maya nodes.
 SANITIZE_SUB = re.compile(r"[^A-Za-z0-9-]").sub
+# Reserved names for maya nodes.
+SANITIZE_RESERVED = ["default", "if", "else",
+                     "do", "while", "switch",
+                     "case", "global"]
 
 # Support Python 3.0+
 try:
@@ -127,7 +131,7 @@ def utilitySanitize(name):
 
     name = SANITIZE_SUB('_', name.strip())
 
-    if name and name[0] in string.digits:
+    if (name and name[0] in string.digits) or name in SANITIZE_RESERVED:
         return '_' + name
     return name
 
