@@ -19,9 +19,9 @@ WEIGHT_THRESHOLD = 0.000001
 # Allowed name characters for maya nodes.
 SANITIZE_SUB = re.compile(r"[^A-Za-z0-9-]").sub
 # Reserved names for maya nodes.
-SANITIZE_RESERVED = ["default", "if", "else",
-                     "do", "while", "switch",
-                     "case", "global"]
+SANITIZE_RESERVED = set(["default", "if", "else",
+                         "do", "while", "switch",
+                         "case", "global"])
 
 # Support Python 3.0+
 try:
