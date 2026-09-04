@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import math
 import sys
@@ -16,7 +17,7 @@ from cast import Cast, CastColor, Model, Animation, Instance, Metadata, File, Co
 # Minimum weight value to be considered.
 WEIGHT_THRESHOLD = 0.000001
 # Allowed name characters for maya nodes.
-ALLOWED_CHARACTERS = set(string.ascii_letters + string.digits + "_")
+SANITIZE_SUB = re.compile(r"[^A-Za-z0-9-]").sub
 
 # Support Python 3.0+
 try:
@@ -120,8 +121,15 @@ def utilitySetWaitCursor():
         pass
 
 
-def utilitySanitizeName(name):
-    return "".join(ch if ch in ALLOWED_CHARACTERS else "_" for ch in name)
+def utilitySanitize(name):
+    if not name:
+        return None
+
+    name = SANITIZE_SUB('_', name.strip())
+
+    if name and name[0] in string.digits:
+        return '_' + name
+    return name
 
 
 def utilityGetNotetracks():
@@ -1121,13 +1129,8 @@ def utilitySaveNodeData(dagPath):
 
 
 def utilityGetOrCreateCurve(name, property, curveType):
-    # Attempt to find the object using the provided name, if that name is not found
-    # try a sanitized version, maya automatically does this when we create objects.
     if not cmds.objExists("%s.%s" % (name, property)):
-        name = utilitySanitizeName(name)
-
-        if not cmds.objExists("%s.%s" % (name, property)):
-            return None
+        return None
 
     try:
         nodePath = utilityGetDagPath(name)
@@ -1421,6 +1424,7 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
         targetBone = paths[indexes[constraint.TargetBone().Hash()]]
         constraintBone = paths[indexes[constraint.ConstraintBone().Hash()]]
 
+        name = utilitySanitize(constraint.Name())
         type = constraint.ConstraintType()
         customOffset = constraint.CustomOffset()
         maintainOffset = constraint.MaintainOffset()
@@ -1443,20 +1447,22 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
 
             if maintainOffset:
                 cmds.pointConstraint(targetBone, constraintBone,
-                                     name=constraint.Name() or "CastPointConstraint",
+                                     name=name or "CastPointConstraint",
                                      maintainOffset=True,
                                      weight=weight,
                                      skip=skip)
             else:
                 cmds.pointConstraint(targetBone, constraintBone,
-                                     name=constraint.Name() or "CastPointConstraint",
+                                     name=name or "CastPointConstraint",
                                      offset=offset,
                                      weight=weight,
                                      skip=skip)
         elif type == "or":
             if customOffset:
-                rotation = OpenMaya.MQuaternion(
-                    customOffset[0], customOffset[1], customOffset[2], customOffset[3])
+                rotation = OpenMaya.MQuaternion(customOffset[0],
+                                                customOffset[1],
+                                                customOffset[2],
+                                                customOffset[3])
                 rotationEuler = rotation.asEulerRotation()
 
                 offset = [rotationEuler.x, rotationEuler.y, rotationEuler.z]
@@ -1465,13 +1471,13 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
 
             if maintainOffset:
                 cmds.orientConstraint(targetBone, constraintBone,
-                                      name=constraint.Name() or "CastOrientConstraint",
+                                      name=name or "CastOrientConstraint",
                                       maintainOffset=True,
                                       weight=weight,
                                       skip=skip)
             else:
                 cmds.orientConstraint(targetBone, constraintBone,
-                                      name=constraint.Name() or "CastOrientConstraint",
+                                      name=name or "CastOrientConstraint",
                                       offset=offset,
                                       weight=weight,
                                       skip=skip)
@@ -1483,14 +1489,14 @@ def importSkeletonConstraintNode(skeleton, handles, paths, indexes, jointTransfo
 
             if maintainOffset:
                 cmds.scaleConstraint(targetBone, constraintBone,
-                                     name=constraint.Name() or "CastScaleConstraint",
+                                     name=name or "CastScaleConstraint",
                                      maintainOffset=True,
                                      offset=offset,
                                      weight=weight,
                                      skip=skip)
             else:
                 cmds.scaleConstraint(targetBone, constraintBone,
-                                     name=constraint.Name() or "CastScaleConstraint",
+                                     name=name or "CastScaleConstraint",
                                      offset=offset,
                                      weight=weight,
                                      skip=skip)
@@ -1511,14 +1517,16 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
     bones = skeleton.Bones()
 
     for i, bone in enumerate(bones):
-        if not bone.Name() in sceneSkeleton:
+        boneName = utilitySanitize(bone.Name())
+
+        if not boneName in sceneSkeleton:
             missingBones.append(i)
             continue
 
         # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
-        remappedBones[paths[i]] = sceneSkeleton[bone.Name()]
+        remappedBones[paths[i]] = sceneSkeleton[boneName]
 
-        existingPath = utilityGetDagPath(sceneSkeleton[bone.Name()])
+        existingPath = utilityGetDagPath(sceneSkeleton[boneName])
 
         # Store remapped connections for later, after bind pose remap.
         existingBones[i] = (existingPath.fullPathName(),
@@ -1529,8 +1537,10 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
 
         foundMatchingRoot = True
 
-        worldMatrix = cmds.xform(
-            sceneSkeleton[bone.Name()], query=True, worldSpace=True, matrix=True)
+        worldMatrix = cmds.xform(sceneSkeleton[boneName],
+                                 query=True,
+                                 worldSpace=True,
+                                 matrix=True)
 
         # Move the models bone to the existing bone in the scene's position.
         cmds.xform(paths[i], worldSpace=True, matrix=worldMatrix)
@@ -1544,29 +1554,35 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
     while missingBones:
         for i in [x for x in missingBones]:
             bone = bones[i]
+            boneParent = bone.ParentIndex()
 
-            if bone.ParentIndex() > -1 and not bones[bone.ParentIndex()].Name() in sceneSkeleton:
+            if boneParent > -1 and not utilitySanitize(bones[boneParent].Name()) in sceneSkeleton:
                 continue
-            elif bone.ParentIndex() > -1:
-                parent = bones[bone.ParentIndex()].Name()
+            elif boneParent > -1:
+                parent = utilitySanitize(bones[boneParent].Name())
             else:
                 parent = None
 
+            boneName = utilitySanitize(bone.Name())
+
             newBone = OpenMayaAnim.MFnIkJoint()
             newBone.create()
-            newBone.setName(bone.Name())
+            newBone.setName(boneName)
 
             cmds.parent(newBone.fullPathName(), sceneSkeleton[parent])
 
-            worldMatrix = cmds.xform(
-                paths[i], query=True, worldSpace=True, matrix=True)
+            worldMatrix = cmds.xform(paths[i],
+                                     query=True,
+                                     worldSpace=True,
+                                     matrix=True)
 
             cmds.xform(newBone.fullPathName(),
-                       worldSpace=True, matrix=worldMatrix)
+                       worldSpace=True,
+                       matrix=worldMatrix)
 
-            sceneSkeleton[bone.Name()] = newBone.fullPathName()
+            sceneSkeleton[boneName] = newBone.fullPathName()
 
-            # Make sure that any bone in handles/paths is updated to joint to the new skeleton.
+            # Make sure that any bone in handles/paths is updated to point to the new skeleton.
             remappedBones[paths[i]] = newBone.fullPathName()
 
             handles[i] = newBone
@@ -1583,7 +1599,9 @@ def importMergeModel(sceneSkeleton, skeleton, handles, paths, jointTransform):
             elif ".lockWeights" in oldConnection:
                 if not cmds.objExists("%s.lockInfluenceWeights" % newBone):
                     cmds.addAttr(newBone,
-                                 shortName="liw", longName="lockInfluenceWeights", attributeType="bool")
+                                 shortName="liw",
+                                 longName="lockInfluenceWeights",
+                                 attributeType="bool")
                 cmds.connectAttr("%s.lockInfluenceWeights" %
                                  newBone, oldConnection, force=True)
             elif ".influenceColor" in oldConnection:
@@ -1669,7 +1687,7 @@ def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
 
         ikHandle = OpenMayaAnim.MFnIkHandle()
         ikHandle.create(startBonePath, endBonePath)
-        ikHandle.setName(handle.Name() or "CastIKHandle")
+        ikHandle.setName(utilitySanitize(handle.Name()) or "CastIKHandle")
 
         # For whatever reason, if we don't "turn it on and off again" it doesn't work...
         cmds.ikHandle(ikHandle.fullPathName(), e=True, solver="ikSCsolver")
@@ -1682,8 +1700,8 @@ def importSkeletonIKNode(skeleton, handles, paths, indexes, jointTransform):
                         paths[indexes[targetBone.Hash()]])
 
             if handle.UseTargetRotation():
-                cmds.orientConstraint(
-                    paths[indexes[targetBone.Hash()]], endBonePath.fullPathName())
+                cmds.orientConstraint(paths[indexes[targetBone.Hash()]],
+                                      endBonePath.fullPathName())
         else:
             cmds.parent(ikHandle.fullPathName(), jointTransform.fullPathName())
 
@@ -1728,7 +1746,7 @@ def importSkeletonNode(skeleton):
     for i, bone in enumerate(bones):
         newBone = OpenMayaAnim.MFnIkJoint()
         newBone.create(jointNode)
-        newBone.setName(bone.Name())
+        newBone.setName(utilitySanitize(bone.Name()))
         handles[i] = newBone
         indexes[bone.Hash()] = i
 
@@ -1776,16 +1794,21 @@ def importSkeletonNode(skeleton):
 
 def importMaterialNode(path, material):
     # If you already created the material, ignore this
-    if cmds.objExists("%sSG" % material.Name()):
-        return material.Name()
+    materialName = utilitySanitize(material.Name())
+
+    if cmds.objExists("%sSG" % materialName):
+        return materialName
 
     # Create the material and assign slots
-    materialNew = utilityCreateMaterial(
-        material.Name(), material.Type(), material.Slots(), path)
+    materialNew = utilityCreateMaterial(materialName,
+                                        material.Type(),
+                                        material.Slots(),
+                                        path)
 
     # Create the shader group that connects to a surface
-    materialGroup = cmds.sets(
-        renderable=True, empty=True, name=("%sSG" % materialNew))
+    materialGroup = cmds.sets(renderable=True,
+                              empty=True,
+                              name=("%sSG" % materialNew))
 
     # Connect shader -> surface
     cmds.connectAttr(("%s.outColor" % materialNew),
@@ -1809,8 +1832,8 @@ def importModelNode(model, path):
     # Import the meshes
     meshTransform = OpenMaya.MFnTransform()
     meshNode = meshTransform.create()
-    meshTransform.setName(
-        model.Name() or os.path.splitext(os.path.basename(path))[0])
+    meshTransform.setName(utilitySanitize(model.Name())
+                          or os.path.splitext(os.path.basename(path))[0])
 
     meshes = model.Meshes()
     progress = utilityCreateProgress("Importing meshes...", len(meshes))
@@ -1819,7 +1842,7 @@ def importModelNode(model, path):
     for m, mesh in enumerate(meshes):
         newMeshTransform = OpenMaya.MFnTransform()
         newMeshNode = newMeshTransform.create(meshNode)
-        newMeshTransform.setName(mesh.Name() or "CastMesh")
+        newMeshTransform.setName(utilitySanitize(mesh.Name()) or "CastMesh")
 
         faces = list(mesh.FaceBuffer())
         facesRemoved = 0
@@ -1868,9 +1891,13 @@ def importModelNode(model, path):
 
         newMesh = OpenMaya.MFnMesh()
         # Store the mesh for reference in other nodes later
-        meshHandles[mesh.Hash()] = newMesh.create(vertexCount, faceCount, vertexPositionBuffer,
-                                                  faceCountBuffer, faceBuffer, newMeshNode)
-        newMesh.setName(mesh.Name() or "CastShape")
+        meshHandles[mesh.Hash()] = newMesh.create(vertexCount,
+                                                  faceCount,
+                                                  vertexPositionBuffer,
+                                                  faceCountBuffer,
+                                                  faceBuffer,
+                                                  newMeshNode)
+        newMesh.setName(utilitySanitize(mesh.Name()) or "CastShape")
 
         scriptUtil = OpenMaya.MScriptUtil()
         scriptUtil.createFromList(
@@ -1886,11 +1913,11 @@ def importModelNode(model, path):
         vertexNormals = mesh.VertexNormalBuffer()
         if vertexNormals is not None:
             scriptUtil = OpenMaya.MScriptUtil()
-            scriptUtil.createFromList(
-                [x for x in vertexNormals], len(vertexNormals))
+            scriptUtil.createFromList([x for x in vertexNormals],
+                                      len(vertexNormals))
 
-            vertexNormalBuffer = OpenMaya.MVectorArray(
-                scriptUtil.asFloat3Ptr(), int(len(vertexNormals) / 3))
+            vertexNormalBuffer = OpenMaya.MVectorArray(scriptUtil.asFloat3Ptr(),
+                                                       int(len(vertexNormals) / 3))
 
             newMesh.setVertexNormals(vertexNormalBuffer, vertexIndexBuffer)
 
@@ -1929,8 +1956,8 @@ def importModelNode(model, path):
         meshMaterial = mesh.Material()
         try:
             if meshMaterial is not None:
-                cmds.sets(newMesh.fullPathName(), forceElement=(
-                    "%sSG" % materials[meshMaterial.Name()]))
+                cmds.sets(newMesh.fullPathName(),
+                          forceElement=("%sSG" % materials[meshMaterial.Name()]))
             else:
                 cmds.sets(newMesh.fullPathName(),
                           forceElement="initialShadingGroup")
@@ -1960,10 +1987,12 @@ def importModelNode(model, path):
                 newUVName = newMesh.currentUVSetName()
 
             newMesh.setCurrentUVSetName(newUVName)
-            newMesh.setUVs(
-                uvUBuffer, uvVBuffer, newUVName)
-            newMesh.assignUVs(
-                faceCountBuffer, faceIndexBuffer, newUVName)
+            newMesh.setUVs(uvUBuffer,
+                           uvVBuffer,
+                           newUVName)
+            newMesh.assignUVs(faceCountBuffer,
+                              faceIndexBuffer,
+                              newUVName)
 
         maximumInfluence = mesh.MaximumWeightInfluence()
         skinningMethod = mesh.SkinningMethod()
@@ -1974,8 +2003,10 @@ def importModelNode(model, path):
             weightedBones = list({paths[x] for x in weightBoneBuffer})
             weightedBonesCount = len(weightedBones)
 
-            skinCluster = utilityCreateSkinCluster(
-                newMesh, weightedBones, maximumInfluence, skinningMethod)
+            skinCluster = utilityCreateSkinCluster(newMesh,
+                                                   weightedBones,
+                                                   maximumInfluence,
+                                                   skinningMethod)
 
             weightedRemap = {paths.index(
                 x): i for i, x in enumerate(weightedBones)}
@@ -2003,8 +2034,8 @@ def importModelNode(model, path):
                 cmds.setAttr(clusterAttrPayload, *weightedValueBuffer)
                 weightedValueBuffer = [0.0] * (weightedBonesCount)
 
-        utilityStepProgress(
-            progress, "Importing mesh [%d] of [%d]..." % (m + 1, len(meshes)))
+        utilityStepProgress(progress,
+                            "Importing mesh [%d] of [%d]..." % (m + 1, len(meshes)))
     utilityEndProgress(progress)
 
     # Import the hairs if necessary.
@@ -2020,7 +2051,7 @@ def importModelNode(model, path):
 
             hairTransform = OpenMaya.MFnTransform()
             hairTransformNode = hairTransform.create(meshNode)
-            hairTransform.setName(hair.Name() or "CastHair")
+            hairTransform.setName(utilitySanitize(hair.Name()) or "CastHair")
 
             status = "Importing hair [%d] of [%d]..." % (h + 1, len(hairs))
             progress = utilityCreateProgress(status, strandCount)
@@ -2128,8 +2159,12 @@ def importModelNode(model, path):
                 faceCountBuffer = OpenMaya.MIntArray(faceCount, 3)
 
                 newMesh = OpenMaya.MFnMesh()
-                newMesh.create(vertexCount, faceCount,
-                               vertexBuffer, faceCountBuffer, faceBuffer, hairTransformNode)
+                newMesh.create(vertexCount,
+                               faceCount,
+                               vertexBuffer,
+                               faceCountBuffer,
+                               faceBuffer,
+                               hairTransformNode)
 
                 newMesh.setVertexNormals(normalBuffer, normalIndices)
 
@@ -2137,8 +2172,8 @@ def importModelNode(model, path):
                 hairMaterial = hair.Material()
                 try:
                     if hairMaterial is not None:
-                        cmds.sets(newMesh.fullPathName(), forceElement=(
-                            "%sSG" % materials[hairMaterial.Name()]))
+                        cmds.sets(newMesh.fullPathName(),
+                                  forceElement=("%sSG" % materials[hairMaterial.Name()]))
                     else:
                         cmds.sets(newMesh.fullPathName(),
                                   forceElement="initialShadingGroup")
@@ -2182,8 +2217,9 @@ def importModelNode(model, path):
                     baseShapeDagNode.fullPathName(), ic=True)
 
                 # Get the actual mesh name.
-                newShapeShapes = cmds.listRelatives(
-                    tempShape, shapes=True, fullPath=True)
+                newShapeShapes = cmds.listRelatives(tempShape,
+                                                    shapes=True,
+                                                    fullPath=True)
 
                 # Grab a handle to the new shape, which will be our target mesh.
                 selectList = OpenMaya.MSelectionList()
@@ -2195,7 +2231,9 @@ def importModelNode(model, path):
                 targetMesh = OpenMaya.MFnMesh(targetShape)
 
                 # Rename the actual mesh to the key name.
-                cmds.rename(newShapeShapes[0], blendShape.Name())
+                blendShapeName = utilitySanitize(blendShape.Name())
+
+                cmds.rename(newShapeShapes[0], blendShapeName)
 
                 # Set the shape positions.
                 indices = blendShape.TargetShapeVertexIndices()
@@ -2203,7 +2241,7 @@ def importModelNode(model, path):
 
                 if not indices or not positions:
                     cmds.warning(
-                        "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShape.Name(), baseShapeDagNode.name()))
+                        "Ignoring blend shape \"%s\" for mesh \"%s\" no indices or positions specified." % (blendShapeName, baseShapeDagNode.name()))
                     cmds.delete(tempShape)
                     utilityStepProgress(progress, "Importing shapes...")
                     continue
@@ -2213,8 +2251,11 @@ def importModelNode(model, path):
                 targetMesh.getPoints(vertexPositions)
 
                 for index, vertexIndex in enumerate(indices):
-                    vertexPositions.set(
-                        vertexIndex, positions[index * 3], positions[(index * 3) + 1], positions[(index * 3) + 2], 1.0)
+                    vertexPositions.set(vertexIndex,
+                                        positions[index * 3],
+                                        positions[(index * 3) + 1],
+                                        positions[(index * 3) + 2],
+                                        1.0)
 
                 targetMesh.setPoints(vertexPositions)
 
@@ -2299,7 +2340,7 @@ def importCurveNode(node, path, timeUnit, startFrame, overrides):
         "vb": utilityImportSingleTrackData
     }
 
-    nodeName = node.NodeName()
+    nodeName = utilitySanitize(node.NodeName())
     propertyName = node.KeyPropertyName()
     keyFrameBuffer = node.KeyFrameBuffer()
     keyValueBuffer = node.KeyValueBuffer()
@@ -2548,7 +2589,8 @@ def importInstanceNodes(nodes, path, sceneRoot):
             base = group.fullPathName()
 
         for instance in instances:
-            newInstance = cmds.instance(base, name=instance.Name())[0]
+            newInstance = cmds.instance(base,
+                                        name=utilitySanitize(instance.Name()))[0]
 
             transform = OpenMaya.MFnTransform(utilityGetDagPath(newInstance))
 
@@ -2656,8 +2698,10 @@ def exportAnimation(root, exportSelected):
 
         # Check simple properties
         for property in simpleProperties:
-            keyframes = cmds.keyframe(
-                object, at=property[0], query=True, timeChange=True)
+            keyframes = cmds.keyframe(object,
+                                      at=property[0],
+                                      query=True,
+                                      timeChange=True)
 
             if keyframes:
                 exportable.append(
