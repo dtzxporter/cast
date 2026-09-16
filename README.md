@@ -236,7 +236,7 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 		<td>True</td>
 		<td>False</td>
  	</tr>
-	 <tr>
+	<tr>
   		<td>Vertex Color Buffer (c%d)</td>
    		<td>Integer 32 (i), Vector 4 (v4)</td>
 		<td>True</td>
@@ -304,11 +304,8 @@ Cast ids are stored as integers to make it faster to serialize and deserialize.
 - If a face contains an invalid index combination `(0, 1, 1), (0, 1, 0), (0, 0, 0)` where two or more indices are the same, it is acceptable for the user processing these faces to ignore them in order to properly render the mesh. It would be wise to present the user with a warning stating that this happened.
 - Each vertex descriptor buffer must contain the same number of elements ex: if you have 16 vertices, you must have 16 normals if they exist, 16 colors if the buffer exists. Otherwise it's assumed they are default / skipped.
 - Weights are additive which means having the same bone with `0.5` and `0.5` would end up making that bones influence `1.0` for example.
+- Weights are not assumed to be normalized and should be read as-is.
 - The default skinning method is `linear`. When set to `quaternion` dual quaternion skinning is used.
-- **NEW 8/18/2024**: The vertex color specification has **changed**, in order to support multiple color layers, a new `Color Layer Count (cl)` was added which mimics the `UV Layer Count (ul)` property.
-  - To be backwards compatible, cast processors should check for `cl`, and use that by default along with the new `c%d` layer properties.
-  - If the `cl` property does not exist, a processor should check for the legacy `vc` property which is the one and only color layer if it exists.
-- **NEW 4/21/2025**: The vertex color buffer specification now allows supplying unpacked floating point rgba colors.
 
 ### Hair:
 <table>
