@@ -210,7 +210,7 @@ class ExportCast(bpy.types.Operator, ExportHelper):
                           description="Override the up axis for this scene",
                           items=[("y", "Y Up", "The Y axis points up"),
                                  ("z", "Z Up", "The Z axis points up")],
-                          default="y")
+                          default="z")
 
     def draw(self, context):
         self.layout.label(text="Export Settings")
