@@ -365,27 +365,23 @@ def utilityGetDagPath(pathName):
 
 def utilityBoneIndex(list, name):
     for i, v in enumerate(list):
-        if v[0] == name:
+        if v[1] == name:
             return i
     return -1
 
 
 def utilityBoneParent(joint):
-    fullPath = joint.fullPathName()
-    splitPath = fullPath[1:].split("|")
-    splitCount = len(splitPath)
+    if joint.parentCount() == 0:
+        return None
 
-    if splitCount > 2:
-        dagPath = utilityGetDagPath("|".join(splitPath[0:len(splitPath) - 2]))
-    elif splitCount == 2:
-        dagPath = utilityGetDagPath(fullPath[0:fullPath.find("|", 1)])
-    else:
-        dagPath = None
+    parent = joint.parent(0)
 
-    if dagPath and dagPath.hasFn(OpenMaya.MFn.kJoint):
-        return splitPath[len(splitPath) - 2]
+    if not parent.hasFn(OpenMaya.MFn.kJoint):
+        return None
 
-    return None
+    parentDag = OpenMaya.MFnDagNode(parent)
+
+    return parentDag.fullPathName()
 
 
 def utilityFramerateToUnit(framerate):
@@ -2828,7 +2824,9 @@ def exportModel(root, exportSelected, filePath):
         if jointName in uniqueBones:
             continue
 
-        parentStack.append((jointName, utilityBoneParent(joint)))
+        parentStack.append((jointName,
+                            jointPathName,
+                            utilityBoneParent(joint)))
 
         worldPosition = joint.getTranslation(OpenMaya.MSpace.kWorld)
         localPosition = joint.getTranslation(OpenMaya.MSpace.kTransform)
@@ -2873,7 +2871,7 @@ def exportModel(root, exportSelected, filePath):
             # Index in the final bone array.
             0]
 
-    for (boneName, boneParent) in parentStack:
+    for (boneName, _, boneParent) in parentStack:
         if boneParent:
             uniqueBones[boneName][0] = \
                 utilityBoneIndex(parentStack, boneParent)
@@ -2881,7 +2879,7 @@ def exportModel(root, exportSelected, filePath):
     if parentStack:
         skeleton = model.CreateSkeleton()
 
-        for (boneName, _) in parentStack:
+        for (boneName, _, _) in parentStack:
             joint = uniqueBones[boneName]
             joint[7] = uniqueBoneIndex
 
