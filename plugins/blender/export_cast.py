@@ -104,6 +104,21 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
 
     boneToIndex = {}
     boneToHash = {}
+    boneTransform = armatureOrMesh.matrix_world.copy()
+    boneSkinned = False
+
+    # Apply root mesh/armature position if available.
+    if not boneTransform.is_identity:
+        (position, rotation, scale) = boneTransform.decompose()
+
+        model.SetPosition((position.x * self.scale,
+                           position.y * self.scale,
+                           position.z * self.scale))
+        model.SetRotation((rotation.x,
+                           rotation.y,
+                           rotation.z,
+                           rotation.w))
+        model.SetScale((scale.x, scale.y, scale.z))
 
     # Build skeleton and collect meshes.
     if armatureOrMesh.type == 'ARMATURE':
@@ -111,6 +126,9 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
 
         bpy.context.view_layer.objects.active = armatureOrMesh
         bpy.ops.object.mode_set(mode='EDIT')
+
+        # Enables baking mesh transforms into vertices as needed.
+        boneSkinned = True
 
         for i, bone in enumerate(armatureOrMesh.data.edit_bones):
             boneToIndex[bone.name] = i
@@ -198,6 +216,14 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                                 vertex_normals=True,
                                 use_shape_key=False,
                                 shape_key_index=0)
+
+            meshTransform = (mesh.matrix_world @ boneTransform.inverted())
+
+            # Bake mesh transforms.
+            if not meshTransform.is_identity and boneSkinned:
+                bmesh.ops.transform(blendMesh,
+                                    matrix=meshTransform,
+                                    verts=blendMesh.verts)
 
             uvLayers = []
             colors = []
@@ -373,6 +399,13 @@ def exportModel(self, context, root, armatureOrMesh, filepath):
                                         vertex_normals=True,
                                         use_shape_key=True,
                                         shape_key_index=i)
+
+                    # Bake mesh transforms.
+                    if not meshTransform.is_identity and boneSkinned:
+                        bmesh.ops.transform(blendMesh,
+                                            matrix=meshTransform,
+                                            verts=blendMesh.verts,
+                                            use_shapekey=True)
 
                     # Reuse the same edge splits as the source mesh.
                     if edgeSplits:
