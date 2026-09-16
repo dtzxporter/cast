@@ -1400,8 +1400,15 @@ def importNotificationTrackNode(node, action, frameStart):
 def importAnimationNode(self, node, path, selectedObject):
     # Check that the selected object is an 'ARMATURE'.
     if selectedObject is None or selectedObject.type != 'ARMATURE':
-        raise Exception(
-            "You must select an armature to apply the animation to.")
+        armatures = [
+            obj for obj in bpy.context.scene.objects if obj.type == 'ARMATURE']
+
+        # Only one armature in the scene, don't make the user select it.
+        if len(armatures) == 1:
+            selectedObject = armatures[0]
+        else:
+            raise Exception(
+                "You must select an armature to apply the animation to.")
 
     # Extract the name of this anim from the path.
     animName = node.Name() or os.path.splitext(os.path.basename(path))[0]
@@ -1415,6 +1422,7 @@ def importAnimationNode(self, node, path, selectedObject):
     for bone in selectedObject.pose.bones.data.bones:
         bone.rotation_mode = 'QUATERNION'
 
+    bpy.context.view_layer.objects.active = selectedObject
     bpy.ops.object.mode_set(mode='POSE')
 
     if self.import_reset:
