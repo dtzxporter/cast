@@ -1101,54 +1101,9 @@ def importRotCurveNode(self, node, nodeName, action, actionObject, poseBones, pa
 
     # https://devtalk.blender.org/t/quaternion-interpolation/15883
     # Blender interpolates rotations as-if they are separate components.
-    # This logic is of course, broken, so we must interpolate ourselves.
+    # This logic is of course, broken, so we flip adjacent antipodal quaternions.
+    # To ensure that the linear interpolation takes the shortest path.
     rotations = []
-    keyframes = []
-
-    if len(keyFrameBuffer) > 0:
-        minFrame = min(keyFrameBuffer)
-        maxFrame = max(keyFrameBuffer)
-
-        existing = {}
-
-        for i in range(0, len(keyValueBuffer), 4):
-            existing[keyFrameBuffer[int(i / 4)]] = Quaternion((keyValueBuffer[i + 3],
-                                                               keyValueBuffer[i],
-                                                               keyValueBuffer[i + 1],
-                                                               keyValueBuffer[i + 2]))
-
-        lastKeyframeValue = None
-        lastKeyframeFrame = None
-        nextKeyframeValue = None
-        nextKeyframeFrame = None
-
-        for frame in range(minFrame, maxFrame + 1):
-            if frame in existing:
-                value = existing[frame]
-
-                lastKeyframeValue = value
-                lastKeyframeFrame = frame
-
-                rotations.append(value)
-                keyframes.append(frame)
-                continue
-
-            if lastKeyframeValue is None or lastKeyframeFrame is None:
-                continue
-
-            if nextKeyframeFrame is None or nextKeyframeFrame <= frame:
-                for nextFrame in range(frame + 1, maxFrame + 1):
-                    if nextFrame in existing:
-                        nextKeyframeValue = existing[nextFrame]
-                        nextKeyframeFrame = nextFrame
-                        break
-
-            if nextKeyframeFrame is not None and nextKeyframeFrame > frame:
-                if lastKeyframeValue != nextKeyframeValue:
-                    rotations.append(lastKeyframeValue.slerp(nextKeyframeValue,
-                                                             (frame - lastKeyframeFrame) / (nextKeyframeFrame - lastKeyframeFrame)))
-                    keyframes.append(frame)
-                continue
 
     # Calculate the inverse rest rotation for this bone.
     bone.matrix_basis.identity()
@@ -1160,23 +1115,33 @@ def importRotCurveNode(self, node, nodeName, action, actionObject, poseBones, pa
     else:
         inv_rest_quat = bone.matrix.to_quaternion().inverted()
 
+    if len(keyFrameBuffer) > 0:
+        for i in range(0, len(keyValueBuffer), 4):
+            rotation = Quaternion((keyValueBuffer[i + 3],
+                                   keyValueBuffer[i],
+                                   keyValueBuffer[i + 1],
+                                   keyValueBuffer[i + 2]))
+
+            if mode == "absolute" or mode is None:
+                rotations.append(inv_rest_quat @ rotation)
+            else:
+                rotations.append(rotation)
+
+        for i in range(1, len(rotations)):
+            if rotations[i].dot(rotations[i - 1]) < 0:
+                rotations[i] = -rotations[i]
+
     # Rotation keyframes in blender are independent from other data.
-    for i in range(0, len(keyframes)):
-        frame = keyframes[i] + startFrame
+    for i in range(0, len(keyFrameBuffer)):
+        frame = keyFrameBuffer[i] + startFrame
 
         smallestFrame = min(frame, smallestFrame)
         largestFrame = max(frame, largestFrame)
 
-        if mode == "absolute" or mode is None:
-            rotation = inv_rest_quat @ rotations[i]
+        rotation = rotations[i]
 
-            for axis, track in enumerate(tracks):
-                utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
-        elif mode == "relative" or mode == "additive":
-            rotation = rotations[i]
-
-            for axis, track in enumerate(tracks):
-                utilityAddKeyframe(track, frame, rotation[axis], "CONSTANT")
+        for axis, track in enumerate(tracks):
+            utilityAddKeyframe(track, frame, rotation[axis], "LINEAR")
 
     for track in tracks:
         track.update()
