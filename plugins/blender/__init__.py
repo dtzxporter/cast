@@ -9,7 +9,7 @@ from .shared_cast import utilityIsVersionAtLeast
 bl_info = {
     "name": "Cast Support",
     "author": "DTZxPorter",
-    "version": (2, 0, 0),
+    "version": (2, 0, 1),
     "blender": (3, 6, 0),
     "location": "File > Import",
     "description": "Import & Export Cast",
